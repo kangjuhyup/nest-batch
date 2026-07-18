@@ -12,6 +12,7 @@ Core owns:
 - job and step definitions
 - execution identifiers and status types
 - repository and checkpoint contracts
+- lock manager contracts
 - runner-facing options
 
 ## `@nest-batch/nest`
@@ -22,8 +23,8 @@ integration. It depends on `@nest-batch/core`; core does not depend on NestJS.
 ## `@nest-batch/postgres`
 
 The Postgres package contains adapter boundaries for job repository,
-checkpoint storage, and future locking. The current scaffold does not implement
-real persistence.
+lock management, and checkpoint storage. The current scaffold does not
+implement real persistence or locking.
 
 ## `@nest-batch/cli`
 

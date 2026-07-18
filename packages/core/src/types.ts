@@ -48,6 +48,22 @@ export interface CheckpointStore {
   delete(executionId: BatchExecutionId, stepName: string): Promise<void>;
 }
 
+export interface LockHandle {
+  readonly resource: string;
+  readonly ownerId: string;
+  readonly expiresAt?: Date;
+}
+
+export interface LockAcquireOptions {
+  readonly ttlMs?: number;
+  readonly signal?: AbortSignal;
+}
+
+export interface LockManager {
+  acquire(resource: string, ownerId: string, options?: LockAcquireOptions): Promise<LockHandle | undefined>;
+  release(handle: LockHandle): Promise<void>;
+}
+
 export interface BatchRunOptions {
   readonly executionId?: BatchExecutionId;
   readonly signal?: AbortSignal;

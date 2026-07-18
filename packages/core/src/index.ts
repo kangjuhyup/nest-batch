@@ -9,6 +9,9 @@ export type {
   JobExecutionStatus,
   JobParameters,
   JobRepository,
+  LockAcquireOptions,
+  LockHandle,
+  LockManager,
   StepDefinition,
   StepExecutionContext
 } from "./types.js";

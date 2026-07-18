@@ -10,7 +10,7 @@ workers, and production scheduling are not implemented yet.
 
 - `@nest-batch/core`: framework-independent job and step contracts.
 - `@nest-batch/nest`: NestJS module and decorator integration.
-- `@nest-batch/postgres`: Postgres adapter boundary for repository and checkpoint storage.
+- `@nest-batch/postgres`: Postgres adapter boundary for repository, lock, and checkpoint storage.
 - `@nest-batch/cli`: operational CLI boundary.
 
 ## Development
