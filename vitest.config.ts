@@ -1,0 +1,18 @@
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "vitest/config";
+
+const fromRoot = (path: string) => fileURLToPath(new URL(path, import.meta.url));
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      "@nest-batch/core": fromRoot("./packages/core/src/index.ts"),
+      "@nest-batch/nest": fromRoot("./packages/nest/src/index.ts"),
+      "@nest-batch/postgres": fromRoot("./packages/postgres/src/index.ts"),
+      "@nest-batch/cli": fromRoot("./packages/cli/src/index.ts")
+    }
+  },
+  test: {
+    include: ["packages/**/*.test.ts"]
+  }
+});
