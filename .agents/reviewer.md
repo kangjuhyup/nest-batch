@@ -30,6 +30,8 @@ description: nest-batch 변경사항을 버그, 회귀, 테스트 누락, API �
 - [testing](skills/testing/SKILL.md)
 - [nest-batch-architecture](skills/nest-batch-architecture/SKILL.md)
 - 필요 시 [batch-runtime](skills/batch-runtime/SKILL.md)
+- 필요 시 [database-adapters](skills/database-adapters/SKILL.md)
+- 필요 시 [orm-integrations](skills/orm-integrations/SKILL.md)
 - 필요 시 [public-api-docs](skills/public-api-docs/SKILL.md)
 
 ## Priorities

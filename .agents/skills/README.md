@@ -12,5 +12,7 @@
 초기 스킬:
 - `nest-batch-architecture`
 - `batch-runtime`
+- `database-adapters`
+- `orm-integrations`
 - `testing`
 - `public-api-docs`

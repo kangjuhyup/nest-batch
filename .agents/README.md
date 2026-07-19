@@ -11,6 +11,8 @@
 초기 역할:
 - `project-architect.md`
 - `runtime-engineer.md`
+- `persistence-engineer.md`
+- `orm-integration-engineer.md`
 - `code-writer.md`
 - `reviewer.md`
 - `docs-writer.md`

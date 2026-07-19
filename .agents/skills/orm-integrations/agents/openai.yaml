@@ -1,0 +1,4 @@
+interface:
+  display_name: "ORM Integrations"
+  short_description: "ORM integration adapter design guide"
+  default_prompt: "Use $orm-integrations to design TypeORM, MikroORM, or Prisma integration for nest-batch."

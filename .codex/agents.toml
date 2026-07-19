@@ -7,6 +7,8 @@ description = "Decide package boundaries, module ownership, Nest integration sha
 skills = [
   "../.agents/skills/nest-batch-architecture/SKILL.md",
   "../.agents/skills/batch-runtime/SKILL.md",
+  "../.agents/skills/database-adapters/SKILL.md",
+  "../.agents/skills/orm-integrations/SKILL.md",
   "../.agents/skills/testing/SKILL.md",
 ]
 use_when = [
@@ -21,11 +23,45 @@ description = "Design and implement durable job and step execution semantics."
 skills = [
   "../.agents/skills/batch-runtime/SKILL.md",
   "../.agents/skills/nest-batch-architecture/SKILL.md",
+  "../.agents/skills/database-adapters/SKILL.md",
   "../.agents/skills/testing/SKILL.md",
 ]
 use_when = [
   "The task involves job execution, steps, retry, skip, checkpoint, locks, workers, or scheduling.",
   "The behavior must remain safe across failure, restart, or cancellation.",
+]
+
+[agents.persistence_engineer]
+name = "persistence-engineer"
+path = "../.agents/persistence-engineer.md"
+description = "Design SQL database adapters for durable repository, checkpoint, lock, and migration behavior."
+skills = [
+  "../.agents/skills/database-adapters/SKILL.md",
+  "../.agents/skills/batch-runtime/SKILL.md",
+  "../.agents/skills/nest-batch-architecture/SKILL.md",
+  "../.agents/skills/testing/SKILL.md",
+  "../.agents/skills/public-api-docs/SKILL.md",
+]
+use_when = [
+  "The task involves Postgres, MySQL, MariaDB, SQL dialects, migrations, repository, checkpoint, or lock adapters.",
+  "The behavior depends on database transaction, isolation, or stale lock semantics.",
+]
+
+[agents.orm_integration_engineer]
+name = "orm-integration-engineer"
+path = "../.agents/orm-integration-engineer.md"
+description = "Design TypeORM, MikroORM, Prisma, transaction, lifecycle, and Nest provider integrations."
+skills = [
+  "../.agents/skills/orm-integrations/SKILL.md",
+  "../.agents/skills/database-adapters/SKILL.md",
+  "../.agents/skills/nest-batch-architecture/SKILL.md",
+  "../.agents/skills/batch-runtime/SKILL.md",
+  "../.agents/skills/testing/SKILL.md",
+  "../.agents/skills/public-api-docs/SKILL.md",
+]
+use_when = [
+  "The task involves TypeORM, MikroORM, Prisma, EntityManager, PrismaClient, ORM transactions, or Nest DI wiring.",
+  "The user asks how nest-batch should integrate with application ORM clients.",
 ]
 
 [agents.code_writer]
@@ -35,6 +71,8 @@ description = "Implement code changes with aligned tests, exports, and docs."
 skills = [
   "../.agents/skills/nest-batch-architecture/SKILL.md",
   "../.agents/skills/batch-runtime/SKILL.md",
+  "../.agents/skills/database-adapters/SKILL.md",
+  "../.agents/skills/orm-integrations/SKILL.md",
   "../.agents/skills/testing/SKILL.md",
   "../.agents/skills/public-api-docs/SKILL.md",
 ]
@@ -51,6 +89,8 @@ skills = [
   "../.agents/skills/testing/SKILL.md",
   "../.agents/skills/nest-batch-architecture/SKILL.md",
   "../.agents/skills/batch-runtime/SKILL.md",
+  "../.agents/skills/database-adapters/SKILL.md",
+  "../.agents/skills/orm-integrations/SKILL.md",
   "../.agents/skills/public-api-docs/SKILL.md",
 ]
 use_when = [
@@ -66,6 +106,8 @@ skills = [
   "../.agents/skills/public-api-docs/SKILL.md",
   "../.agents/skills/nest-batch-architecture/SKILL.md",
   "../.agents/skills/batch-runtime/SKILL.md",
+  "../.agents/skills/database-adapters/SKILL.md",
+  "../.agents/skills/orm-integrations/SKILL.md",
 ]
 use_when = [
   "The user asks for documentation.",

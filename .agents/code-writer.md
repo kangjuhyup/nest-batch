@@ -29,6 +29,8 @@ description: 합의된 설계에 따라 nest-batch 기능 구현과 테스트 �
 
 - [nest-batch-architecture](skills/nest-batch-architecture/SKILL.md)
 - [batch-runtime](skills/batch-runtime/SKILL.md)
+- 필요 시 [database-adapters](skills/database-adapters/SKILL.md)
+- 필요 시 [orm-integrations](skills/orm-integrations/SKILL.md)
 - [testing](skills/testing/SKILL.md)
 - 필요 시 [public-api-docs](skills/public-api-docs/SKILL.md)
 

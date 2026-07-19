@@ -1,0 +1,4 @@
+interface:
+  display_name: "Database Adapters"
+  short_description: "SQL database adapter design guide"
+  default_prompt: "Use $database-adapters to design SQL persistence adapters for nest-batch."

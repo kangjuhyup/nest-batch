@@ -42,6 +42,11 @@ packages/
   core/       # Nest에 의존하지 않는 job/step runtime, contracts, policies
   nest/       # Nest module, decorators, discovery, lifecycle integration
   postgres/   # JobRepository, lock, checkpoint Postgres adapter
+  mysql/      # JobRepository, lock, checkpoint MySQL adapter
+  mariadb/    # JobRepository, lock, checkpoint MariaDB adapter
+  typeorm/    # TypeORM integration adapter
+  mikro-orm/  # MikroORM integration adapter
+  prisma/     # Prisma integration adapter
   cli/        # run/status/retry/list 같은 운영 CLI
 examples/
   basic/
@@ -59,10 +64,12 @@ docs/
 | --- | --- |
 | 패키지 경계, 공개 API, Nest 통합 구조 설계 | `$nest-batch-architecture` / `.agents/skills/nest-batch-architecture/SKILL.md` |
 | job/step runtime, retry, skip, checkpoint, lock, worker 구현 | `$batch-runtime` / `.agents/skills/batch-runtime/SKILL.md` |
+| Postgres, MySQL, MariaDB adapter, SQL dialect, migration, lock/checkpoint 설계 | `$database-adapters` / `.agents/skills/database-adapters/SKILL.md` |
+| TypeORM, MikroORM, Prisma, ORM transaction, Nest DI 연동 설계 | `$orm-integrations` / `.agents/skills/orm-integrations/SKILL.md` |
 | 테스트 설계, 실패 재현, 검증 명령 정리 | `$testing` / `.agents/skills/testing/SKILL.md` |
 | README, JSDoc, 사용 예제, 공개 API 문서 | `$public-api-docs` / `.agents/skills/public-api-docs/SKILL.md` |
 
-명시 호출이 필요할 때는 사용자 프롬프트나 에이전트 handoff에 `$nest-batch-architecture`, `$batch-runtime`, `$testing`, `$public-api-docs`를 포함합니다.
+명시 호출이 필요할 때는 사용자 프롬프트나 에이전트 handoff에 `$nest-batch-architecture`, `$batch-runtime`, `$database-adapters`, `$orm-integrations`, `$testing`, `$public-api-docs`를 포함합니다.
 
 ## Agent Roles
 
@@ -72,6 +79,8 @@ docs/
 | --- | --- |
 | `project-architect` | 패키지 경계, 모듈 책임, 공개 API 방향 |
 | `runtime-engineer` | durable runtime, checkpoint, retry, locking, worker |
+| `persistence-engineer` | Postgres, MySQL, MariaDB adapter와 SQL durable storage |
+| `orm-integration-engineer` | TypeORM, MikroORM, Prisma 연동과 Nest provider wiring |
 | `code-writer` | 설계에 따른 실제 구현과 테스트 |
 | `reviewer` | 버그, 회귀, 테스트 누락, API 위험 리뷰 |
 | `docs-writer` | 공개 문서, 예제, JSDoc 정리 |
@@ -81,6 +90,8 @@ docs/
 - 구현 전에 변경이 어느 패키지 경계에 속하는지 먼저 판단합니다.
 - core에서 NestJS decorator, provider token, lifecycle hook에 의존하지 않습니다.
 - adapter 구현이 core type을 오염시키지 않게 합니다.
+- SQL adapter별 database dialect 차이를 public option과 문서에서 숨기지 않습니다.
+- ORM integration은 `core`가 ORM type에 의존하지 않도록 별도 package 경계에 둡니다.
 - runtime 코드는 cancellation과 graceful shutdown을 고려합니다.
 - checkpoint 저장 위치와 idempotency 기대치를 코드와 문서에 드러냅니다.
 - public export를 추가하거나 바꾸면 README/JSDoc 영향도 확인합니다.
