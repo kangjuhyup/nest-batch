@@ -1,4 +1,5 @@
 # Basic Example
 
-This example shows the scaffold-level programmatic API from `@nest-batch/core`.
-It defines a job and a step, but does not run durable execution yet.
+이 예제는 `@nest-batch/core`의 scaffold-level programmatic API를 보여줍니다.
+`defineChunkStep`으로 chunk step을 정의하지만, 아직 durable execution을 직접
+실행하지는 않습니다.

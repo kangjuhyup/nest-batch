@@ -1,14 +1,37 @@
-import { defineJob, defineStep } from "@nest-batch/core";
+import { defineChunkStep, defineJob, skipItem } from "@nest-batch/core";
 
-const loadUsers = defineStep({
-  name: "load-users",
-  async execute({ signal }) {
+interface SourceUser {
+  readonly id: string;
+  readonly active: boolean;
+}
+
+interface ImportedUser {
+  readonly id: string;
+}
+
+export const writtenUsers: ImportedUser[] = [];
+
+const importUsers = defineChunkStep<SourceUser, ImportedUser>({
+  name: "import-users",
+  chunkSize: 100,
+  reader: async function* ({ signal }) {
     signal.throwIfAborted();
-    return ["user-1", "user-2"];
+    yield { id: "user-1", active: true };
+    yield { id: "user-2", active: false };
+  },
+  processor(user) {
+    if (!user.active) {
+      return skipItem("inactive user");
+    }
+
+    return { id: user.id };
+  },
+  writer(users) {
+    writtenUsers.push(...users);
   }
 });
 
 export const dailyUserImport = defineJob({
   name: "daily-user-import",
-  steps: [loadUsers]
+  steps: [importUsers]
 });
