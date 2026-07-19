@@ -2,17 +2,19 @@
 
 `nest-batch` is a Node-native batch framework project for the NestJS ecosystem.
 
-This repository is currently in scaffold stage. The package boundaries and
-public entry points are present, but durable execution, persistence, distributed
-workers, and production scheduling are not implemented yet.
+This repository is currently in early implementation stage. The package
+boundaries and public entry points are present, and MySQL/MariaDB persistence
+adapters provide initial driver-backed repository, checkpoint, and lock storage.
+Durable execution, distributed workers, and production scheduling are not
+implemented yet.
 
 ## Packages
 
 - `@nest-batch/core`: framework-independent job and step contracts.
 - `@nest-batch/nest`: NestJS module and decorator integration.
 - `@nest-batch/postgres`: Postgres adapter boundary for repository, lock, and checkpoint storage.
-- `@nest-batch/mysql`: MySQL adapter boundary for repository, lock, and checkpoint storage.
-- `@nest-batch/mariadb`: MariaDB adapter boundary for repository, lock, and checkpoint storage.
+- `@nest-batch/mysql`: MySQL driver-backed repository, lock, and checkpoint storage.
+- `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, and checkpoint storage.
 - `@nest-batch/cli`: operational CLI boundary.
 
 ## Development
@@ -53,6 +55,31 @@ not needed because the test environment only depends on official database
 images.
 
 Use `docker compose down -v` when you need to reset all database state.
+
+## MySQL and MariaDB Storage
+
+MySQL과 MariaDB adapter는 driver pool을 통해 `JobRepository`,
+`CheckpointStore`, `LockManager`를 제공합니다. `initialize()`는 필요한
+table을 `CREATE TABLE IF NOT EXISTS`로 준비합니다.
+
+```ts
+import { MySqlBatchStorage } from "@nest-batch/mysql";
+
+const storage = new MySqlBatchStorage({
+  connectionString: process.env.NEST_BATCH_MYSQL_URL,
+  database: "nest_batch"
+});
+
+await storage.initialize();
+await storage.repository.create({
+  id: "execution-1",
+  jobName: "daily-user-import",
+  status: "created",
+  parameters: { tenant: "acme" },
+  createdAt: new Date()
+});
+await storage.close();
+```
 
 ## Core Example
 
