@@ -10,9 +10,9 @@ import {
 } from "./constants.js";
 
 export interface NestBatchModuleOptions {
+  readonly storage: DatabaseBatchStorage;
   readonly defaultTimeoutMs?: number;
   readonly runner?: Partial<BatchRunOptions>;
-  readonly storage?: DatabaseBatchStorage;
 }
 
 export interface NestBatchModuleAsyncOptions {
@@ -39,11 +39,15 @@ const createDatabaseStorageProviders = (): Provider[] => [
   }
 ];
 
-const createStaticStorageProviders = (storage: DatabaseBatchStorage | undefined): Provider[] => {
+const assertDatabaseBatchStorage = (storage: DatabaseBatchStorage | undefined): DatabaseBatchStorage => {
   if (!storage) {
-    return [];
+    throw new Error("NestBatchModule requires a DatabaseBatchStorage instance.");
   }
 
+  return storage;
+};
+
+const createStaticStorageProviders = (storage: DatabaseBatchStorage): Provider[] => {
   return [
     {
       provide: DatabaseBatchStorage,
@@ -57,11 +61,7 @@ const createAsyncStorageProviders = (): Provider[] => [
   {
     provide: DatabaseBatchStorage,
     useFactory: (options: NestBatchModuleOptions): DatabaseBatchStorage => {
-      if (!options.storage) {
-        throw new Error("NestBatchModule requires a DatabaseBatchStorage instance.");
-      }
-
-      return options.storage;
+      return assertDatabaseBatchStorage(options?.storage);
     },
     inject: [NEST_BATCH_OPTIONS]
   },
@@ -70,8 +70,9 @@ const createAsyncStorageProviders = (): Provider[] => [
 
 @Module({})
 export class NestBatchModule {
-  static forRoot(options: NestBatchModuleOptions = {}): DynamicModule {
-    const storageProviders = createStaticStorageProviders(options.storage);
+  static forRoot(options: NestBatchModuleOptions): DynamicModule {
+    const storage = assertDatabaseBatchStorage(options?.storage);
+    const storageProviders = createStaticStorageProviders(storage);
 
     return {
       module: NestBatchModule,
@@ -84,9 +85,10 @@ export class NestBatchModule {
       ],
       exports: [
         NEST_BATCH_OPTIONS,
-        ...(options.storage
-          ? [DatabaseBatchStorage, BATCH_JOB_REPOSITORY, BATCH_CHECKPOINT_STORE, BATCH_LOCK_MANAGER]
-          : [])
+        DatabaseBatchStorage,
+        BATCH_JOB_REPOSITORY,
+        BATCH_CHECKPOINT_STORE,
+        BATCH_LOCK_MANAGER
       ]
     };
   }
