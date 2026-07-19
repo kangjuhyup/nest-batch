@@ -1,4 +1,5 @@
 export { defineChunkStep, defineJob, defineStep } from "./definitions.js";
+export { createJobInstanceId, hashJobParameters } from "./parameters.js";
 export { DefaultBatchRunner } from "./runner.js";
 export { SKIP_ITEM, isSkipItem, skipItem } from "./skip-item.js";
 export { DatabaseBatchStorage } from "./types/index.js";
@@ -11,9 +12,12 @@ export type {
   BatchRunner,
   CheckpointStore,
   ChunkCheckpointContext,
+  ChunkFailurePhase,
   ChunkItemContext,
   ChunkProcessor,
   ChunkReader,
+  ChunkRetryContext,
+  ChunkSkipContext,
   ChunkStepDefinition,
   ChunkStepExecutionContext,
   ChunkStepOptions,
@@ -24,14 +28,19 @@ export type {
   JobDefinition,
   JobExecution,
   JobExecutionStatus,
+  JobInstance,
+  JobInstanceId,
   JobParameters,
+  JobParametersHash,
   JobRepository,
   LockAcquireOptions,
   LockHandle,
   LockManager,
   Processor,
   Reader,
+  RetryPolicy,
   SkipItem,
+  SkipPolicy,
   StepDefinition,
   StepExecution,
   StepExecutionContext,

@@ -6,14 +6,24 @@ const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const DEFAULT_TABLE_PREFIX = "nest_batch";
 
 export interface MariaDbTables {
+  readonly jobInstances: string;
   readonly jobExecutions: string;
   readonly stepExecutions: string;
   readonly checkpoints: string;
   readonly locks: string;
 }
 
+export interface MariaDbJobInstanceRow {
+  readonly id: string;
+  readonly job_name: string;
+  readonly parameters_hash: string;
+  readonly parameters: unknown;
+  readonly created_at: unknown;
+}
+
 export interface MariaDbJobExecutionRow {
   readonly id: string;
+  readonly instance_id: string;
   readonly job_name: string;
   readonly status: string;
   readonly parameters: unknown;
@@ -49,6 +59,7 @@ export const createMariaDbTables = (
   };
 
   return {
+    jobInstances: qualify("job_instances"),
     jobExecutions: qualify("job_executions"),
     stepExecutions: qualify("step_executions"),
     checkpoints: qualify("checkpoints"),

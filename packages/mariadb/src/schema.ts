@@ -7,8 +7,21 @@ export const ensureMariaDbSchema = async (options: MariaDbBatchOptions): Promise
   const tables = createMariaDbTables(options);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS ${tables.jobInstances} (
+      id VARCHAR(191) NOT NULL,
+      job_name VARCHAR(255) NOT NULL,
+      parameters_hash VARCHAR(191) NOT NULL,
+      parameters JSON NOT NULL,
+      created_at DATETIME(3) NOT NULL,
+      PRIMARY KEY (id),
+      UNIQUE KEY idx_job_instances_job_parameters (job_name, parameters_hash)
+    ) ENGINE=InnoDB
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS ${tables.jobExecutions} (
       id VARCHAR(191) NOT NULL,
+      instance_id VARCHAR(191) NOT NULL,
       job_name VARCHAR(255) NOT NULL,
       status VARCHAR(32) NOT NULL,
       parameters JSON NOT NULL,
@@ -17,7 +30,8 @@ export const ensureMariaDbSchema = async (options: MariaDbBatchOptions): Promise
       ended_at DATETIME(3) NULL,
       failure_reason TEXT NULL,
       PRIMARY KEY (id),
-      KEY idx_job_executions_job_status (job_name, status)
+      KEY idx_job_executions_job_status (job_name, status),
+      KEY idx_job_executions_instance_status (instance_id, status, created_at)
     ) ENGINE=InnoDB
   `);
 

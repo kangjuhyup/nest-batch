@@ -11,8 +11,25 @@ export const ensurePostgresSchema = async (options: PostgresBatchOptions): Promi
   }
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS ${tables.jobInstances} (
+      id TEXT NOT NULL,
+      job_name TEXT NOT NULL,
+      parameters_hash TEXT NOT NULL,
+      parameters JSONB NOT NULL,
+      created_at TIMESTAMPTZ(3) NOT NULL,
+      PRIMARY KEY (id)
+    )
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS ${tables.jobInstanceParametersIndex}
+    ON ${tables.jobInstances} (job_name, parameters_hash)
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS ${tables.jobExecutions} (
       id TEXT NOT NULL,
+      instance_id TEXT NOT NULL,
       job_name TEXT NOT NULL,
       status TEXT NOT NULL,
       parameters JSONB NOT NULL,
@@ -27,6 +44,11 @@ export const ensurePostgresSchema = async (options: PostgresBatchOptions): Promi
   await pool.query(`
     CREATE INDEX IF NOT EXISTS ${tables.jobStatusIndex}
     ON ${tables.jobExecutions} (job_name, status)
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS ${tables.jobExecutionInstanceStatusIndex}
+    ON ${tables.jobExecutions} (instance_id, status, created_at)
   `);
 
   await pool.query(`

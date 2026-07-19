@@ -1,25 +1,25 @@
 # nest-batch
 
-`nest-batch` is a Node-native batch framework project for the NestJS ecosystem.
+`nest-batch`는 NestJS 생태계를 위한 Node-native batch framework
+프로젝트입니다.
 
-This repository is currently in early implementation stage. The package
-boundaries and public entry points are present, and Postgres/MySQL/MariaDB
-persistence adapters provide initial driver-backed repository, checkpoint, and
-lock storage. `DefaultBatchRunner` provides the first durable execution slice
-for sequential tasklet/chunk steps with `JobInstance` identity and duplicate
-active execution prevention. It can restart from the latest failed execution's
-checkpoint for the same `JobInstance`. Chunk steps support processor/writer
-retry policy and processor skip policy. Distributed workers and production
-scheduling are not implemented yet.
+이 저장소는 현재 초기 구현 단계입니다. package boundary와 public entry
+point는 준비되어 있고, Postgres/MySQL/MariaDB persistence adapter는
+driver-backed repository, checkpoint, lock storage의 초기 구현을 제공합니다.
+`DefaultBatchRunner`는 순차 tasklet/chunk step을 위한 첫 durable execution
+구간을 제공하며, `JobInstance` identity와 active execution 중복 방지를
+지원합니다. 같은 `JobInstance`의 최신 failed execution checkpoint부터 restart할
+수 있고, chunk step은 processor/writer retry policy와 processor skip policy를
+지원합니다. distributed worker와 production scheduling은 아직 구현되지 않았습니다.
 
 ## Packages
 
-- `@nest-batch/core`: framework-independent job and step contracts.
-- `@nest-batch/nest`: NestJS module and decorator integration.
-- `@nest-batch/postgres`: Postgres driver-backed repository, lock, and checkpoint storage.
-- `@nest-batch/mysql`: MySQL driver-backed repository, lock, and checkpoint storage.
-- `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, and checkpoint storage.
-- `@nest-batch/cli`: operational CLI boundary.
+- `@nest-batch/core`: framework에 독립적인 job/step contract.
+- `@nest-batch/nest`: NestJS module과 decorator integration.
+- `@nest-batch/postgres`: Postgres driver-backed repository, lock, checkpoint storage.
+- `@nest-batch/mysql`: MySQL driver-backed repository, lock, checkpoint storage.
+- `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, checkpoint storage.
+- `@nest-batch/cli`: 운영 CLI 경계.
 
 ## Development
 
@@ -32,9 +32,9 @@ pnpm build
 
 ## Test Databases
 
-The repository uses Docker Compose for local database integration tests. A
-single `compose.yaml` starts Postgres, MySQL, and MariaDB with separate host
-ports so they can run together on one machine.
+이 저장소는 local database integration test를 위해 Docker Compose를 사용합니다.
+루트의 `compose.yaml` 하나로 Postgres, MySQL, MariaDB를 함께 실행할 수 있고,
+각 database는 같은 machine에서 동시에 떠 있도록 별도 host port를 사용합니다.
 
 ```bash
 docker compose up -d postgres mysql mariadb
@@ -42,7 +42,7 @@ docker compose ps
 docker compose down
 ```
 
-Default adapter test connection values:
+adapter test의 기본 접속 값은 다음과 같습니다.
 
 ```bash
 NEST_BATCH_POSTGRES_URL=postgresql://nest_batch:nest_batch@localhost:15432/nest_batch
@@ -53,17 +53,20 @@ NEST_BATCH_MARIADB_URL=mariadb://nest_batch:nest_batch@localhost:13307/nest_batc
 NEST_BATCH_MARIADB_DATABASE=nest_batch
 ```
 
-From another Compose service, use `postgres:5432`, `mysql:3306`, and
-`mariadb:3306` instead of the localhost ports above. A custom `Dockerfile` is
-not needed because the test environment only depends on official database
-images.
+다른 Compose service에서 접속할 때는 위 localhost port 대신 `postgres:5432`,
+`mysql:3306`, `mariadb:3306`을 사용합니다. 테스트 환경은 공식 database
+image만 사용하므로 custom `Dockerfile`은 필요하지 않습니다.
 
-Use `docker compose down -v` when you need to reset all database state.
+모든 database state를 초기화해야 할 때는 다음 명령을 사용합니다.
+
+```bash
+docker compose down -v
+```
 
 ### E2E Tests
 
-E2E tests are excluded from the default `pnpm test` command. Start the needed
-database first, then run the e2e script explicitly.
+E2E test는 기본 `pnpm test` 명령에서 제외됩니다. 필요한 database를 먼저
+실행한 뒤 e2e script를 명시적으로 실행합니다.
 
 ```bash
 docker compose up -d postgres
@@ -74,14 +77,14 @@ pnpm test:e2e:examples
 pnpm test:e2e:postgres
 ```
 
-E2E tests are organized by ownership boundary:
+E2E test는 책임 경계별로 나눕니다.
 
-- `packages/*/test/*.e2e.test.ts`: package-local adapter e2e tests.
-- `e2e/*.e2e.test.ts`: system e2e tests that cross package boundaries.
-- `examples/*/test/*.e2e.test.ts`: example app e2e tests.
+- `packages/*/test/*.e2e.test.ts`: package-local adapter e2e test.
+- `e2e/*.e2e.test.ts`: package boundary를 가로지르는 system e2e test.
+- `examples/*/test/*.e2e.test.ts`: example app e2e test.
 
-Postgres e2e tests use a disposable schema named `batch_e2e` by default. To
-override it, use a schema name that starts with `batch_e2e`:
+Postgres e2e test는 기본적으로 `batch_e2e`라는 disposable schema를 사용합니다.
+schema를 바꾸려면 `batch_e2e`로 시작하는 이름을 사용해야 합니다.
 
 ```bash
 NEST_BATCH_E2E_POSTGRES_URL=postgresql://nest_batch:nest_batch@127.0.0.1:15432/nest_batch \
@@ -89,24 +92,24 @@ NEST_BATCH_E2E_POSTGRES_SCHEMA=batch_e2e_local \
 pnpm test:e2e:postgres
 ```
 
-System Postgres e2e tests use a separate disposable schema named
-`batch_system_e2e` by default. Custom system schemas must start with
-`batch_system_e2e`.
+System Postgres e2e test는 기본적으로 `batch_system_e2e`라는 별도 disposable
+schema를 사용합니다. custom system schema는 `batch_system_e2e`로 시작해야
+합니다.
 
 ### Performance Tests
 
-Performance tests are also excluded from the default `pnpm test` command. They
-start with adapter micro-benchmarks and are intended to grow into heavier
-database concurrency scenarios without changing the normal test path.
+performance test도 기본 `pnpm test` 명령에서 제외됩니다. 현재는 adapter
+micro-benchmark부터 시작하며, 일반 테스트 경로를 바꾸지 않고 더 무거운 database
+concurrency scenario로 확장하는 것을 전제로 둡니다.
 
 ```bash
 docker compose up -d postgres
 pnpm test:perf:postgres
 ```
 
-Postgres performance tests use a disposable schema named `batch_perf` by
-default. The result table reports operations, total duration, average latency,
-and operations per second. Tune local runs with these environment variables:
+Postgres performance test는 기본적으로 `batch_perf`라는 disposable schema를
+사용합니다. 결과 table은 operation 수, 전체 duration, 평균 latency,
+operations per second를 출력합니다. local run은 다음 환경 변수로 조정합니다.
 
 ```bash
 NEST_BATCH_PERF_POSTGRES_URL=postgresql://nest_batch:nest_batch@127.0.0.1:15432/nest_batch \
@@ -116,9 +119,9 @@ NEST_BATCH_PERF_WARMUP_ITERATIONS=100 \
 pnpm test:perf:postgres
 ```
 
-Custom performance schemas must start with `batch_perf` so cleanup cannot drop
-shared schemas. Future lock contention and stale-lock load tests should use the
-same `*.perf.test.ts` pattern and `test:perf` script.
+custom performance schema는 cleanup이 shared schema를 지우지 않도록
+`batch_perf`로 시작해야 합니다. 이후 lock contention과 stale-lock load test는
+같은 `*.perf.test.ts` pattern과 `test:perf` script를 사용해 추가합니다.
 
 ## SQL Storage
 
@@ -230,7 +233,7 @@ export const job = defineJob({
 
 ## Chunk Step Example
 
-`defineChunkStep`은 item을 streaming으로 읽고, optional processor를 거친 뒤,
+`defineChunkStep`은 item을 streaming으로 읽고, optional processor를 거친 뒤
 writer에 chunk 단위로 전달합니다. `null`과 `undefined`는 유효한 output이며,
 명시적 skip은 `skipItem()`으로 표현합니다. `retryPolicy`는 processor와 writer
 실패에 적용되고, `skipPolicy`는 processor 실패 item을 건너뛰는 데만 적용됩니다.
@@ -295,4 +298,4 @@ export const importUsers = defineChunkStep({
 });
 ```
 
-See `docs/architecture.md` for package boundaries and runtime constraints.
+package boundary와 runtime constraint는 `docs/architecture.md`를 참고하세요.

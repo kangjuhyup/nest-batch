@@ -1,11 +1,26 @@
-import type { BatchExecutionId, BatchStepExecutionId, JobParameters } from "./common.js";
+import type {
+  BatchExecutionId,
+  BatchStepExecutionId,
+  JobInstanceId,
+  JobParameters,
+  JobParametersHash
+} from "./common.js";
 
 export type JobExecutionStatus = "created" | "running" | "completed" | "failed" | "cancelled";
 
 export type StepExecutionStatus = JobExecutionStatus;
 
+export interface JobInstance<Parameters extends JobParameters = JobParameters> {
+  readonly id: JobInstanceId;
+  readonly jobName: string;
+  readonly parametersHash: JobParametersHash;
+  readonly parameters: Parameters;
+  readonly createdAt: Date;
+}
+
 export interface JobExecution<Parameters extends JobParameters = JobParameters> {
   readonly id: BatchExecutionId;
+  readonly instanceId: JobInstanceId;
   readonly jobName: string;
   readonly status: JobExecutionStatus;
   readonly parameters: Parameters;

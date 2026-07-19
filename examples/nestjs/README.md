@@ -19,8 +19,9 @@ src/
       billing.types.ts
 ```
 
-`BillingModule`은 `Reader`, `Processor`, `Writer` class를 provider로 등록하고,
-factory provider에서 core `defineChunkStep`으로 chunk step을 조립합니다.
+`BillingModule`은 `@BatchReader`, `@BatchProcessor`, `@BatchWriter`가 붙은
+`Reader`, `Processor`, `Writer` class를 provider로 등록하고, factory
+provider에서 core `defineChunkStep`으로 chunk step을 조립합니다.
 `BillingJob`은 `@BatchJob`, `@BatchStep` decorator로 Nest-facing metadata를 붙입니다.
 
 현재 repository는 scaffold 단계입니다. decorator discovery와 durable runtime

@@ -39,15 +39,18 @@ describe("postgres batch storage / postgres batch storage를 검증한다", () =
     await storage.initialize();
     await storage.close();
 
-    expect(pool.calls).toHaveLength(8);
+    expect(pool.calls).toHaveLength(11);
     expect(pool.calls[0]).toContain('CREATE SCHEMA IF NOT EXISTS "batch"');
-    expect(pool.calls[1]).toContain('CREATE TABLE IF NOT EXISTS "batch"."nb_job_executions"');
-    expect(pool.calls[2]).toContain('CREATE INDEX IF NOT EXISTS "idx_nb_job_executions_job_status"');
-    expect(pool.calls[3]).toContain('CREATE TABLE IF NOT EXISTS "batch"."nb_step_executions"');
-    expect(pool.calls[4]).toContain('CREATE INDEX IF NOT EXISTS "idx_nb_step_executions_job_step_status"');
-    expect(pool.calls[5]).toContain('CREATE TABLE IF NOT EXISTS "batch"."nb_checkpoints"');
-    expect(pool.calls[6]).toContain('CREATE TABLE IF NOT EXISTS "batch"."nb_locks"');
-    expect(pool.calls[7]).toContain('CREATE INDEX IF NOT EXISTS "idx_nb_locks_expires_at"');
+    expect(pool.calls[1]).toContain('CREATE TABLE IF NOT EXISTS "batch"."nb_job_instances"');
+    expect(pool.calls[2]).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "idx_nb_job_instances_job_parameters"');
+    expect(pool.calls[3]).toContain('CREATE TABLE IF NOT EXISTS "batch"."nb_job_executions"');
+    expect(pool.calls[4]).toContain('CREATE INDEX IF NOT EXISTS "idx_nb_job_executions_job_status"');
+    expect(pool.calls[5]).toContain('CREATE INDEX IF NOT EXISTS "idx_nb_job_executions_instance_status"');
+    expect(pool.calls[6]).toContain('CREATE TABLE IF NOT EXISTS "batch"."nb_step_executions"');
+    expect(pool.calls[7]).toContain('CREATE INDEX IF NOT EXISTS "idx_nb_step_executions_job_step_status"');
+    expect(pool.calls[8]).toContain('CREATE TABLE IF NOT EXISTS "batch"."nb_checkpoints"');
+    expect(pool.calls[9]).toContain('CREATE TABLE IF NOT EXISTS "batch"."nb_locks"');
+    expect(pool.calls[10]).toContain('CREATE INDEX IF NOT EXISTS "idx_nb_locks_expires_at"');
     expect(pool.closed).toBe(false);
   });
 });

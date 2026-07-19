@@ -4,9 +4,15 @@ import {
   BATCH_JOB_METADATA,
   BATCH_JOB_REPOSITORY,
   BATCH_LOCK_MANAGER,
+  BATCH_PROCESSOR_METADATA,
+  BATCH_READER_METADATA,
   BATCH_STEP_METADATA,
+  BATCH_WRITER_METADATA,
   BatchJob,
+  BatchProcessor,
+  BatchReader,
   BatchStep,
+  BatchWriter,
   NestBatchModule,
   NEST_BATCH_OPTIONS
 } from "../src/index.js";
@@ -16,11 +22,17 @@ describe("nest package exports / nest package export를 검증한다", () => {
     expect(typeof NEST_BATCH_OPTIONS).toBe("symbol");
     expect(typeof BATCH_JOB_METADATA).toBe("symbol");
     expect(typeof BATCH_STEP_METADATA).toBe("symbol");
+    expect(typeof BATCH_READER_METADATA).toBe("symbol");
+    expect(typeof BATCH_PROCESSOR_METADATA).toBe("symbol");
+    expect(typeof BATCH_WRITER_METADATA).toBe("symbol");
     expect(typeof BATCH_JOB_REPOSITORY).toBe("symbol");
     expect(typeof BATCH_CHECKPOINT_STORE).toBe("symbol");
     expect(typeof BATCH_LOCK_MANAGER).toBe("symbol");
     expect(typeof BatchJob).toBe("function");
     expect(typeof BatchStep).toBe("function");
+    expect(typeof BatchReader).toBe("function");
+    expect(typeof BatchProcessor).toBe("function");
+    expect(typeof BatchWriter).toBe("function");
     expect(typeof NestBatchModule.forRoot).toBe("function");
     expect(typeof NestBatchModule.forRootAsync).toBe("function");
   });

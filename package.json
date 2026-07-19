@@ -10,7 +10,12 @@
     "clean": "tsc -b --clean",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:e2e:adapters": "vitest run --config vitest.e2e.config.ts ./packages/",
+    "test:e2e:example-basic": "vitest run --config vitest.e2e.config.ts examples/basic/test/basic-example.e2e.test.ts",
+    "test:e2e:example-nestjs": "vitest run --config vitest.e2e.config.ts examples/nestjs/test/nestjs-example.e2e.test.ts",
+    "test:e2e:examples": "vitest run --config vitest.e2e.config.ts ./examples/",
     "test:e2e:postgres": "vitest run --config vitest.e2e.config.ts packages/postgres/test/postgres.e2e.test.ts",
+    "test:e2e:system": "vitest run --config vitest.e2e.config.ts ./e2e/",
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:perf:postgres": "vitest run --config vitest.perf.config.ts packages/postgres/test/postgres.perf.test.ts",
     "typecheck": "tsc -b"

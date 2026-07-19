@@ -1,4 +1,4 @@
-import type { BatchExecutionId, JobExecution, StepExecution } from "@nest-batch/core";
+import type { BatchExecutionId, JobExecution, JobInstance, StepExecution } from "@nest-batch/core";
 import { describe, expect, it } from "vitest";
 import {
   MySqlCheckpointStore,
@@ -42,8 +42,18 @@ class FakeMySqlPool {
 
 const createExecution = (overrides: Partial<JobExecution> = {}): JobExecution => ({
   id: "execution-1",
+  instanceId: "instance-1",
   jobName: "daily-user-import",
   status: "created",
+  parameters: { tenant: "acme" },
+  createdAt: new Date("2026-07-19T00:00:00.000Z"),
+  ...overrides
+});
+
+const createInstance = (overrides: Partial<JobInstance> = {}): JobInstance => ({
+  id: "instance-1",
+  jobName: "daily-user-import",
+  parametersHash: "sha256:parameters",
   parameters: { tenant: "acme" },
   createdAt: new Date("2026-07-19T00:00:00.000Z"),
   ...overrides
@@ -84,6 +94,7 @@ describe("mysql adapter / mysql adapter를 검증한다", () => {
     expect(pool.calls[0]?.sql).toContain("INSERT INTO `batch`.`nb_job_executions`");
     expect(pool.calls[0]?.values).toEqual([
       "execution-1",
+      "instance-1",
       "daily-user-import",
       "created",
       JSON.stringify({ tenant: "acme" }),
@@ -98,6 +109,7 @@ describe("mysql adapter / mysql adapter를 검증한다", () => {
 
     expect(pool.calls[1]?.sql).toContain("UPDATE `batch`.`nb_job_executions`");
     expect(pool.calls[1]?.values).toEqual([
+      "instance-1",
       "daily-user-import",
       "completed",
       JSON.stringify({ tenant: "acme" }),
@@ -111,6 +123,7 @@ describe("mysql adapter / mysql adapter를 검증한다", () => {
     pool.queueRows([
       {
         id: "execution-1",
+        instance_id: "instance-1",
         job_name: "daily-user-import",
         status: "completed",
         parameters: JSON.stringify({ tenant: "acme" }),
@@ -123,6 +136,7 @@ describe("mysql adapter / mysql adapter를 검증한다", () => {
 
     await expect(repository.findById("execution-1")).resolves.toEqual({
       id: "execution-1",
+      instanceId: "instance-1",
       jobName: "daily-user-import",
       status: "completed",
       parameters: { tenant: "acme" },
@@ -217,6 +231,92 @@ describe("mysql adapter / mysql adapter를 검증한다", () => {
     ]);
   });
 
+  it("persists job instances and finds active executions / job instance를 저장하고 실행 중 execution을 조회한다", async () => {
+    const pool = new FakeMySqlPool();
+    const repository = new MySqlJobRepository({ pool, database: "batch", tablePrefix: "nb" });
+    const createdAt = new Date("2026-07-19T00:00:00.000Z");
+
+    pool.queueResult(1);
+    await expect(repository.createJobInstance(createInstance({ createdAt }))).resolves.toEqual(
+      createInstance({ createdAt })
+    );
+
+    expect(pool.calls[0]?.sql).toContain("INSERT INTO `batch`.`nb_job_instances`");
+    expect(pool.calls[0]?.values).toEqual([
+      "instance-1",
+      "daily-user-import",
+      "sha256:parameters",
+      JSON.stringify({ tenant: "acme" }),
+      createdAt
+    ]);
+
+    pool.queueRows([
+      {
+        id: "instance-1",
+        job_name: "daily-user-import",
+        parameters_hash: "sha256:parameters",
+        parameters: JSON.stringify({ tenant: "acme" }),
+        created_at: createdAt
+      }
+    ]);
+
+    await expect(repository.findJobInstance("daily-user-import", "sha256:parameters")).resolves.toEqual(
+      createInstance({ createdAt })
+    );
+
+    pool.queueRows([
+      {
+        id: "execution-1",
+        instance_id: "instance-1",
+        job_name: "daily-user-import",
+        status: "running",
+        parameters: JSON.stringify({ tenant: "acme" }),
+        created_at: createdAt,
+        started_at: createdAt,
+        ended_at: null,
+        failure_reason: null
+      }
+    ]);
+
+    await expect(repository.findActiveJobExecution("instance-1")).resolves.toEqual({
+      id: "execution-1",
+      instanceId: "instance-1",
+      jobName: "daily-user-import",
+      status: "running",
+      parameters: { tenant: "acme" },
+      createdAt,
+      startedAt: createdAt
+    });
+
+    pool.queueRows([
+      {
+        id: "failed-execution",
+        instance_id: "instance-1",
+        job_name: "daily-user-import",
+        status: "failed",
+        parameters: JSON.stringify({ tenant: "acme" }),
+        created_at: createdAt,
+        started_at: createdAt,
+        ended_at: createdAt,
+        failure_reason: "writer unavailable"
+      }
+    ]);
+
+    await expect(repository.findLatestFailedJobExecution("instance-1")).resolves.toEqual({
+      id: "failed-execution",
+      instanceId: "instance-1",
+      jobName: "daily-user-import",
+      status: "failed",
+      parameters: { tenant: "acme" },
+      createdAt,
+      startedAt: createdAt,
+      endedAt: createdAt,
+      failureReason: "writer unavailable"
+    });
+    expect(pool.calls[3]?.sql).toContain("status = 'failed'");
+    expect(pool.calls[3]?.sql).toContain("ORDER BY created_at DESC, id DESC");
+  });
+
   it("stores and removes checkpoints through upsert SQL / upsert SQL로 checkpoint를 저장하고 삭제한다", async () => {
     const pool = new FakeMySqlPool();
     const store = new MySqlCheckpointStore({ pool, tablePrefix: "nb" });
@@ -272,13 +372,13 @@ describe("mysql adapter / mysql adapter를 검증한다", () => {
   it("creates schema tables with qualified mysql identifiers / 정규화한 mysql identifier로 schema table을 생성한다", async () => {
     const pool = new FakeMySqlPool();
 
-    pool.queueResult(1);
-    pool.queueResult(1);
-    pool.queueResult(1);
-    pool.queueResult(1);
+    for (let index = 0; index < 5; index += 1) {
+      pool.queueResult(1);
+    }
     await ensureMySqlSchema({ pool, database: "batch", tablePrefix: "nb" });
 
     expect(pool.calls.map((call) => call.sql)).toEqual([
+      expect.stringContaining("CREATE TABLE IF NOT EXISTS `batch`.`nb_job_instances`"),
       expect.stringContaining("CREATE TABLE IF NOT EXISTS `batch`.`nb_job_executions`"),
       expect.stringContaining("CREATE TABLE IF NOT EXISTS `batch`.`nb_step_executions`"),
       expect.stringContaining("CREATE TABLE IF NOT EXISTS `batch`.`nb_checkpoints`"),

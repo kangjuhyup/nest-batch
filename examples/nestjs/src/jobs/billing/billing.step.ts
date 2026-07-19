@@ -1,4 +1,3 @@
-import { Injectable } from "@nestjs/common";
 import { defineChunkStep, skipItem } from "@nest-batch/core";
 import type {
   ChunkStepDefinition,
@@ -7,11 +6,12 @@ import type {
   Reader,
   Writer
 } from "@nest-batch/core";
+import { BatchProcessor, BatchReader, BatchWriter } from "@nest-batch/nest";
 import type { BillingAccount, BillingCharge } from "./billing.types.js";
 
 export const writtenCharges: BillingCharge[] = [];
 
-@Injectable()
+@BatchReader("charge-accounts-reader")
 export class ChargeAccountsReader implements Reader<BillingAccount> {
   async *read({ signal }: ChunkStepExecutionContext): AsyncIterable<BillingAccount> {
     signal.throwIfAborted();
@@ -20,7 +20,7 @@ export class ChargeAccountsReader implements Reader<BillingAccount> {
   }
 }
 
-@Injectable()
+@BatchProcessor("charge-accounts-processor")
 export class ChargeAccountsProcessor implements Processor<BillingAccount, BillingCharge> {
   process(account: BillingAccount) {
     if (account.status !== "active") {
@@ -34,7 +34,7 @@ export class ChargeAccountsProcessor implements Processor<BillingAccount, Billin
   }
 }
 
-@Injectable()
+@BatchWriter("billing-charge-writer")
 export class BillingChargeWriter implements Writer<BillingCharge> {
   write(charges: readonly BillingCharge[]) {
     writtenCharges.push(...charges);

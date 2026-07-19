@@ -1,4 +1,4 @@
-import type { JobExecution } from "@nest-batch/core";
+import type { JobExecution, JobInstance } from "@nest-batch/core";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresBatchStorage } from "../src/index.js";
@@ -17,8 +17,18 @@ let postgresAvailable = false;
 
 const createExecution = (overrides: Partial<JobExecution> = {}): JobExecution => ({
   id: "postgres-e2e-execution-1",
+  instanceId: "postgres-e2e-instance-1",
   jobName: "daily-user-import",
   status: "created",
+  parameters: { tenant: "acme", run: 1 },
+  createdAt: new Date("2026-07-19T00:00:00.000Z"),
+  ...overrides
+});
+
+const createInstance = (overrides: Partial<JobInstance> = {}): JobInstance => ({
+  id: "postgres-e2e-instance-1",
+  jobName: "daily-user-import",
+  parametersHash: "sha256:e2e-parameters",
   parameters: { tenant: "acme", run: 1 },
   createdAt: new Date("2026-07-19T00:00:00.000Z"),
   ...overrides
@@ -41,18 +51,37 @@ describe("postgres e2e adapter / postgres e2e adapter를 검증한다", () => {
   }, 30_000);
 
   it("persists job executions in postgres / postgres에 job execution을 저장하고 조회한다", async () => {
+    const instance = createInstance();
     const created = createExecution();
     const completed = createExecution({
       status: "completed",
       startedAt: new Date("2026-07-19T00:01:00.000Z"),
       endedAt: new Date("2026-07-19T00:02:00.000Z")
     });
+    const failed = createExecution({
+      id: "postgres-e2e-execution-2",
+      status: "failed",
+      createdAt: new Date("2026-07-19T00:03:00.000Z"),
+      startedAt: new Date("2026-07-19T00:04:00.000Z"),
+      endedAt: new Date("2026-07-19T00:05:00.000Z"),
+      failureReason: "writer unavailable"
+    });
+
+    await expect(storage.repository.createJobInstance(instance)).resolves.toEqual(instance);
+    await expect(
+      storage.repository.findJobInstance(instance.jobName, instance.parametersHash)
+    ).resolves.toEqual(instance);
 
     await storage.repository.create(created);
     await expect(storage.repository.findById(created.id)).resolves.toEqual(created);
+    await expect(storage.repository.findActiveJobExecution(instance.id)).resolves.toEqual(created);
 
     await storage.repository.update(completed);
     await expect(storage.repository.findById(completed.id)).resolves.toEqual(completed);
+    await expect(storage.repository.findActiveJobExecution(instance.id)).resolves.toBeUndefined();
+
+    await storage.repository.create(failed);
+    await expect(storage.repository.findLatestFailedJobExecution(instance.id)).resolves.toEqual(failed);
   });
 
   it("upserts and deletes checkpoints in postgres / postgres에서 checkpoint를 갱신하고 삭제한다", async () => {

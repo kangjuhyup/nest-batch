@@ -140,7 +140,7 @@ class InMemoryLockManager implements LockManager {
   }
 }
 
-class ExampleBatchStorage extends DatabaseBatchStorage {
+export class InMemoryBatchStorage extends DatabaseBatchStorage {
   readonly repository = new InMemoryJobRepository();
   readonly checkpointStore = new InMemoryCheckpointStore();
   readonly lockManager = new InMemoryLockManager();
@@ -150,5 +150,3 @@ const compareJobExecutionByCreatedAtDesc = (left: JobExecution, right: JobExecut
   const diff = right.createdAt.getTime() - left.createdAt.getTime();
   return diff === 0 ? right.id.localeCompare(left.id) : diff;
 };
-
-export const exampleBatchStorage = new ExampleBatchStorage();

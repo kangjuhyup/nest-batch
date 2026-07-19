@@ -6,17 +6,29 @@ const DEFAULT_TABLE_PREFIX = "nest_batch";
 
 export interface PostgresTables {
   readonly schema?: string;
+  readonly jobInstances: string;
   readonly jobExecutions: string;
   readonly stepExecutions: string;
   readonly checkpoints: string;
   readonly locks: string;
+  readonly jobInstanceParametersIndex: string;
   readonly jobStatusIndex: string;
+  readonly jobExecutionInstanceStatusIndex: string;
   readonly stepStatusIndex: string;
   readonly locksExpiresAtIndex: string;
 }
 
+export interface PostgresJobInstanceRow {
+  readonly id: string;
+  readonly job_name: string;
+  readonly parameters_hash: string;
+  readonly parameters: unknown;
+  readonly created_at: unknown;
+}
+
 export interface PostgresJobExecutionRow {
   readonly id: string;
+  readonly instance_id: string;
   readonly job_name: string;
   readonly status: string;
   readonly parameters: unknown;
@@ -53,11 +65,14 @@ export const createPostgresTables = (
 
   return {
     schema,
+    jobInstances: qualify("job_instances"),
     jobExecutions: qualify("job_executions"),
     stepExecutions: qualify("step_executions"),
     checkpoints: qualify("checkpoints"),
     locks: qualify("locks"),
+    jobInstanceParametersIndex: quotePostgresIdentifier(`idx_${tablePrefix}_job_instances_job_parameters`),
     jobStatusIndex: quotePostgresIdentifier(`idx_${tablePrefix}_job_executions_job_status`),
+    jobExecutionInstanceStatusIndex: quotePostgresIdentifier(`idx_${tablePrefix}_job_executions_instance_status`),
     stepStatusIndex: quotePostgresIdentifier(`idx_${tablePrefix}_step_executions_job_step_status`),
     locksExpiresAtIndex: quotePostgresIdentifier(`idx_${tablePrefix}_locks_expires_at`)
   };

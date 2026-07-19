@@ -1,4 +1,4 @@
-import type { JobExecution } from "@nest-batch/core";
+import type { JobExecution, JobInstance } from "@nest-batch/core";
 import { performance } from "node:perf_hooks";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -35,11 +35,20 @@ interface BenchmarkResult {
 
 const createExecution = (id: string, overrides: Partial<JobExecution> = {}): JobExecution => ({
   id,
+  instanceId: `${id}-instance`,
   jobName: "postgres-perf-job",
   status: "created",
   parameters: { tenant: "acme", id },
   createdAt: new Date("2026-07-19T00:00:00.000Z"),
   ...overrides
+});
+
+const createInstance = (id: string): JobInstance => ({
+  id: `${id}-instance`,
+  jobName: "postgres-perf-job",
+  parametersHash: `sha256:${id}`,
+  parameters: { tenant: "acme", id },
+  createdAt: new Date("2026-07-19T00:00:00.000Z")
 });
 
 describe("postgres perf adapter / postgres adapter 성능 기준을 측정한다", () => {
@@ -59,6 +68,7 @@ describe("postgres perf adapter / postgres adapter 성능 기준을 측정한다
   }, 60_000);
 
   it("measures single worker storage operations / 단일 worker storage 작업 성능을 측정한다", async () => {
+    await seedInstances("perf-create", iterations + warmupIterations);
     await seedExecutions("perf-find", iterations + warmupIterations);
     await seedExecutions("perf-update", iterations + warmupIterations);
 
@@ -110,7 +120,15 @@ describe("postgres perf adapter / postgres adapter 성능 기준을 측정한다
 
 async function seedExecutions(prefix: string, count: number): Promise<void> {
   for (let index = 0; index < count; index += 1) {
-    await storage.repository.create(createExecution(`${prefix}-${index}`));
+    const id = `${prefix}-${index}`;
+    await storage.repository.createJobInstance(createInstance(id));
+    await storage.repository.create(createExecution(id));
+  }
+}
+
+async function seedInstances(prefix: string, count: number): Promise<void> {
+  for (let index = 0; index < count; index += 1) {
+    await storage.repository.createJobInstance(createInstance(`${prefix}-${index}`));
   }
 }
 

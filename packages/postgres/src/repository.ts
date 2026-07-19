@@ -1,4 +1,12 @@
-import type { BatchExecutionId, JobExecution, JobRepository, StepExecution } from "@nest-batch/core";
+import type {
+  BatchExecutionId,
+  JobExecution,
+  JobInstance,
+  JobInstanceId,
+  JobParametersHash,
+  JobRepository,
+  StepExecution
+} from "@nest-batch/core";
 import { resolvePostgresPool } from "./driver.js";
 import type { PostgresBatchOptions } from "./options.js";
 import type { PostgresPoolLike } from "./options.js";
@@ -12,6 +20,7 @@ import {
   rowsFromPostgresResult,
   stringifyPostgresJson,
   type PostgresJobExecutionRow,
+  type PostgresJobInstanceRow,
   type PostgresStepExecutionRow,
   type PostgresTables
 } from "./sql.js";
@@ -25,11 +34,111 @@ export class PostgresJobRepository implements JobRepository {
     this.tables = createPostgresTables(options);
   }
 
+  async createJobInstance(instance: JobInstance): Promise<JobInstance> {
+    await this.pool.query(
+      `
+        INSERT INTO ${this.tables.jobInstances} (
+          id,
+          job_name,
+          parameters_hash,
+          parameters,
+          created_at
+        )
+        VALUES ($1, $2, $3, $4::jsonb, $5)
+      `,
+      [
+        instance.id,
+        instance.jobName,
+        instance.parametersHash,
+        stringifyPostgresJson(instance.parameters),
+        instance.createdAt
+      ]
+    );
+
+    return instance;
+  }
+
+  async findJobInstance(
+    jobName: string,
+    parametersHash: JobParametersHash
+  ): Promise<JobInstance | undefined> {
+    const result = await this.pool.query<PostgresJobInstanceRow>(
+      `
+        SELECT
+          id,
+          job_name,
+          parameters_hash,
+          parameters,
+          created_at
+        FROM ${this.tables.jobInstances}
+        WHERE job_name = $1
+          AND parameters_hash = $2
+      `,
+      [jobName, parametersHash]
+    );
+    const [row] = rowsFromPostgresResult<PostgresJobInstanceRow>(result);
+
+    return row ? toJobInstance(row) : undefined;
+  }
+
+  async findActiveJobExecution(instanceId: JobInstanceId): Promise<JobExecution | undefined> {
+    const result = await this.pool.query<PostgresJobExecutionRow>(
+      `
+        SELECT
+          id,
+          instance_id,
+          job_name,
+          status,
+          parameters,
+          created_at,
+          started_at,
+          ended_at,
+          failure_reason
+        FROM ${this.tables.jobExecutions}
+        WHERE instance_id = $1
+          AND status IN ('created', 'running')
+        ORDER BY created_at ASC, id ASC
+        LIMIT 1
+      `,
+      [instanceId]
+    );
+    const [row] = rowsFromPostgresResult<PostgresJobExecutionRow>(result);
+
+    return row ? toJobExecution(row) : undefined;
+  }
+
+  async findLatestFailedJobExecution(instanceId: JobInstanceId): Promise<JobExecution | undefined> {
+    const result = await this.pool.query<PostgresJobExecutionRow>(
+      `
+        SELECT
+          id,
+          instance_id,
+          job_name,
+          status,
+          parameters,
+          created_at,
+          started_at,
+          ended_at,
+          failure_reason
+        FROM ${this.tables.jobExecutions}
+        WHERE instance_id = $1
+          AND status = 'failed'
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+      `,
+      [instanceId]
+    );
+    const [row] = rowsFromPostgresResult<PostgresJobExecutionRow>(result);
+
+    return row ? toJobExecution(row) : undefined;
+  }
+
   async create(execution: JobExecution): Promise<void> {
     await this.pool.query(
       `
         INSERT INTO ${this.tables.jobExecutions} (
           id,
+          instance_id,
           job_name,
           status,
           parameters,
@@ -38,10 +147,11 @@ export class PostgresJobRepository implements JobRepository {
           ended_at,
           failure_reason
         )
-        VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9)
       `,
       [
         execution.id,
+        execution.instanceId,
         execution.jobName,
         execution.status,
         stringifyPostgresJson(execution.parameters),
@@ -58,16 +168,18 @@ export class PostgresJobRepository implements JobRepository {
       `
         UPDATE ${this.tables.jobExecutions}
         SET
-          job_name = $1,
-          status = $2,
-          parameters = $3::jsonb,
-          created_at = $4,
-          started_at = $5,
-          ended_at = $6,
-          failure_reason = $7
-        WHERE id = $8
+          instance_id = $1,
+          job_name = $2,
+          status = $3,
+          parameters = $4::jsonb,
+          created_at = $5,
+          started_at = $6,
+          ended_at = $7,
+          failure_reason = $8
+        WHERE id = $9
       `,
       [
+        execution.instanceId,
         execution.jobName,
         execution.status,
         stringifyPostgresJson(execution.parameters),
@@ -85,6 +197,7 @@ export class PostgresJobRepository implements JobRepository {
       `
         SELECT
           id,
+          instance_id,
           job_name,
           status,
           parameters,
@@ -103,16 +216,7 @@ export class PostgresJobRepository implements JobRepository {
       return undefined;
     }
 
-    return {
-      id: row.id,
-      jobName: row.job_name,
-      status: parsePostgresJobStatus(row.status),
-      parameters: parsePostgresJobParameters(row.parameters),
-      createdAt: parsePostgresRequiredDate(row.created_at, "created_at"),
-      startedAt: parsePostgresOptionalDate(row.started_at),
-      endedAt: parsePostgresOptionalDate(row.ended_at),
-      failureReason: typeof row.failure_reason === "string" ? row.failure_reason : undefined
-    };
+    return toJobExecution(row);
   }
 
   async createStepExecution(execution: StepExecution): Promise<void> {
@@ -212,6 +316,26 @@ export class PostgresJobRepository implements JobRepository {
     return rowsFromPostgresResult<PostgresStepExecutionRow>(result).map(toStepExecution);
   }
 }
+
+const toJobInstance = (row: PostgresJobInstanceRow): JobInstance => ({
+  id: row.id,
+  jobName: row.job_name,
+  parametersHash: row.parameters_hash,
+  parameters: parsePostgresJobParameters(row.parameters),
+  createdAt: parsePostgresRequiredDate(row.created_at, "created_at")
+});
+
+const toJobExecution = (row: PostgresJobExecutionRow): JobExecution => ({
+  id: row.id,
+  instanceId: row.instance_id,
+  jobName: row.job_name,
+  status: parsePostgresJobStatus(row.status),
+  parameters: parsePostgresJobParameters(row.parameters),
+  createdAt: parsePostgresRequiredDate(row.created_at, "created_at"),
+  startedAt: parsePostgresOptionalDate(row.started_at),
+  endedAt: parsePostgresOptionalDate(row.ended_at),
+  failureReason: typeof row.failure_reason === "string" ? row.failure_reason : undefined
+});
 
 const toStepExecution = (row: PostgresStepExecutionRow): StepExecution => ({
   id: row.id,

@@ -11,7 +11,7 @@ Core owns:
 
 - job and step definitions
 - tasklet step and chunk step contracts
-- execution identifiers and status types
+- job instance, execution identifiers, and status types
 - repository and checkpoint contracts
 - lock manager contracts
 - default sequential batch runner
@@ -53,10 +53,14 @@ The CLI package owns operational commands such as `run`, `status`, `retry`, and
 
 Runtime work should treat failure and restart as normal paths:
 
-- job execution has a durable identity
+- `JobInstance` is identified by job name and a stable parameters hash
+- `JobExecution` is one concrete attempt for a job instance
+- duplicate active execution is prevented by a job-instance lock and repository active-state lookup
+- restart orchestration must start from the latest failed execution for the same job instance
 - step execution can be checkpointed
 - cancellation uses `AbortSignal`
 - chunk step readers are `AsyncIterable`-first and checkpoints are saved at chunk boundaries after writer success
+- chunk retry policy covers processor and writer failures; skip policy currently covers processor failures only
 - distributed execution assumes at-least-once delivery
 - SQL adapter locks store `ownerId`, `acquiredAt`, and optional `expiresAt`; stale lock recovery is TTL based
 - idempotency expectations are documented near job parameters and retry behavior

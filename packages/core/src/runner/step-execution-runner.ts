@@ -1,0 +1,81 @@
+import { errorToFailureReason, isAbortError } from "./errors.js";
+import { runChunkStep } from "./chunk-step-runner.js";
+import { runTaskletStep } from "./tasklet-step-runner.js";
+import type {
+  AnyStepDefinition,
+  BatchExecutionId,
+  BatchStepExecutionId,
+  DatabaseBatchStorage,
+  StepExecution
+} from "../types/index.js";
+import type { StepRunContext, StepRunResult } from "./step-run-context.js";
+
+export interface StepExecutionRunnerOptions {
+  readonly storage: DatabaseBatchStorage;
+  readonly generateStepExecutionId: (context: {
+    readonly jobExecutionId: BatchExecutionId;
+    readonly stepName: string;
+    readonly stepIndex: number;
+  }) => BatchStepExecutionId;
+  readonly now: () => Date;
+}
+
+export const runStepExecution = async (
+  step: AnyStepDefinition,
+  context: StepRunContext,
+  options: StepExecutionRunnerOptions
+): Promise<StepRunResult> => {
+  const { storage } = options;
+  let execution: StepExecution = {
+    id: options.generateStepExecutionId({
+      jobExecutionId: context.jobExecutionId,
+      stepName: step.name,
+      stepIndex: context.stepIndex
+    }),
+    jobExecutionId: context.jobExecutionId,
+    stepName: step.name,
+    status: "created",
+    readCount: 0,
+    writeCount: 0,
+    skipCount: 0,
+    retryCount: 0,
+    createdAt: options.now()
+  };
+
+  await storage.repository.createStepExecution(execution);
+
+  try {
+    context.signal?.throwIfAborted();
+    execution = {
+      ...execution,
+      status: "running",
+      startedAt: options.now()
+    };
+    await storage.repository.updateStepExecution(execution);
+
+    const result =
+      step.kind === "chunk"
+        ? await runChunkStep(step, context, storage.checkpointStore)
+        : await runTaskletStep(step, context, storage.checkpointStore);
+
+    execution = {
+      ...execution,
+      ...result,
+      status: "completed",
+      endedAt: options.now()
+    };
+    await storage.repository.updateStepExecution(execution);
+
+    return result;
+  } catch (error) {
+    execution = {
+      ...execution,
+      status: isAbortError(error) || context.signal?.aborted ? "cancelled" : "failed",
+      endedAt: options.now(),
+      failureReason: errorToFailureReason(error)
+    };
+    await storage.repository.updateStepExecution(execution);
+
+    throw error;
+  }
+};

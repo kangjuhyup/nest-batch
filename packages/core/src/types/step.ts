@@ -1,6 +1,43 @@
 import type { SkipItem } from "../skip-item.js";
 import type { BatchExecutionId } from "./common.js";
 
+export type ChunkFailurePhase = "process" | "write";
+
+export interface ChunkRetryContext<Input = unknown, Output = unknown, TCheckpoint = unknown>
+  extends ChunkStepExecutionContext<TCheckpoint> {
+  readonly phase: ChunkFailurePhase;
+  readonly error: unknown;
+  readonly attempt: number;
+  readonly item?: Input;
+  readonly items?: readonly Output[];
+  readonly readCount: number;
+  readonly writeCount: number;
+  readonly skipCount: number;
+}
+
+export interface ChunkSkipContext<Input = unknown, TCheckpoint = unknown>
+  extends ChunkStepExecutionContext<TCheckpoint> {
+  readonly phase: "process";
+  readonly error: unknown;
+  readonly item: Input;
+  readonly readCount: number;
+  readonly writeCount: number;
+  readonly skipCount: number;
+}
+
+export interface RetryPolicy<Input = unknown, Output = unknown, TCheckpoint = unknown> {
+  canRetry(
+    context: ChunkRetryContext<Input, Output, TCheckpoint>
+  ): boolean | Promise<boolean>;
+  backoffMs?(
+    context: ChunkRetryContext<Input, Output, TCheckpoint>
+  ): number | Promise<number>;
+}
+
+export interface SkipPolicy<Input = unknown, TCheckpoint = unknown> {
+  canSkip(context: ChunkSkipContext<Input, TCheckpoint>): boolean | Promise<boolean>;
+}
+
 export interface StepExecutionContext<Input = unknown> {
   readonly input?: Input;
   readonly signal: AbortSignal;
@@ -67,6 +104,8 @@ export interface ChunkStepDefinition<Input = unknown, Output = Input, TCheckpoin
   readonly reader: ChunkReader<Input, TCheckpoint>;
   readonly processor?: ChunkProcessor<Input, Output, TCheckpoint>;
   readonly writer: ChunkWriter<Output, TCheckpoint>;
+  readonly retryPolicy?: RetryPolicy<Input, Output, TCheckpoint>;
+  readonly skipPolicy?: SkipPolicy<Input, TCheckpoint>;
   readonly checkpoint?: (
     context: ChunkCheckpointContext<TCheckpoint>
   ) => Promise<TCheckpoint | undefined> | TCheckpoint | undefined;

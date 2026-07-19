@@ -15,7 +15,7 @@ export default defineConfig({
     }
   },
   test: {
-    include: ["packages/**/*.e2e.test.ts"],
+    include: ["packages/**/*.e2e.test.ts", "e2e/**/*.e2e.test.ts", "examples/*/test/**/*.e2e.test.ts"],
     hookTimeout: 30_000,
     testTimeout: 30_000
   }

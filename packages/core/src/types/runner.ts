@@ -7,6 +7,7 @@ export interface BatchRunOptions {
   readonly ownerId?: string;
   readonly lockTtlMs?: number;
   readonly signal?: AbortSignal;
+  readonly restart?: boolean;
 }
 
 export interface BatchRunner {
