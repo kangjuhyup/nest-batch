@@ -10,10 +10,81 @@ export interface StepExecutionContext<Input = unknown> {
   readonly checkpoint?: unknown;
 }
 
-export interface StepDefinition<Input = unknown, Output = unknown> {
+export interface ChunkStepExecutionContext<TCheckpoint = unknown> {
+  readonly signal: AbortSignal;
+  readonly checkpoint?: TCheckpoint;
+}
+
+export interface ChunkItemContext<Input = unknown, TCheckpoint = unknown>
+  extends ChunkStepExecutionContext<TCheckpoint> {
+  readonly item: Input;
+  readonly index: number;
+}
+
+export interface ChunkWriteContext<TCheckpoint = unknown> extends ChunkStepExecutionContext<TCheckpoint> {
+  readonly chunkIndex: number;
+  readonly attempt: number;
+}
+
+export const SKIP_ITEM: unique symbol = Symbol("nest-batch.skip-item");
+
+export interface SkipItem {
+  readonly kind: "skip";
+  readonly reason?: string;
+  readonly cause?: unknown;
+  readonly [SKIP_ITEM]: true;
+}
+
+export type ChunkReader<Input, TCheckpoint = unknown> = (
+  context: ChunkStepExecutionContext<TCheckpoint>
+) => AsyncIterable<Input> | Iterable<Input>;
+
+export type ChunkProcessor<Input, Output, TCheckpoint = unknown> = (
+  item: Input,
+  context: ChunkItemContext<Input, TCheckpoint>
+) => Output | SkipItem | Promise<Output | SkipItem>;
+
+export type ChunkWriter<Output, TCheckpoint = unknown> = (
+  items: readonly Output[],
+  context: ChunkWriteContext<TCheckpoint>
+) => Promise<void> | void;
+
+export interface TaskletStepDefinition<Input = unknown, Output = unknown> {
+  readonly kind?: "tasklet";
   readonly name: string;
   readonly execute: (context: StepExecutionContext<Input>) => Promise<Output> | Output;
 }
+
+export interface ChunkStepDefinition<Input = unknown, Output = Input, TCheckpoint = unknown> {
+  readonly kind: "chunk";
+  readonly name: string;
+  readonly chunkSize: number;
+  readonly reader: ChunkReader<Input, TCheckpoint>;
+  readonly processor?: ChunkProcessor<Input, Output, TCheckpoint>;
+  readonly writer: ChunkWriter<Output, TCheckpoint>;
+}
+
+export type ChunkStepWithoutProcessorOptions<Input = unknown, TCheckpoint = unknown> = Omit<
+  ChunkStepDefinition<Input, Input, TCheckpoint>,
+  "kind" | "processor"
+> & {
+  readonly processor?: undefined;
+};
+
+export type ChunkStepWithProcessorOptions<Input = unknown, Output = unknown, TCheckpoint = unknown> = Omit<
+  ChunkStepDefinition<Input, Output, TCheckpoint>,
+  "kind"
+> & {
+  readonly processor: ChunkProcessor<Input, Output, TCheckpoint>;
+};
+
+export type ChunkStepOptions<Input = unknown, Output = Input, TCheckpoint = unknown> =
+  | ChunkStepWithoutProcessorOptions<Input, TCheckpoint>
+  | ChunkStepWithProcessorOptions<Input, Output, TCheckpoint>;
+
+export type StepDefinition<Input = unknown, Output = unknown> =
+  | TaskletStepDefinition<Input, Output>
+  | ChunkStepDefinition<Input, Output>;
 
 export interface JobDefinition<Parameters extends JobParameters = JobParameters> {
   readonly name: string;

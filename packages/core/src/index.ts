@@ -1,9 +1,20 @@
-export { defineJob, defineStep } from "./definitions.js";
+export { defineChunkStep, defineJob, defineStep, isSkipItem, skipItem } from "./definitions.js";
+export { SKIP_ITEM } from "./types.js";
 export type {
   BatchExecutionId,
   BatchRunOptions,
   BatchRunner,
   CheckpointStore,
+  ChunkItemContext,
+  ChunkProcessor,
+  ChunkReader,
+  ChunkStepDefinition,
+  ChunkStepExecutionContext,
+  ChunkStepOptions,
+  ChunkStepWithProcessorOptions,
+  ChunkStepWithoutProcessorOptions,
+  ChunkWriter,
+  ChunkWriteContext,
   JobDefinition,
   JobExecution,
   JobExecutionStatus,
@@ -12,6 +23,8 @@ export type {
   LockAcquireOptions,
   LockHandle,
   LockManager,
+  SkipItem,
   StepDefinition,
-  StepExecutionContext
+  StepExecutionContext,
+  TaskletStepDefinition
 } from "./types.js";
