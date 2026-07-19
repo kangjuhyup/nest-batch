@@ -6,6 +6,8 @@
     { "path": "./packages/postgres" },
     { "path": "./packages/mysql" },
     { "path": "./packages/mariadb" },
-    { "path": "./packages/cli" }
+    { "path": "./packages/cli" },
+    { "path": "./examples/basic" },
+    { "path": "./examples/nestjs" }
   ]
 }
