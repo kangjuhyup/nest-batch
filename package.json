@@ -9,6 +9,10 @@
     "build": "tsc -b",
     "clean": "tsc -b --clean",
     "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:e2e:postgres": "vitest run --config vitest.e2e.config.ts packages/postgres/test/postgres.e2e.test.ts",
+    "test:perf": "vitest run --config vitest.perf.config.ts",
+    "test:perf:postgres": "vitest run --config vitest.perf.config.ts packages/postgres/test/postgres.perf.test.ts",
     "typecheck": "tsc -b"
   },
   "devDependencies": {

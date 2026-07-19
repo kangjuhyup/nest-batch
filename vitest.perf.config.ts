@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { configDefaults, defineConfig } from "vitest/config";
+import { defineConfig } from "vitest/config";
 
 const fromRoot = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 
@@ -15,7 +15,8 @@ export default defineConfig({
     }
   },
   test: {
-    include: ["packages/**/*.test.ts"],
-    exclude: [...configDefaults.exclude, "packages/**/*.e2e.test.ts", "packages/**/*.perf.test.ts"]
+    include: ["packages/**/*.perf.test.ts"],
+    hookTimeout: 60_000,
+    testTimeout: 180_000
   }
 });

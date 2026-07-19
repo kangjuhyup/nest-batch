@@ -15,6 +15,8 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test:e2e": "vitest run --root ../.. --config vitest.e2e.config.ts packages/postgres/test/postgres.e2e.test.ts",
+    "test:perf": "vitest run --root ../.. --config vitest.perf.config.ts packages/postgres/test/postgres.perf.test.ts",
     "test": "vitest run --root ../.. --config vitest.config.ts packages/postgres/test/adapter.test.ts packages/postgres/test/storage.test.ts"
   },
   "dependencies": {
