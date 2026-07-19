@@ -9,4 +9,4 @@ export {
 export { BatchJob, BatchStep } from "./decorators.js";
 export type { BatchJobOptions, BatchStepOptions } from "./decorators.js";
 export { NestBatchModule } from "./module.js";
-export type { NestBatchModuleAsyncOptions, NestBatchModuleOptions } from "./module.js";
+export type { NestBatchModuleAsyncOptions, NestBatchModuleOptions } from "./module-options.js";

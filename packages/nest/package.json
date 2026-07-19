@@ -15,7 +15,7 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run --root ../.. --config vitest.config.ts packages/nest/test/exports.test.ts"
+    "test": "vitest run --root ../.. --config vitest.config.ts packages/nest/test"
   },
   "dependencies": {
     "@nest-batch/core": "workspace:*"

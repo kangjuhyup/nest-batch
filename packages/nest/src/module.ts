@@ -1,72 +1,13 @@
-import { DynamicModule, Module } from "@nestjs/common";
-import { DatabaseBatchStorage } from "@nest-batch/core";
-import type { BatchRunOptions } from "@nest-batch/core";
-import type { FactoryProvider, Provider } from "@nestjs/common";
+import { Module } from "@nestjs/common";
+import type { DynamicModule } from "@nestjs/common";
+import { NEST_BATCH_OPTIONS } from "./constants.js";
+import type { NestBatchModuleAsyncOptions, NestBatchModuleOptions } from "./module-options.js";
 import {
-  BATCH_CHECKPOINT_STORE,
-  BATCH_JOB_REPOSITORY,
-  BATCH_LOCK_MANAGER,
-  NEST_BATCH_OPTIONS
-} from "./constants.js";
-
-export interface NestBatchModuleOptions {
-  readonly storage: DatabaseBatchStorage;
-  readonly defaultTimeoutMs?: number;
-  readonly runner?: Partial<BatchRunOptions>;
-}
-
-export interface NestBatchModuleAsyncOptions {
-  readonly imports?: DynamicModule["imports"];
-  readonly inject?: FactoryProvider["inject"];
-  readonly useFactory: (...args: any[]) => Promise<NestBatchModuleOptions> | NestBatchModuleOptions;
-}
-
-const createDatabaseStorageProviders = (): Provider[] => [
-  {
-    provide: BATCH_JOB_REPOSITORY,
-    useFactory: (storage: DatabaseBatchStorage) => storage.repository,
-    inject: [DatabaseBatchStorage]
-  },
-  {
-    provide: BATCH_CHECKPOINT_STORE,
-    useFactory: (storage: DatabaseBatchStorage) => storage.checkpointStore,
-    inject: [DatabaseBatchStorage]
-  },
-  {
-    provide: BATCH_LOCK_MANAGER,
-    useFactory: (storage: DatabaseBatchStorage) => storage.lockManager,
-    inject: [DatabaseBatchStorage]
-  }
-];
-
-const assertDatabaseBatchStorage = (storage: DatabaseBatchStorage | undefined): DatabaseBatchStorage => {
-  if (!storage) {
-    throw new Error("NestBatchModule requires a DatabaseBatchStorage instance.");
-  }
-
-  return storage;
-};
-
-const createStaticStorageProviders = (storage: DatabaseBatchStorage): Provider[] => {
-  return [
-    {
-      provide: DatabaseBatchStorage,
-      useValue: storage
-    },
-    ...createDatabaseStorageProviders()
-  ];
-};
-
-const createAsyncStorageProviders = (): Provider[] => [
-  {
-    provide: DatabaseBatchStorage,
-    useFactory: (options: NestBatchModuleOptions): DatabaseBatchStorage => {
-      return assertDatabaseBatchStorage(options?.storage);
-    },
-    inject: [NEST_BATCH_OPTIONS]
-  },
-  ...createDatabaseStorageProviders()
-];
+  assertDatabaseBatchStorage,
+  createAsyncStorageProviders,
+  createStaticStorageProviders,
+  NEST_BATCH_STORAGE_EXPORTS
+} from "./storage.providers.js";
 
 @Module({})
 export class NestBatchModule {
@@ -83,13 +24,7 @@ export class NestBatchModule {
         },
         ...storageProviders
       ],
-      exports: [
-        NEST_BATCH_OPTIONS,
-        DatabaseBatchStorage,
-        BATCH_JOB_REPOSITORY,
-        BATCH_CHECKPOINT_STORE,
-        BATCH_LOCK_MANAGER
-      ]
+      exports: [NEST_BATCH_OPTIONS, ...NEST_BATCH_STORAGE_EXPORTS]
     };
   }
 
@@ -105,13 +40,7 @@ export class NestBatchModule {
         },
         ...createAsyncStorageProviders()
       ],
-      exports: [
-        NEST_BATCH_OPTIONS,
-        DatabaseBatchStorage,
-        BATCH_JOB_REPOSITORY,
-        BATCH_CHECKPOINT_STORE,
-        BATCH_LOCK_MANAGER
-      ]
+      exports: [NEST_BATCH_OPTIONS, ...NEST_BATCH_STORAGE_EXPORTS]
     };
   }
 }

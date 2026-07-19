@@ -1,0 +1,96 @@
+import { describe, expect, it } from "vitest";
+import { DatabaseBatchStorage } from "@nest-batch/core";
+import {
+  BATCH_CHECKPOINT_STORE,
+  BATCH_JOB_REPOSITORY,
+  BATCH_LOCK_MANAGER,
+  NestBatchModule,
+  type NestBatchModuleOptions,
+  NEST_BATCH_OPTIONS
+} from "../src/index.js";
+import { FakeDatabaseBatchStorage, findFactoryProvider, findValueProvider } from "./support/providers.js";
+
+describe("NestBatchModule / NestBatchModule", () => {
+  it("creates a root module with options and storage providers / options와 storage provider가 있는 root module을 생성한다", () => {
+    const storage = new FakeDatabaseBatchStorage();
+    const dynamicModule = NestBatchModule.forRoot({ defaultTimeoutMs: 5000, storage });
+    const providers = dynamicModule.providers ?? [];
+
+    expect(dynamicModule.module).toBe(NestBatchModule);
+    expect(findValueProvider(providers, NEST_BATCH_OPTIONS).useValue).toEqual({
+      defaultTimeoutMs: 5000,
+      storage
+    });
+    expect(findValueProvider(providers, DatabaseBatchStorage).useValue).toBe(storage);
+    expect(dynamicModule.exports).toEqual(
+      expect.arrayContaining([
+        NEST_BATCH_OPTIONS,
+        DatabaseBatchStorage,
+        BATCH_JOB_REPOSITORY,
+        BATCH_CHECKPOINT_STORE,
+        BATCH_LOCK_MANAGER
+      ])
+    );
+  });
+
+  it("rejects root options without storage / storage 없는 root option을 거부한다", () => {
+    expect(() =>
+      NestBatchModule.forRoot({ defaultTimeoutMs: 5000 } as unknown as NestBatchModuleOptions)
+    ).toThrow("NestBatchModule requires a DatabaseBatchStorage instance.");
+  });
+
+  it("depends on DatabaseBatchStorage for database wiring / database wiring에 DatabaseBatchStorage만 의존한다", () => {
+    const storage = new FakeDatabaseBatchStorage();
+    const dynamicModule = NestBatchModule.forRoot({ storage });
+    const providers = dynamicModule.providers ?? [];
+
+    expect(providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ provide: DatabaseBatchStorage, useValue: storage }),
+        expect.objectContaining({ provide: BATCH_JOB_REPOSITORY }),
+        expect.objectContaining({ provide: BATCH_CHECKPOINT_STORE }),
+        expect.objectContaining({ provide: BATCH_LOCK_MANAGER })
+      ])
+    );
+  });
+
+  it("creates async module providers from storage options / storage option으로 async module provider를 생성한다", () => {
+    const storage = new FakeDatabaseBatchStorage();
+    const dynamicModule = NestBatchModule.forRootAsync({
+      inject: ["CONFIG"],
+      useFactory: () => ({ storage })
+    });
+    const providers = dynamicModule.providers ?? [];
+
+    expect(findFactoryProvider(providers, NEST_BATCH_OPTIONS).inject).toEqual(["CONFIG"]);
+    expect(findFactoryProvider(providers, DatabaseBatchStorage).inject).toEqual([NEST_BATCH_OPTIONS]);
+    expect(providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ provide: BATCH_JOB_REPOSITORY }),
+        expect.objectContaining({ provide: BATCH_CHECKPOINT_STORE }),
+        expect.objectContaining({ provide: BATCH_LOCK_MANAGER })
+      ])
+    );
+    expect(dynamicModule.exports).toEqual(
+      expect.arrayContaining([
+        NEST_BATCH_OPTIONS,
+        DatabaseBatchStorage,
+        BATCH_JOB_REPOSITORY,
+        BATCH_CHECKPOINT_STORE,
+        BATCH_LOCK_MANAGER
+      ])
+    );
+  });
+
+  it("keeps async module imports and defaults empty injection / async module imports와 기본 inject 값을 유지한다", () => {
+    const importedModule = { module: class ConfigModule {} };
+    const dynamicModule = NestBatchModule.forRootAsync({
+      imports: [importedModule],
+      useFactory: () => ({ storage: new FakeDatabaseBatchStorage() })
+    });
+    const optionsProvider = findFactoryProvider(dynamicModule.providers ?? [], NEST_BATCH_OPTIONS);
+
+    expect(dynamicModule.imports).toEqual([importedModule]);
+    expect(optionsProvider.inject).toEqual([]);
+  });
+});
