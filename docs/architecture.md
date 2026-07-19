@@ -15,6 +15,7 @@ Core owns:
 - repository and checkpoint contracts
 - lock manager contracts
 - default sequential batch runner
+- batch lifecycle event observer contracts
 - step execution counters
 - runner-facing options
 
@@ -54,7 +55,9 @@ MariaDB connection and database options inside the adapter package, and exposes
 ## `@nest-batch/cli`
 
 The CLI package owns operational commands such as `run`, `status`, `retry`, and
-`list`. The current scaffold exposes command boundaries only.
+`list`. It depends on core contracts and expects the application bootstrap to
+inject `DatabaseBatchStorage` and registered `JobDefinition` values; it does not
+own database client construction or job discovery.
 
 ## Runtime Constraints
 
@@ -63,8 +66,11 @@ Runtime work should treat failure and restart as normal paths:
 - `JobInstance` is identified by job name and a stable parameters hash
 - `JobExecution` is one concrete attempt for a job instance
 - duplicate active execution is prevented by a job-instance lock and repository active-state lookup
+- durable repositories expose `createExecutionAttempt` so instance creation, active execution detection, and execution creation can be atomic
 - restart orchestration must start from the latest failed execution for the same job instance
+- restart skips prior completed step executions and resumes from the first failed or missing step
 - step execution can be checkpointed
+- job, step, retry, skip, and chunk write lifecycle events can be observed without changing execution semantics
 - cancellation uses `AbortSignal`
 - chunk step readers are `AsyncIterable`-first and checkpoints are saved at chunk boundaries after writer success
 - chunk retry policy covers processor and writer failures; skip policy currently covers processor failures only

@@ -7,10 +7,12 @@ boundaries and public entry points are present, and Postgres/MySQL/MariaDB
 persistence adapters provide initial driver-backed repository, checkpoint, and
 lock storage. `DefaultBatchRunner` provides the first durable execution slice
 for sequential tasklet/chunk steps with `JobInstance` identity and duplicate
-active execution prevention. It can restart from the latest failed execution's
-checkpoint for the same `JobInstance`. Chunk steps support processor/writer
-retry policy and processor skip policy. Distributed workers and production
-scheduling are not implemented yet.
+active execution prevention. It can restart from the latest failed execution for
+the same `JobInstance`, skip steps that already completed, and resume the failed
+step from its checkpoint. Chunk steps support processor/writer retry policy,
+processor skip policy, and `BatchObserver` lifecycle events. The CLI can run,
+retry, inspect, and list jobs when an application supplies storage and a job
+registry. Distributed workers and production scheduling are not implemented yet.
 
 ## Packages
 
@@ -142,8 +144,10 @@ Postgres, MySQL, MariaDB adapter는 driver pool을 통해 `JobRepository`,
 name과 parameters hash로 식별되는 `JobInstance`, 실제 실행 시도인
 `JobExecution`, 그리고 `StepExecution` 상태를 저장합니다. 같은 instance의
 active execution과 마지막 failed execution을 조회할 수 있어 중복 실행 방지와
-restart 준비 흐름의 source of truth가 됩니다. `initialize()`는 필요한 schema와
-table을 idempotent하게 준비합니다.
+restart 준비 흐름의 source of truth가 됩니다. runner가 새 실행을 만들 때는
+`createExecutionAttempt()`를 사용하며, SQL adapter는 가능한 경우 driver
+transaction 안에서 instance 생성, active execution 확인, execution 생성을 함께
+처리합니다. `initialize()`는 필요한 schema와 table을 idempotent하게 준비합니다.
 
 ```ts
 import { PostgresBatchStorage } from "@nest-batch/postgres";
@@ -189,7 +193,9 @@ name과 parameters를 안정적으로 hash해 `JobInstance`를 찾거나 만들�
 거부합니다. 이후 job/step 상태 전이를 repository에 저장합니다. chunk step은
 writer가 성공한 뒤 `checkpoint()` callback이 반환한 값을 `CheckpointStore`에
 저장합니다. `restart: true`를 넘기면 같은 instance의 최신 failed execution에서
-checkpoint를 읽고, 새 execution id로 checkpoint를 다시 저장합니다.
+checkpoint를 읽고, 이전 execution에서 이미 completed 상태였던 step은 새
+execution에 completed 기록만 남긴 뒤 다시 실행하지 않습니다. 재시작된 step은 새
+execution id로 checkpoint를 다시 저장합니다.
 
 ```ts
 import { DefaultBatchRunner, defineJob, defineStep } from "@nest-batch/core";
@@ -223,6 +229,48 @@ await storage.close();
 ```ts
 await runner.run(job, { tenant: "acme" }, { restart: true });
 ```
+
+Runner lifecycle과 chunk 처리 이벤트는 `BatchObserver`로 받을 수 있습니다.
+
+```ts
+const runner = new DefaultBatchRunner(storage, {
+  observer: {
+    onBatchEvent(event) {
+      console.log(event.type);
+    }
+  }
+});
+```
+
+## Operational CLI
+
+`@nest-batch/cli` exposes `runCli(args, { storage, jobs })` for application-owned
+CLI bootstrapping. The package-level `nest-batch` binary cannot infer database
+settings or job registration by itself yet, so production apps should wrap
+`runCli` in their own bootstrap until config loading is added.
+
+```ts
+import { runCli } from "@nest-batch/cli";
+
+const result = await runCli(
+  [
+    "run",
+    "--job",
+    "daily-user-import",
+    "--parameters",
+    '{"tenant":"acme"}'
+  ],
+  {
+    storage,
+    jobs: [job]
+  }
+);
+```
+
+Supported commands are `run`, `retry`, `status`, and `list`. `run`, `retry`, and
+`status` require `DatabaseBatchStorage`; `run` and `retry` also require the job
+to be present in the supplied registry. Command output is JSON for operational
+commands.
 
 ## Core Example
 
