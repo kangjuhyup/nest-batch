@@ -10,6 +10,7 @@ NestJS, database clients, queue clients, or CLI frameworks.
 Core owns:
 
 - job and step definitions
+- tasklet step and chunk step contracts
 - execution identifiers and status types
 - repository and checkpoint contracts
 - lock manager contracts
@@ -50,6 +51,7 @@ Future runtime work should treat failure and restart as normal paths:
 - job execution has a durable identity
 - step execution can be checkpointed
 - cancellation uses `AbortSignal`
+- chunk step readers are `AsyncIterable`-first and checkpoints are saved at chunk boundaries after writer success
 - distributed execution assumes at-least-once delivery
 - idempotency expectations are documented near job parameters and retry behavior
 - schedulers create or enqueue executions instead of bypassing the runtime

@@ -43,4 +43,33 @@ export const job = defineJob({
 });
 ```
 
+## Chunk Step Example
+
+`defineChunkStep`은 item을 streaming으로 읽고, optional processor를 거친 뒤,
+writer에 chunk 단위로 전달합니다. `null`과 `undefined`는 유효한 output이며,
+skip은 `skipItem()`으로만 명시합니다.
+
+```ts
+import { defineChunkStep, skipItem } from "@nest-batch/core";
+
+export const importUsers = defineChunkStep({
+  name: "import-users",
+  chunkSize: 100,
+  reader: async function* ({ signal }) {
+    signal.throwIfAborted();
+    yield { id: "user-1", active: true };
+  },
+  processor(user) {
+    if (!user.active) {
+      return skipItem("inactive user");
+    }
+
+    return { id: user.id };
+  },
+  async writer(users) {
+    await saveUsers(users);
+  }
+});
+```
+
 See `docs/architecture.md` for package boundaries and runtime constraints.
