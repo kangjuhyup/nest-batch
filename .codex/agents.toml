@@ -1,0 +1,73 @@
+# Codex-local mapping for nest-batch agent role documents.
+
+[agents.project_architect]
+name = "project-architect"
+path = "../.agents/project-architect.md"
+description = "Decide package boundaries, module ownership, Nest integration shape, and public API direction."
+skills = [
+  "../.agents/skills/nest-batch-architecture/SKILL.md",
+  "../.agents/skills/batch-runtime/SKILL.md",
+  "../.agents/skills/testing/SKILL.md",
+]
+use_when = [
+  "The task affects package boundaries, public API, or architectural direction.",
+  "The user asks where a feature should live.",
+]
+
+[agents.runtime_engineer]
+name = "runtime-engineer"
+path = "../.agents/runtime-engineer.md"
+description = "Design and implement durable job and step execution semantics."
+skills = [
+  "../.agents/skills/batch-runtime/SKILL.md",
+  "../.agents/skills/nest-batch-architecture/SKILL.md",
+  "../.agents/skills/testing/SKILL.md",
+]
+use_when = [
+  "The task involves job execution, steps, retry, skip, checkpoint, locks, workers, or scheduling.",
+  "The behavior must remain safe across failure, restart, or cancellation.",
+]
+
+[agents.code_writer]
+name = "code-writer"
+path = "../.agents/code-writer.md"
+description = "Implement code changes with aligned tests, exports, and docs."
+skills = [
+  "../.agents/skills/nest-batch-architecture/SKILL.md",
+  "../.agents/skills/batch-runtime/SKILL.md",
+  "../.agents/skills/testing/SKILL.md",
+  "../.agents/skills/public-api-docs/SKILL.md",
+]
+use_when = [
+  "The user asks to implement or modify behavior.",
+  "The next step is editing source or test files.",
+]
+
+[agents.reviewer]
+name = "reviewer"
+path = "../.agents/reviewer.md"
+description = "Review changes for runtime bugs, regressions, missing tests, and API risk."
+skills = [
+  "../.agents/skills/testing/SKILL.md",
+  "../.agents/skills/nest-batch-architecture/SKILL.md",
+  "../.agents/skills/batch-runtime/SKILL.md",
+  "../.agents/skills/public-api-docs/SKILL.md",
+]
+use_when = [
+  "The user asks for a review.",
+  "A change needs a final risk and coverage pass.",
+]
+
+[agents.docs_writer]
+name = "docs-writer"
+path = "../.agents/docs-writer.md"
+description = "Update README, examples, public API docs, and JSDoc."
+skills = [
+  "../.agents/skills/public-api-docs/SKILL.md",
+  "../.agents/skills/nest-batch-architecture/SKILL.md",
+  "../.agents/skills/batch-runtime/SKILL.md",
+]
+use_when = [
+  "The user asks for documentation.",
+  "A public API or user workflow changed.",
+]

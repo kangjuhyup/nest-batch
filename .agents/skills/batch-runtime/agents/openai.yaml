@@ -1,0 +1,4 @@
+interface:
+  display_name: "Batch Runtime"
+  short_description: "job/step runtime 기준"
+  default_prompt: "Use $batch-runtime to design or implement durable job and step execution."

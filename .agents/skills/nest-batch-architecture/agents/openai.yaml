@@ -1,0 +1,4 @@
+interface:
+  display_name: "Nest Batch Architecture"
+  short_description: "nest-batch 아키텍처 기준"
+  default_prompt: "Use $nest-batch-architecture to decide package boundaries and public API shape for nest-batch."

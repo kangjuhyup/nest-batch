@@ -1,0 +1,4 @@
+interface:
+  display_name: "Testing"
+  short_description: "nest-batch 테스트 기준"
+  default_prompt: "Use $testing to plan or verify nest-batch test coverage."

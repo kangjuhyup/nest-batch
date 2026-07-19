@@ -1,0 +1,4 @@
+interface:
+  display_name: "Public API Docs"
+  short_description: "public API 문서 기준"
+  default_prompt: "Use $public-api-docs to update nest-batch public API documentation and examples."
