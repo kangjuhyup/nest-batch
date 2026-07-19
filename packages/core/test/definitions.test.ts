@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { defineJob, defineStep } from "../src/index.js";
 
-describe("core definitions", () => {
-  it("defines a job with ordered steps without NestJS", async () => {
+describe("core definitions / core 정의", () => {
+  it("defines a job with ordered steps without NestJS / NestJS 없이 순서가 있는 step으로 job을 정의한다", async () => {
     const step = defineStep({
       name: "load-users",
       async execute({ input }) {
@@ -21,13 +21,13 @@ describe("core definitions", () => {
     expect(job.steps[0]).toBe(step);
   });
 
-  it("rejects jobs without steps", () => {
+  it("rejects jobs without steps / step이 없는 job을 거부한다", () => {
     expect(() => defineJob({ name: "empty-job", steps: [] })).toThrow(
       'Job "empty-job" must include at least one step.'
     );
   });
 
-  it("rejects blank names", () => {
+  it("rejects blank names / 비어 있는 이름을 거부한다", () => {
     expect(() =>
       defineStep({
         name: " ",

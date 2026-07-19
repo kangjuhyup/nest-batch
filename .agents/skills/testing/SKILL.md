@@ -1,6 +1,6 @@
 ---
 name: testing
-description: nest-batch 저장소에서 테스트 설계, 실패 재현, 회귀 검증, 커버리지 보강, 런타임 edge case 검증이 필요할 때 우선 사용한다. job/step 실행, checkpoint/restart, retry/skip, lock, Nest integration, public API 예제를 검증할 때 사용한다.
+description: nest-batch 저장소에서 테스트 설계, 테스트 설명, 실패 재현, 회귀 검증, 커버리지 보강, 런타임 edge case 검증이 필요할 때 우선 사용한다. job/step 실행, checkpoint/restart, retry/skip, lock, Nest integration, public API 예제를 검증할 때 사용한다.
 ---
 
 # Testing
@@ -16,6 +16,9 @@ description: nest-batch 저장소에서 테스트 설계, 실패 재현, 회귀 
 - runtime test는 시간, lock, repository, reader/writer를 제어 가능한 fake로 둡니다.
 - 외부 DB adapter는 contract test와 integration test를 분리합니다.
 - 테스트는 내부 구현보다 public behavior와 상태 전이를 고정합니다.
+- `describe`, `it`, `test` 설명은 `English / 한국어` 형식으로 작성합니다.
+- 영어 설명을 먼저 쓰고, 같은 의미를 읽기 쉬운 한국어로 뒤에 씁니다.
+- 한국어 설명은 직역보다 테스트 의도가 드러나는 문장을 우선합니다.
 
 ## 테스트 분류
 

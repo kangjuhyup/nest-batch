@@ -97,6 +97,7 @@ docs/
 - checkpoint 저장 위치와 idempotency 기대치를 코드와 문서에 드러냅니다.
 - public export를 추가하거나 바꾸면 README/JSDoc 영향도 확인합니다.
 - 테스트는 정상 경로보다 실패, 재시작, 중복 실행, 취소, 부분 성공을 더 중요하게 봅니다.
+- 테스트 설명(`describe`, `it`, `test`)은 `English / 한국어` 형식으로 작성합니다.
 - 커밋 메시지는 `feat|fix|refactor|chore|docs : 제목` 형식을 쓰고, 제목과 작업내용은 한국어로 작성합니다.
 
 ## Output Rules
