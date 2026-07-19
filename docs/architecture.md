@@ -14,6 +14,8 @@ Core owns:
 - execution identifiers and status types
 - repository and checkpoint contracts
 - lock manager contracts
+- default sequential batch runner
+- step execution counters
 - runner-facing options
 
 ## `@nest-batch/nest`
@@ -23,24 +25,24 @@ integration. It depends on `@nest-batch/core`; core does not depend on NestJS.
 
 ## `@nest-batch/postgres`
 
-The Postgres package contains driver-backed job repository, lock management,
-and checkpoint storage. It uses `pg`, keeps Postgres connection and schema
-options inside the adapter package, and exposes `PostgresBatchStorage` for Nest
-integration or programmatic runtime wiring.
+The Postgres package contains driver-backed job and step execution repository,
+lock management, and checkpoint storage. It uses `pg`, keeps Postgres
+connection and schema options inside the adapter package, and exposes
+`PostgresBatchStorage` for Nest integration or programmatic runtime wiring.
 
 ## `@nest-batch/mysql`
 
-The MySQL package contains driver-backed job repository, lock management, and
-checkpoint storage. It uses `mysql2/promise`, keeps MySQL connection and
-database options inside the adapter package, and exposes `MySqlBatchStorage`
-for Nest integration or programmatic runtime wiring.
+The MySQL package contains driver-backed job and step execution repository,
+lock management, and checkpoint storage. It uses `mysql2/promise`, keeps MySQL
+connection and database options inside the adapter package, and exposes
+`MySqlBatchStorage` for Nest integration or programmatic runtime wiring.
 
 ## `@nest-batch/mariadb`
 
-The MariaDB package contains driver-backed job repository, lock management, and
-checkpoint storage. It uses the `mariadb` driver, keeps MariaDB connection and
-database options inside the adapter package, and exposes `MariaDbBatchStorage`
-for Nest integration or programmatic runtime wiring.
+The MariaDB package contains driver-backed job and step execution repository,
+lock management, and checkpoint storage. It uses the `mariadb` driver, keeps
+MariaDB connection and database options inside the adapter package, and exposes
+`MariaDbBatchStorage` for Nest integration or programmatic runtime wiring.
 
 ## `@nest-batch/cli`
 
@@ -49,7 +51,7 @@ The CLI package owns operational commands such as `run`, `status`, `retry`, and
 
 ## Runtime Constraints
 
-Future runtime work should treat failure and restart as normal paths:
+Runtime work should treat failure and restart as normal paths:
 
 - job execution has a durable identity
 - step execution can be checkpointed
