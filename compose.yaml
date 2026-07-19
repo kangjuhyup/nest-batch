@@ -1,0 +1,70 @@
+name: nest-batch
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: nest_batch
+      POSTGRES_USER: nest_batch
+      POSTGRES_PASSWORD: nest_batch
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nest_batch -d nest_batch"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: nest_batch
+      MYSQL_USER: nest_batch
+      MYSQL_PASSWORD: nest_batch
+      MYSQL_ROOT_PASSWORD: nest_batch_root
+      TZ: UTC
+    command:
+      - --default-time-zone=+00:00
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    ports:
+      - "13306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -unest_batch -pnest_batch --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mariadb:
+    image: mariadb:11.4
+    environment:
+      MARIADB_DATABASE: nest_batch
+      MARIADB_USER: nest_batch
+      MARIADB_PASSWORD: nest_batch
+      MARIADB_ROOT_PASSWORD: nest_batch_root
+      TZ: UTC
+    command:
+      - --default-time-zone=+00:00
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "13307:3306"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -unest_batch -pnest_batch --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres-data:
+  mysql-data:
+  mariadb-data:

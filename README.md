@@ -24,6 +24,36 @@ pnpm test
 pnpm build
 ```
 
+## Test Databases
+
+The repository uses Docker Compose for local database integration tests. A
+single `compose.yaml` starts Postgres, MySQL, and MariaDB with separate host
+ports so they can run together on one machine.
+
+```bash
+docker compose up -d postgres mysql mariadb
+docker compose ps
+docker compose down
+```
+
+Default adapter test connection values:
+
+```bash
+NEST_BATCH_POSTGRES_URL=postgresql://nest_batch:nest_batch@localhost:15432/nest_batch
+NEST_BATCH_POSTGRES_SCHEMA=batch
+NEST_BATCH_MYSQL_URL=mysql://nest_batch:nest_batch@localhost:13306/nest_batch
+NEST_BATCH_MYSQL_DATABASE=nest_batch
+NEST_BATCH_MARIADB_URL=mariadb://nest_batch:nest_batch@localhost:13307/nest_batch
+NEST_BATCH_MARIADB_DATABASE=nest_batch
+```
+
+From another Compose service, use `postgres:5432`, `mysql:3306`, and
+`mariadb:3306` instead of the localhost ports above. A custom `Dockerfile` is
+not needed because the test environment only depends on official database
+images.
+
+Use `docker compose down -v` when you need to reset all database state.
+
 ## Core Example
 
 ```ts
