@@ -1,19 +1,103 @@
 import type { LockAcquireOptions, LockHandle, LockManager } from "@nest-batch/core";
-import { createPostgresScaffoldError } from "./errors.js";
+import { resolvePostgresPool } from "./driver.js";
 import type { PostgresBatchOptions } from "./options.js";
+import type { PostgresPoolLike } from "./options.js";
+import {
+  createPostgresTables,
+  isPostgresUniqueViolation,
+  rowCountFromPostgresResult,
+  type PostgresTables
+} from "./sql.js";
 
 export class PostgresLockManager implements LockManager {
-  constructor(readonly options: PostgresBatchOptions) {}
+  private readonly pool: PostgresPoolLike;
+  private readonly tables: PostgresTables;
+
+  constructor(readonly options: PostgresBatchOptions) {
+    this.pool = resolvePostgresPool(options);
+    this.tables = createPostgresTables(options);
+  }
 
   async acquire(
-    _resource: string,
-    _ownerId: string,
-    _options?: LockAcquireOptions
+    resource: string,
+    ownerId: string,
+    options?: LockAcquireOptions
   ): Promise<LockHandle | undefined> {
-    throw createPostgresScaffoldError("lock manager");
+    options?.signal?.throwIfAborted();
+    const { acquiredAt, expiresAt } = createLockTimes(options?.ttlMs);
+    const handle = createLockHandle(resource, ownerId, expiresAt);
+
+    const renewalResult = await this.pool.query(
+      `
+        UPDATE ${this.tables.locks}
+        SET acquired_at = $1, expires_at = $2
+        WHERE resource = $3 AND owner_id = $4
+      `,
+      [acquiredAt, expiresAt ?? null, resource, ownerId]
+    );
+
+    if (rowCountFromPostgresResult(renewalResult) > 0) {
+      return handle;
+    }
+
+    options?.signal?.throwIfAborted();
+    await this.pool.query(
+      `
+        DELETE FROM ${this.tables.locks}
+        WHERE resource = $1 AND expires_at IS NOT NULL AND expires_at <= CURRENT_TIMESTAMP(3)
+      `,
+      [resource]
+    );
+
+    options?.signal?.throwIfAborted();
+
+    try {
+      await this.pool.query(
+        `
+          INSERT INTO ${this.tables.locks} (
+            resource,
+            owner_id,
+            acquired_at,
+            expires_at
+          )
+          VALUES ($1, $2, $3, $4)
+        `,
+        [resource, ownerId, acquiredAt, expiresAt ?? null]
+      );
+    } catch (error) {
+      if (isPostgresUniqueViolation(error)) {
+        return undefined;
+      }
+
+      throw error;
+    }
+
+    return handle;
   }
 
-  async release(_handle: LockHandle): Promise<void> {
-    throw createPostgresScaffoldError("lock manager");
+  async release(handle: LockHandle): Promise<void> {
+    await this.pool.query(
+      `
+        DELETE FROM ${this.tables.locks}
+        WHERE resource = $1 AND owner_id = $2
+      `,
+      [handle.resource, handle.ownerId]
+    );
   }
 }
+
+const createLockTimes = (ttlMs?: number): { readonly acquiredAt: Date; readonly expiresAt?: Date } => {
+  if (ttlMs !== undefined && (!Number.isSafeInteger(ttlMs) || ttlMs <= 0)) {
+    throw new TypeError("Postgres lock ttlMs must be a positive safe integer.");
+  }
+
+  const acquiredAt = new Date();
+  return {
+    acquiredAt,
+    expiresAt: ttlMs ? new Date(acquiredAt.getTime() + ttlMs) : undefined
+  };
+};
+
+const createLockHandle = (resource: string, ownerId: string, expiresAt?: Date): LockHandle => {
+  return expiresAt ? { resource, ownerId, expiresAt } : { resource, ownerId };
+};

@@ -1,7 +1,7 @@
 {
   "name": "@nest-batch/postgres",
   "version": "0.0.1",
-  "description": "Postgres persistence adapter boundary for nest-batch.",
+  "description": "Postgres persistence adapter for nest-batch.",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.js",
@@ -15,9 +15,13 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run --root ../.. --config vitest.config.ts packages/postgres/test/exports.test.ts"
+    "test": "vitest run --root ../.. --config vitest.config.ts packages/postgres/test/adapter.test.ts packages/postgres/test/storage.test.ts"
   },
   "dependencies": {
-    "@nest-batch/core": "workspace:*"
+    "@nest-batch/core": "workspace:*",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.20.0"
   }
 }

@@ -23,9 +23,10 @@ integration. It depends on `@nest-batch/core`; core does not depend on NestJS.
 
 ## `@nest-batch/postgres`
 
-The Postgres package contains adapter boundaries for job repository,
-lock management, and checkpoint storage. The current scaffold does not
-implement real persistence or locking.
+The Postgres package contains driver-backed job repository, lock management,
+and checkpoint storage. It uses `pg`, keeps Postgres connection and schema
+options inside the adapter package, and exposes `PostgresBatchStorage` for Nest
+integration or programmatic runtime wiring.
 
 ## `@nest-batch/mysql`
 
