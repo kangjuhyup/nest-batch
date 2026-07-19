@@ -26,6 +26,18 @@ The Postgres package contains adapter boundaries for job repository,
 lock management, and checkpoint storage. The current scaffold does not
 implement real persistence or locking.
 
+## `@nest-batch/mysql`
+
+The MySQL package contains adapter boundaries for job repository, lock
+management, and checkpoint storage. The current scaffold does not implement
+real persistence or locking.
+
+## `@nest-batch/mariadb`
+
+The MariaDB package contains adapter boundaries for job repository, lock
+management, and checkpoint storage. The current scaffold does not implement
+real persistence or locking.
+
 ## `@nest-batch/cli`
 
 The CLI package owns operational commands such as `run`, `status`, `retry`, and

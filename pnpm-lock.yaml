@@ -18,7 +18,25 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)
 
+  packages/cli:
+    dependencies:
+      '@nest-batch/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/core: {}
+
+  packages/mariadb:
+    dependencies:
+      '@nest-batch/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/mysql:
+    dependencies:
+      '@nest-batch/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/nest:
     dependencies:
@@ -35,6 +53,12 @@ importers:
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
+
+  packages/postgres:
+    dependencies:
+      '@nest-batch/core':
+        specifier: workspace:*
+        version: link:../core
 
 packages:
 
