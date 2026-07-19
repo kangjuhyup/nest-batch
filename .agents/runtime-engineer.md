@@ -32,6 +32,7 @@ description: durable job/step runtime, checkpoint, retry, lock, worker 실행 �
 - [nest-batch-architecture](skills/nest-batch-architecture/SKILL.md)
 - 필요 시 [database-adapters](skills/database-adapters/SKILL.md)
 - 필요 시 [testing](skills/testing/SKILL.md)
+- 커밋 작성 시 [commit-messages](skills/commit-messages/SKILL.md)
 
 ## Priorities
 

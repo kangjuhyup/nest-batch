@@ -16,3 +16,4 @@
 - `orm-integrations`
 - `testing`
 - `public-api-docs`
+- `commit-messages`

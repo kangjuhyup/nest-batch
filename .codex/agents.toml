@@ -10,6 +10,7 @@ skills = [
   "../.agents/skills/database-adapters/SKILL.md",
   "../.agents/skills/orm-integrations/SKILL.md",
   "../.agents/skills/testing/SKILL.md",
+  "../.agents/skills/commit-messages/SKILL.md",
 ]
 use_when = [
   "The task affects package boundaries, public API, or architectural direction.",
@@ -25,6 +26,7 @@ skills = [
   "../.agents/skills/nest-batch-architecture/SKILL.md",
   "../.agents/skills/database-adapters/SKILL.md",
   "../.agents/skills/testing/SKILL.md",
+  "../.agents/skills/commit-messages/SKILL.md",
 ]
 use_when = [
   "The task involves job execution, steps, retry, skip, checkpoint, locks, workers, or scheduling.",
@@ -41,6 +43,7 @@ skills = [
   "../.agents/skills/nest-batch-architecture/SKILL.md",
   "../.agents/skills/testing/SKILL.md",
   "../.agents/skills/public-api-docs/SKILL.md",
+  "../.agents/skills/commit-messages/SKILL.md",
 ]
 use_when = [
   "The task involves Postgres, MySQL, MariaDB, SQL dialects, migrations, repository, checkpoint, or lock adapters.",
@@ -58,6 +61,7 @@ skills = [
   "../.agents/skills/batch-runtime/SKILL.md",
   "../.agents/skills/testing/SKILL.md",
   "../.agents/skills/public-api-docs/SKILL.md",
+  "../.agents/skills/commit-messages/SKILL.md",
 ]
 use_when = [
   "The task involves TypeORM, MikroORM, Prisma, EntityManager, PrismaClient, ORM transactions, or Nest DI wiring.",
@@ -75,6 +79,7 @@ skills = [
   "../.agents/skills/orm-integrations/SKILL.md",
   "../.agents/skills/testing/SKILL.md",
   "../.agents/skills/public-api-docs/SKILL.md",
+  "../.agents/skills/commit-messages/SKILL.md",
 ]
 use_when = [
   "The user asks to implement or modify behavior.",
@@ -92,6 +97,7 @@ skills = [
   "../.agents/skills/database-adapters/SKILL.md",
   "../.agents/skills/orm-integrations/SKILL.md",
   "../.agents/skills/public-api-docs/SKILL.md",
+  "../.agents/skills/commit-messages/SKILL.md",
 ]
 use_when = [
   "The user asks for a review.",
@@ -108,6 +114,7 @@ skills = [
   "../.agents/skills/batch-runtime/SKILL.md",
   "../.agents/skills/database-adapters/SKILL.md",
   "../.agents/skills/orm-integrations/SKILL.md",
+  "../.agents/skills/commit-messages/SKILL.md",
 ]
 use_when = [
   "The user asks for documentation.",

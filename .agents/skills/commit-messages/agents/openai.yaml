@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit Messages"
+  short_description: "Korean commit message convention"
+  default_prompt: "Use $commit-messages to write a Korean commit message for nest-batch."

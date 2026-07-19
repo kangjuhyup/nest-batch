@@ -32,6 +32,7 @@ description: nest-batch의 README, public API 문서, JSDoc, 예제를 정리하
 - 필요 시 [batch-runtime](skills/batch-runtime/SKILL.md)
 - 필요 시 [database-adapters](skills/database-adapters/SKILL.md)
 - 필요 시 [orm-integrations](skills/orm-integrations/SKILL.md)
+- 커밋 작성 시 [commit-messages](skills/commit-messages/SKILL.md)
 
 ## Priorities
 
