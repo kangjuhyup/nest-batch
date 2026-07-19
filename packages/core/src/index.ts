@@ -1,6 +1,7 @@
 export { defineChunkStep, defineJob, defineStep, isSkipItem, skipItem } from "./definitions.js";
-export { SKIP_ITEM } from "./types.js";
+export { DatabaseBatchStorage, SKIP_ITEM } from "./types.js";
 export type {
+  AnyStepDefinition,
   BatchExecutionId,
   BatchRunOptions,
   BatchRunner,

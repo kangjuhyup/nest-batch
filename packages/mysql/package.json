@@ -1,7 +1,7 @@
 {
   "name": "@nest-batch/mysql",
   "version": "0.0.1",
-  "description": "MySQL persistence adapter boundary for nest-batch.",
+  "description": "MySQL persistence adapter for nest-batch.",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.js",
@@ -15,9 +15,10 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run --root ../.. --config vitest.config.ts packages/mysql/test/exports.test.ts"
+    "test": "vitest run --root ../.. --config vitest.config.ts packages/mysql/test/adapter.test.ts"
   },
   "dependencies": {
-    "@nest-batch/core": "workspace:*"
+    "@nest-batch/core": "workspace:*",
+    "mysql2": "^3.23.0"
   }
 }

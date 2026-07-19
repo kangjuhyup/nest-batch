@@ -1,7 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { defineChunkStep, defineJob, defineStep, isSkipItem, skipItem } from "../src/index.js";
+import {
+  DatabaseBatchStorage,
+  defineChunkStep,
+  defineJob,
+  defineStep,
+  isSkipItem,
+  skipItem
+} from "../src/index.js";
+import type { CheckpointStore, JobRepository, LockManager } from "../src/index.js";
+
+class FakeDatabaseBatchStorage extends DatabaseBatchStorage {
+  constructor(
+    readonly repository: JobRepository,
+    readonly checkpointStore: CheckpointStore,
+    readonly lockManager: LockManager
+  ) {
+    super();
+  }
+}
 
 describe("core definitions / core 정의", () => {
+  it("groups database adapters behind one storage abstraction / database adapter들을 하나의 storage 추상화로 묶는다", () => {
+    const repository = {} as JobRepository;
+    const checkpointStore = {} as CheckpointStore;
+    const lockManager = {} as LockManager;
+    const storage = new FakeDatabaseBatchStorage(repository, checkpointStore, lockManager);
+
+    expect(storage).toBeInstanceOf(DatabaseBatchStorage);
+    expect(storage.repository).toBe(repository);
+    expect(storage.checkpointStore).toBe(checkpointStore);
+    expect(storage.lockManager).toBe(lockManager);
+  });
+
   it("defines a job with ordered steps without NestJS / NestJS 없이 순서가 있는 step으로 job을 정의한다", async () => {
     const step = defineStep({
       name: "load-users",

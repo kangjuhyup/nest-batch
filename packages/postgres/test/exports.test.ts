@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { DatabaseBatchStorage } from "@nest-batch/core";
 import {
+  PostgresBatchStorage,
   PostgresCheckpointStore,
   PostgresJobRepository,
   PostgresLockManager,
@@ -7,6 +9,16 @@ import {
 } from "../src/index.js";
 
 describe("postgres package exports / postgres package export를 검증한다", () => {
+  it("implements DatabaseBatchStorage with postgres adapters / postgres adapter로 DatabaseBatchStorage를 구현한다", () => {
+    const options = { connectionString: "postgres://localhost/nest_batch", schema: "batch" };
+    const storage = new PostgresBatchStorage(options);
+
+    expect(storage).toBeInstanceOf(DatabaseBatchStorage);
+    expect(storage.repository).toBeInstanceOf(PostgresJobRepository);
+    expect(storage.checkpointStore).toBeInstanceOf(PostgresCheckpointStore);
+    expect(storage.lockManager).toBeInstanceOf(PostgresLockManager);
+  });
+
   it("constructs adapter shells with explicit options / 명시한 option으로 adapter shell을 생성한다", () => {
     const options = { connectionString: "postgres://localhost/nest_batch" };
 

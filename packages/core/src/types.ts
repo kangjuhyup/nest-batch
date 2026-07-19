@@ -86,9 +86,11 @@ export type StepDefinition<Input = unknown, Output = unknown> =
   | TaskletStepDefinition<Input, Output>
   | ChunkStepDefinition<Input, Output>;
 
+export type AnyStepDefinition = StepDefinition<any, any>;
+
 export interface JobDefinition<Parameters extends JobParameters = JobParameters> {
   readonly name: string;
-  readonly steps: readonly StepDefinition[];
+  readonly steps: readonly AnyStepDefinition[];
   readonly parametersSchema?: (parameters: unknown) => Parameters;
 }
 
@@ -133,6 +135,16 @@ export interface LockAcquireOptions {
 export interface LockManager {
   acquire(resource: string, ownerId: string, options?: LockAcquireOptions): Promise<LockHandle | undefined>;
   release(handle: LockHandle): Promise<void>;
+}
+
+export abstract class DatabaseBatchStorage {
+  abstract readonly repository: JobRepository;
+  abstract readonly checkpointStore: CheckpointStore;
+  abstract readonly lockManager: LockManager;
+
+  async initialize(): Promise<void> {}
+
+  async close(): Promise<void> {}
 }
 
 export interface BatchRunOptions {

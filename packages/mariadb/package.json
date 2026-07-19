@@ -1,7 +1,7 @@
 {
   "name": "@nest-batch/mariadb",
   "version": "0.0.1",
-  "description": "MariaDB persistence adapter boundary for nest-batch.",
+  "description": "MariaDB persistence adapter for nest-batch.",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.js",
@@ -12,12 +12,15 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run --root ../.. --config vitest.config.ts packages/mariadb/test/exports.test.ts"
+    "test": "vitest run --root ../.. --config vitest.config.ts packages/mariadb/test/adapter.test.ts"
   },
   "dependencies": {
-    "@nest-batch/core": "workspace:*"
+    "@nest-batch/core": "workspace:*",
+    "mariadb": "^3.5.3"
   }
 }
