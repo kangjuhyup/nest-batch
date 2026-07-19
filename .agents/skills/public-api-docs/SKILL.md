@@ -1,6 +1,6 @@
 ---
 name: public-api-docs
-description: nest-batch 저장소에서 README, quickstart, cookbook, JSDoc, public API 설명, 예제 코드를 작성하거나 갱신할 때 우선 사용한다. decorator API, programmatic API, CLI, retry/restart/checkpoint 의미를 사용자 문서에 반영해야 하는 작업에서 사용한다.
+description: nest-batch 저장소에서 README, quickstart, cookbook, JSDoc, 설계 문서, public API 설명, 예제 코드를 작성하거나 갱신할 때 우선 사용한다. decorator API, programmatic API, CLI, retry/restart/checkpoint 의미를 사용자 문서에 반영해야 하는 작업에서 사용한다.
 ---
 
 # Public API Docs
@@ -11,6 +11,7 @@ description: nest-batch 저장소에서 README, quickstart, cookbook, JSDoc, pub
 
 ## 문서 원칙
 
+- 설계 문서와 `docs/superpowers/specs/` 아래 spec 문서는 한국어로 작성합니다.
 - quickstart는 설치부터 첫 job 실행까지 이어져야 합니다.
 - public API 이름과 import 경로는 실제 export와 일치해야 합니다.
 - retry, skip, restart, checkpoint, idempotency 의미를 과장 없이 설명합니다.
@@ -47,6 +48,7 @@ description: nest-batch 저장소에서 README, quickstart, cookbook, JSDoc, pub
 ## 문체
 
 - 기본 설명은 짧고 직접적으로 씁니다.
+- 본문 설명은 한국어로 쓰고, 코드, public API 이름, npm package 이름, 타입 이름은 영어를 유지합니다.
 - 기능 목록보다 사용 흐름을 우선합니다.
 - 아직 구현되지 않은 기능을 약속처럼 쓰지 않습니다.
 - 코드 주석은 API 의미를 보강할 때만 사용합니다.
