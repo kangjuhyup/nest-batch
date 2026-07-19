@@ -16,6 +16,7 @@ driver-backed repository, checkpoint, lock storage의 초기 구현을 제공합
 
 - `@nest-batch/core`: framework에 독립적인 job/step contract.
 - `@nest-batch/nest`: NestJS module과 decorator integration.
+- `@nest-batch/inmemory`: test와 example용 비영속 in-memory repository, lock, checkpoint storage.
 - `@nest-batch/postgres`: Postgres driver-backed repository, lock, checkpoint storage.
 - `@nest-batch/mysql`: MySQL driver-backed repository, lock, checkpoint storage.
 - `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, checkpoint storage.
@@ -122,6 +123,20 @@ pnpm test:perf:postgres
 custom performance schema는 cleanup이 shared schema를 지우지 않도록
 `batch_perf`로 시작해야 합니다. 이후 lock contention과 stale-lock load test는
 같은 `*.perf.test.ts` pattern과 `test:perf` script를 사용해 추가합니다.
+
+## In-Memory Storage
+
+`@nest-batch/inmemory`는 `JobRepository`, `CheckpointStore`, `LockManager`의
+비영속 구현을 제공합니다. process memory에만 state를 저장하므로 restart,
+multi-process worker, 운영 durability 검증에는 사용하지 않습니다. example e2e,
+runner unit test, 빠른 local smoke test처럼 database fixture가 핵심이 아닌
+경우에 사용합니다.
+
+```ts
+import { InMemoryBatchStorage } from "@nest-batch/inmemory";
+
+const storage = new InMemoryBatchStorage();
+```
 
 ## SQL Storage
 

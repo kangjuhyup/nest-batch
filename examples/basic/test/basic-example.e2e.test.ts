@@ -1,7 +1,7 @@
 import { DefaultBatchRunner } from "@nest-batch/core";
+import { InMemoryBatchStorage } from "@nest-batch/inmemory";
 import { describe, expect, it } from "vitest";
 import { dailyUserImport, writtenUsers } from "../src/index.js";
-import { InMemoryBatchStorage } from "./support/in-memory-batch-storage.js";
 
 describe("basic example e2e / basic example e2e를 검증한다", () => {
   it("runs the exported import job / export된 import job을 실행한다", async () => {

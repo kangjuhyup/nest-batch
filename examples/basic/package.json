@@ -10,6 +10,7 @@
     "@nest-batch/core": "workspace:*"
   },
   "devDependencies": {
+    "@nest-batch/inmemory": "workspace:*",
     "typescript": "^5.7.3"
   }
 }

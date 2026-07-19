@@ -8,6 +8,7 @@ export default defineConfig({
     alias: {
       "@nest-batch/core": fromRoot("./packages/core/src/index.ts"),
       "@nest-batch/nest": fromRoot("./packages/nest/src/index.ts"),
+      "@nest-batch/inmemory": fromRoot("./packages/inmemory/src/index.ts"),
       "@nest-batch/postgres": fromRoot("./packages/postgres/src/index.ts"),
       "@nest-batch/mysql": fromRoot("./packages/mysql/src/index.ts"),
       "@nest-batch/mariadb": fromRoot("./packages/mariadb/src/index.ts"),

@@ -16,6 +16,7 @@ scheduling are not implemented yet.
 
 - `@nest-batch/core`: framework-independent job and step contracts.
 - `@nest-batch/nest`: NestJS module and decorator integration.
+- `@nest-batch/inmemory`: non-durable in-memory repository, lock, and checkpoint storage for tests and examples.
 - `@nest-batch/postgres`: Postgres driver-backed repository, lock, and checkpoint storage.
 - `@nest-batch/mysql`: MySQL driver-backed repository, lock, and checkpoint storage.
 - `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, and checkpoint storage.
@@ -119,6 +120,20 @@ pnpm test:perf:postgres
 Custom performance schemas must start with `batch_perf` so cleanup cannot drop
 shared schemas. Future lock contention and stale-lock load tests should use the
 same `*.perf.test.ts` pattern and `test:perf` script.
+
+## In-Memory Storage
+
+`@nest-batch/inmemory` provides non-durable implementations of `JobRepository`,
+`CheckpointStore`, and `LockManager`. State lives only in process memory, so do
+not use it for restart, multi-process worker, or production durability
+validation. It is intended for example e2e tests, runner unit tests, and fast
+local smoke tests where a database fixture is not the behavior under test.
+
+```ts
+import { InMemoryBatchStorage } from "@nest-batch/inmemory";
+
+const storage = new InMemoryBatchStorage();
+```
 
 ## SQL Storage
 

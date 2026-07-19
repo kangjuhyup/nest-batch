@@ -23,6 +23,13 @@ Core owns:
 Nest integration contains module APIs, decorators, discovery, and lifecycle
 integration. It depends on `@nest-batch/core`; core does not depend on NestJS.
 
+## `@nest-batch/inmemory`
+
+in-memory package는 core repository, checkpoint, lock contract의 비영속 구현을
+담습니다. example-local test support가 아니라 adapter package가 소유하므로,
+example app 안에 storage 동작을 넣지 않고 examples와 unit test가 같은 contract
+구현을 공유할 수 있습니다.
+
 ## `@nest-batch/postgres`
 
 The Postgres package contains driver-backed job and step execution repository,

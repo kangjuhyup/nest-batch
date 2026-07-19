@@ -3,6 +3,7 @@
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/nest" },
+    { "path": "./packages/inmemory" },
     { "path": "./packages/postgres" },
     { "path": "./packages/mysql" },
     { "path": "./packages/mariadb" },

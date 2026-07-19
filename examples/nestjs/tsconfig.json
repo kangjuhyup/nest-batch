@@ -8,5 +8,9 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../../packages/core" }, { "path": "../../packages/nest" }]
+  "references": [
+    { "path": "../../packages/core" },
+    { "path": "../../packages/inmemory" },
+    { "path": "../../packages/nest" }
+  ]
 }

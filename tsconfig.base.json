@@ -16,6 +16,7 @@
     "paths": {
       "@nest-batch/core": ["packages/core/src/index.ts"],
       "@nest-batch/nest": ["packages/nest/src/index.ts"],
+      "@nest-batch/inmemory": ["packages/inmemory/src/index.ts"],
       "@nest-batch/postgres": ["packages/postgres/src/index.ts"],
       "@nest-batch/mysql": ["packages/mysql/src/index.ts"],
       "@nest-batch/mariadb": ["packages/mariadb/src/index.ts"],
