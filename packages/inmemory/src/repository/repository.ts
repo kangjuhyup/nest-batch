@@ -1,12 +1,14 @@
 import type {
   BatchExecutionId,
   JobExecution,
+  JobExecutionAttempt,
   JobInstance,
   JobInstanceId,
   JobParametersHash,
   JobRepository,
   StepExecution
 } from "@nest-batch/core";
+import { cloneJobExecution, cloneJobInstance, cloneStepExecution } from "./mapper.js";
 
 export class InMemoryJobRepository implements JobRepository {
   private readonly executions = new Map<BatchExecutionId, JobExecution>();
@@ -47,6 +49,27 @@ export class InMemoryJobRepository implements JobRepository {
       .sort(compareJobExecutionByCreatedAtDesc)[0];
 
     return execution ? cloneJobExecution(execution) : undefined;
+  }
+
+  async createExecutionAttempt(
+    instance: JobInstance,
+    execution: JobExecution
+  ): Promise<JobExecutionAttempt> {
+    const existingInstance =
+      (await this.findJobInstance(instance.jobName, instance.parametersHash)) ??
+      (await this.createJobInstance(instance));
+    const activeExecution = await this.findActiveJobExecution(existingInstance.id);
+
+    if (activeExecution) {
+      return { instance: existingInstance, activeExecution };
+    }
+
+    await this.create({
+      ...execution,
+      instanceId: existingInstance.id
+    });
+
+    return { instance: existingInstance };
   }
 
   async create(execution: JobExecution): Promise<void> {
@@ -104,27 +127,4 @@ const compareJobExecutionByCreatedAtDesc = (left: JobExecution, right: JobExecut
 const compareStepExecutionByCreatedAtAsc = (left: StepExecution, right: StepExecution): number => {
   const diff = left.createdAt.getTime() - right.createdAt.getTime();
   return diff === 0 ? left.id.localeCompare(right.id) : diff;
-};
-
-const cloneJobInstance = (instance: JobInstance): JobInstance => ({
-  ...instance,
-  createdAt: new Date(instance.createdAt.getTime())
-});
-
-const cloneJobExecution = (execution: JobExecution): JobExecution => ({
-  ...execution,
-  createdAt: new Date(execution.createdAt.getTime()),
-  startedAt: cloneOptionalDate(execution.startedAt),
-  endedAt: cloneOptionalDate(execution.endedAt)
-});
-
-const cloneStepExecution = (execution: StepExecution): StepExecution => ({
-  ...execution,
-  createdAt: new Date(execution.createdAt.getTime()),
-  startedAt: cloneOptionalDate(execution.startedAt),
-  endedAt: cloneOptionalDate(execution.endedAt)
-});
-
-const cloneOptionalDate = (date?: Date): Date | undefined => {
-  return date ? new Date(date.getTime()) : undefined;
 };

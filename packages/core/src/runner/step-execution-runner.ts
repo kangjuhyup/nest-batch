@@ -1,5 +1,6 @@
 import { errorToFailureReason, isAbortError } from "./errors.js";
 import { runChunkStep } from "./chunk-step-runner.js";
+import { emitBatchEvent } from "./events.js";
 import { runTaskletStep } from "./tasklet-step-runner.js";
 import type {
   AnyStepDefinition,
@@ -52,6 +53,7 @@ export const runStepExecution = async (
       startedAt: options.now()
     };
     await storage.repository.updateStepExecution(execution);
+    await emitBatchEvent(context.observer, { type: "step.started", execution });
 
     const result =
       step.kind === "chunk"
@@ -65,6 +67,7 @@ export const runStepExecution = async (
       endedAt: options.now()
     };
     await storage.repository.updateStepExecution(execution);
+    await emitBatchEvent(context.observer, { type: "step.completed", execution });
 
     return result;
   } catch (error) {
@@ -75,7 +78,45 @@ export const runStepExecution = async (
       failureReason: errorToFailureReason(error)
     };
     await storage.repository.updateStepExecution(execution);
+    await emitBatchEvent(context.observer, {
+      type: execution.status === "cancelled" ? "step.cancelled" : "step.failed",
+      execution
+    });
 
     throw error;
   }
+};
+
+export const recordCompletedRestartStepExecution = async (
+  previousExecution: StepExecution,
+  context: StepRunContext,
+  options: StepExecutionRunnerOptions
+): Promise<StepRunResult> => {
+  const execution: StepExecution = {
+    id: options.generateStepExecutionId({
+      jobExecutionId: context.jobExecutionId,
+      stepName: previousExecution.stepName,
+      stepIndex: context.stepIndex
+    }),
+    jobExecutionId: context.jobExecutionId,
+    stepName: previousExecution.stepName,
+    status: "completed",
+    readCount: previousExecution.readCount,
+    writeCount: previousExecution.writeCount,
+    skipCount: previousExecution.skipCount,
+    retryCount: previousExecution.retryCount,
+    createdAt: options.now(),
+    startedAt: options.now(),
+    endedAt: options.now()
+  };
+
+  await options.storage.repository.createStepExecution(execution);
+  await emitBatchEvent(context.observer, { type: "step.completed", execution });
+
+  return {
+    readCount: execution.readCount,
+    writeCount: execution.writeCount,
+    skipCount: execution.skipCount,
+    retryCount: execution.retryCount
+  };
 };

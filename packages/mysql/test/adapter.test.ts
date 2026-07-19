@@ -14,6 +14,8 @@ interface MySqlCall {
 
 class FakeMySqlPool {
   readonly calls: MySqlCall[] = [];
+  readonly transactions: string[] = [];
+  releasedConnections = 0;
   private readonly results: unknown[] = [];
 
   queueRows(rows: readonly Record<string, unknown>[]): void {
@@ -37,6 +39,30 @@ class FakeMySqlPool {
     }
 
     return result ?? [{ affectedRows: 0 }, []];
+  }
+
+  async getConnection(): Promise<{
+    execute: FakeMySqlPool["execute"];
+    beginTransaction(): Promise<void>;
+    commit(): Promise<void>;
+    rollback(): Promise<void>;
+    release(): void;
+  }> {
+    return {
+      execute: (sql, values) => this.execute(sql, values),
+      beginTransaction: async () => {
+        this.transactions.push("begin");
+      },
+      commit: async () => {
+        this.transactions.push("commit");
+      },
+      rollback: async () => {
+        this.transactions.push("rollback");
+      },
+      release: () => {
+        this.releasedConnections += 1;
+      }
+    };
   }
 }
 
@@ -315,6 +341,38 @@ describe("mysql adapter / mysql adapter를 검증한다", () => {
     });
     expect(pool.calls[3]?.sql).toContain("status = 'failed'");
     expect(pool.calls[3]?.sql).toContain("ORDER BY created_at DESC, id DESC");
+  });
+
+  it("creates execution attempts inside a mysql transaction / mysql transaction 안에서 execution attempt를 생성한다", async () => {
+    const pool = new FakeMySqlPool();
+    const repository = new MySqlJobRepository({ pool, database: "batch", tablePrefix: "nb" });
+    const createdAt = new Date("2026-07-19T00:00:00.000Z");
+
+    pool.queueResult(1);
+    pool.queueRows([
+      {
+        id: "instance-1",
+        job_name: "daily-user-import",
+        parameters_hash: "sha256:parameters",
+        parameters: JSON.stringify({ tenant: "acme" }),
+        created_at: createdAt
+      }
+    ]);
+    pool.queueRows([]);
+    pool.queueResult(1);
+
+    await expect(
+      repository.createExecutionAttempt(
+        createInstance({ createdAt }),
+        createExecution({ createdAt })
+      )
+    ).resolves.toEqual({ instance: createInstance({ createdAt }) });
+
+    expect(pool.transactions).toEqual(["begin", "commit"]);
+    expect(pool.calls[0]?.sql).toContain("INSERT IGNORE INTO `batch`.`nb_job_instances`");
+    expect(pool.calls[1]?.sql).toContain("FOR UPDATE");
+    expect(pool.calls[3]?.sql).toContain("INSERT INTO `batch`.`nb_job_executions`");
+    expect(pool.releasedConnections).toBe(1);
   });
 
   it("stores and removes checkpoints through upsert SQL / upsert SQL로 checkpoint를 저장하고 삭제한다", async () => {

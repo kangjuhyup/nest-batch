@@ -1,21 +1,22 @@
 import type { LockAcquireOptions, LockHandle, LockManager } from "@nest-batch/core";
-import { resolveMariaDbPool } from "./driver.js";
-import type { MariaDbBatchOptions } from "./options.js";
-import type { MariaDbPoolLike } from "./options.js";
+import { resolveMySqlPool } from "../driver.js";
+import type { MySqlBatchOptions } from "../options.js";
+import type { MySqlPoolLike } from "../options.js";
 import {
-  affectedRowsFromMariaDbResult,
-  createMariaDbTables,
-  isMariaDbDuplicateKeyError,
-  type MariaDbTables
-} from "./sql.js";
+  affectedRowsFromMySqlResult,
+  createMySqlTables,
+  isMySqlDuplicateKeyError,
+  type MySqlTables
+} from "../sql.js";
+import { createLockHandle, createLockTimes } from "./lock-state.js";
 
-export class MariaDbLockManager implements LockManager {
-  private readonly pool: MariaDbPoolLike;
-  private readonly tables: MariaDbTables;
+export class MySqlLockManager implements LockManager {
+  private readonly pool: MySqlPoolLike;
+  private readonly tables: MySqlTables;
 
-  constructor(readonly options: MariaDbBatchOptions) {
-    this.pool = resolveMariaDbPool(options);
-    this.tables = createMariaDbTables(options);
+  constructor(readonly options: MySqlBatchOptions) {
+    this.pool = resolveMySqlPool(options);
+    this.tables = createMySqlTables(options);
   }
 
   async acquire(
@@ -27,7 +28,7 @@ export class MariaDbLockManager implements LockManager {
     const { acquiredAt, expiresAt } = createLockTimes(options?.ttlMs);
     const handle = createLockHandle(resource, ownerId, expiresAt);
 
-    const renewalResult = await this.pool.query(
+    const renewalResult = await this.pool.execute(
       `
         UPDATE ${this.tables.locks}
         SET acquired_at = ?, expires_at = ?
@@ -36,12 +37,12 @@ export class MariaDbLockManager implements LockManager {
       [acquiredAt, expiresAt ?? null, resource, ownerId]
     );
 
-    if (affectedRowsFromMariaDbResult(renewalResult) > 0) {
+    if (affectedRowsFromMySqlResult(renewalResult) > 0) {
       return handle;
     }
 
     options?.signal?.throwIfAborted();
-    await this.pool.query(
+    await this.pool.execute(
       `
         DELETE FROM ${this.tables.locks}
         WHERE resource = ? AND expires_at IS NOT NULL AND expires_at <= CURRENT_TIMESTAMP(3)
@@ -52,7 +53,7 @@ export class MariaDbLockManager implements LockManager {
     options?.signal?.throwIfAborted();
 
     try {
-      await this.pool.query(
+      await this.pool.execute(
         `
           INSERT INTO ${this.tables.locks} (
             resource,
@@ -65,7 +66,7 @@ export class MariaDbLockManager implements LockManager {
         [resource, ownerId, acquiredAt, expiresAt ?? null]
       );
     } catch (error) {
-      if (isMariaDbDuplicateKeyError(error)) {
+      if (isMySqlDuplicateKeyError(error)) {
         return undefined;
       }
 
@@ -76,7 +77,7 @@ export class MariaDbLockManager implements LockManager {
   }
 
   async release(handle: LockHandle): Promise<void> {
-    await this.pool.query(
+    await this.pool.execute(
       `
         DELETE FROM ${this.tables.locks}
         WHERE resource = ? AND owner_id = ?
@@ -85,19 +86,3 @@ export class MariaDbLockManager implements LockManager {
     );
   }
 }
-
-const createLockTimes = (ttlMs?: number): { readonly acquiredAt: Date; readonly expiresAt?: Date } => {
-  if (ttlMs !== undefined && (!Number.isSafeInteger(ttlMs) || ttlMs <= 0)) {
-    throw new TypeError("MariaDB lock ttlMs must be a positive safe integer.");
-  }
-
-  const acquiredAt = new Date();
-  return {
-    acquiredAt,
-    expiresAt: ttlMs ? new Date(acquiredAt.getTime() + ttlMs) : undefined
-  };
-};
-
-const createLockHandle = (resource: string, ownerId: string, expiresAt?: Date): LockHandle => {
-  return expiresAt ? { resource, ownerId, expiresAt } : { resource, ownerId };
-};

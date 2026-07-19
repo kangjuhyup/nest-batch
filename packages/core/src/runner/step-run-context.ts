@@ -1,4 +1,4 @@
-import type { BatchExecutionId } from "../types/index.js";
+import type { BatchExecutionId, BatchObserver } from "../types/index.js";
 
 export interface StepRunContext {
   readonly jobExecutionId: BatchExecutionId;
@@ -6,6 +6,7 @@ export interface StepRunContext {
   readonly stepIndex: number;
   readonly input: unknown;
   readonly signal?: AbortSignal;
+  readonly observer?: BatchObserver;
 }
 
 export interface StepRunResult {

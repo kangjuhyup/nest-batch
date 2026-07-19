@@ -1,4 +1,5 @@
 import type { LockAcquireOptions, LockHandle, LockManager } from "@nest-batch/core";
+import { createExpiresAt, createLockHandle, isLockActive } from "./lock-state.js";
 
 export class InMemoryLockManager implements LockManager {
   private readonly locks = new Map<string, LockHandle>();
@@ -12,7 +13,7 @@ export class InMemoryLockManager implements LockManager {
     const expiresAt = createExpiresAt(options.ttlMs);
     const existing = this.locks.get(resource);
 
-    if (existing && isActive(existing)) {
+    if (existing && isLockActive(existing)) {
       if (existing.ownerId !== ownerId) {
         return undefined;
       }
@@ -35,19 +36,3 @@ export class InMemoryLockManager implements LockManager {
     }
   }
 }
-
-const createExpiresAt = (ttlMs?: number): Date | undefined => {
-  if (ttlMs !== undefined && (!Number.isSafeInteger(ttlMs) || ttlMs <= 0)) {
-    throw new TypeError("InMemory lock ttlMs must be a positive safe integer.");
-  }
-
-  return ttlMs === undefined ? undefined : new Date(Date.now() + ttlMs);
-};
-
-const createLockHandle = (resource: string, ownerId: string, expiresAt?: Date): LockHandle => {
-  return expiresAt ? { resource, ownerId, expiresAt } : { resource, ownerId };
-};
-
-const isActive = (handle: LockHandle): boolean => {
-  return !handle.expiresAt || handle.expiresAt.getTime() > Date.now();
-};

@@ -1,9 +1,9 @@
 import { DatabaseBatchStorage } from "@nest-batch/core";
 import { MySqlCheckpointStore } from "./checkpoint-store.js";
 import { resolveMySqlPool } from "./driver.js";
-import { MySqlLockManager } from "./lock-manager.js";
+import { MySqlLockManager } from "./lock/lock-manager.js";
 import type { MySqlBatchOptions, MySqlPoolLike } from "./options.js";
-import { MySqlJobRepository } from "./repository.js";
+import { MySqlJobRepository } from "./repository/repository.js";
 import { ensureMySqlSchema } from "./schema.js";
 
 export class MySqlBatchStorage extends DatabaseBatchStorage {

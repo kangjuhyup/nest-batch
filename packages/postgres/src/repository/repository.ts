@@ -1,29 +1,26 @@
 import type {
   BatchExecutionId,
   JobExecution,
+  JobExecutionAttempt,
   JobInstance,
   JobInstanceId,
   JobParametersHash,
   JobRepository,
   StepExecution
 } from "@nest-batch/core";
-import { resolvePostgresPool } from "./driver.js";
-import type { PostgresBatchOptions } from "./options.js";
-import type { PostgresPoolLike } from "./options.js";
+import { resolvePostgresPool } from "../driver.js";
+import { toJobExecution, toJobInstance, toStepExecution } from "./mapper.js";
+import type { PostgresBatchOptions } from "../options.js";
+import type { PostgresClientLike, PostgresPoolLike } from "../options.js";
 import {
   createPostgresTables,
-  parsePostgresJobParameters,
-  parsePostgresJobStatus,
-  parsePostgresOptionalDate,
-  parsePostgresRequiredDate,
-  parsePostgresStepStatus,
   rowsFromPostgresResult,
   stringifyPostgresJson,
   type PostgresJobExecutionRow,
   type PostgresJobInstanceRow,
   type PostgresStepExecutionRow,
   type PostgresTables
-} from "./sql.js";
+} from "../sql.js";
 
 export class PostgresJobRepository implements JobRepository {
   private readonly pool: PostgresPoolLike;
@@ -131,6 +128,57 @@ export class PostgresJobRepository implements JobRepository {
     const [row] = rowsFromPostgresResult<PostgresJobExecutionRow>(result);
 
     return row ? toJobExecution(row) : undefined;
+  }
+
+  async createExecutionAttempt(
+    instance: JobInstance,
+    execution: JobExecution
+  ): Promise<JobExecutionAttempt> {
+    return this.withTransaction(async (client) => {
+      await client.query(
+        `
+          INSERT INTO ${this.tables.jobInstances} (
+            id,
+            job_name,
+            parameters_hash,
+            parameters,
+            created_at
+          )
+          VALUES ($1, $2, $3, $4::jsonb, $5)
+          ON CONFLICT (job_name, parameters_hash) DO NOTHING
+        `,
+        [
+          instance.id,
+          instance.jobName,
+          instance.parametersHash,
+          stringifyPostgresJson(instance.parameters),
+          instance.createdAt
+        ]
+      );
+
+      const storedInstance = await this.findJobInstanceWithClient(
+        client,
+        instance.jobName,
+        instance.parametersHash
+      );
+
+      if (!storedInstance) {
+        throw new Error(`Failed to create job instance "${instance.id}".`);
+      }
+
+      const activeExecution = await this.findActiveJobExecutionWithClient(client, storedInstance.id);
+
+      if (activeExecution) {
+        return { instance: storedInstance, activeExecution };
+      }
+
+      await this.createWithClient(client, {
+        ...execution,
+        instanceId: storedInstance.id
+      });
+
+      return { instance: storedInstance };
+    });
   }
 
   async create(execution: JobExecution): Promise<void> {
@@ -315,49 +363,113 @@ export class PostgresJobRepository implements JobRepository {
 
     return rowsFromPostgresResult<PostgresStepExecutionRow>(result).map(toStepExecution);
   }
-}
 
-const toJobInstance = (row: PostgresJobInstanceRow): JobInstance => ({
-  id: row.id,
-  jobName: row.job_name,
-  parametersHash: row.parameters_hash,
-  parameters: parsePostgresJobParameters(row.parameters),
-  createdAt: parsePostgresRequiredDate(row.created_at, "created_at")
-});
+  private async withTransaction<T>(
+    operation: (client: PostgresClientLike) => Promise<T>
+  ): Promise<T> {
+    if (!this.pool.connect) {
+      return operation(this.pool);
+    }
 
-const toJobExecution = (row: PostgresJobExecutionRow): JobExecution => ({
-  id: row.id,
-  instanceId: row.instance_id,
-  jobName: row.job_name,
-  status: parsePostgresJobStatus(row.status),
-  parameters: parsePostgresJobParameters(row.parameters),
-  createdAt: parsePostgresRequiredDate(row.created_at, "created_at"),
-  startedAt: parsePostgresOptionalDate(row.started_at),
-  endedAt: parsePostgresOptionalDate(row.ended_at),
-  failureReason: typeof row.failure_reason === "string" ? row.failure_reason : undefined
-});
+    const client = await this.pool.connect();
 
-const toStepExecution = (row: PostgresStepExecutionRow): StepExecution => ({
-  id: row.id,
-  jobExecutionId: row.job_execution_id,
-  stepName: row.step_name,
-  status: parsePostgresStepStatus(row.status),
-  readCount: parsePostgresCount(row.read_count, "read_count"),
-  writeCount: parsePostgresCount(row.write_count, "write_count"),
-  skipCount: parsePostgresCount(row.skip_count, "skip_count"),
-  retryCount: parsePostgresCount(row.retry_count, "retry_count"),
-  createdAt: parsePostgresRequiredDate(row.created_at, "created_at"),
-  startedAt: parsePostgresOptionalDate(row.started_at),
-  endedAt: parsePostgresOptionalDate(row.ended_at),
-  failureReason: typeof row.failure_reason === "string" ? row.failure_reason : undefined
-});
-
-const parsePostgresCount = (value: unknown, fieldName: string): number => {
-  const count = typeof value === "number" ? value : Number(value);
-
-  if (!Number.isSafeInteger(count) || count < 0) {
-    throw new TypeError(`Invalid Postgres ${fieldName} count.`);
+    try {
+      await client.query("BEGIN");
+      const result = await operation(client);
+      await client.query("COMMIT");
+      return result;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release?.();
+    }
   }
 
-  return count;
-};
+  private async findJobInstanceWithClient(
+    client: PostgresClientLike,
+    jobName: string,
+    parametersHash: JobParametersHash
+  ): Promise<JobInstance | undefined> {
+    const result = await client.query<PostgresJobInstanceRow>(
+      `
+        SELECT
+          id,
+          job_name,
+          parameters_hash,
+          parameters,
+          created_at
+        FROM ${this.tables.jobInstances}
+        WHERE job_name = $1
+          AND parameters_hash = $2
+        FOR UPDATE
+      `,
+      [jobName, parametersHash]
+    );
+    const [row] = rowsFromPostgresResult<PostgresJobInstanceRow>(result);
+
+    return row ? toJobInstance(row) : undefined;
+  }
+
+  private async findActiveJobExecutionWithClient(
+    client: PostgresClientLike,
+    instanceId: JobInstanceId
+  ): Promise<JobExecution | undefined> {
+    const result = await client.query<PostgresJobExecutionRow>(
+      `
+        SELECT
+          id,
+          instance_id,
+          job_name,
+          status,
+          parameters,
+          created_at,
+          started_at,
+          ended_at,
+          failure_reason
+        FROM ${this.tables.jobExecutions}
+        WHERE instance_id = $1
+          AND status IN ('created', 'running')
+        ORDER BY created_at ASC, id ASC
+        LIMIT 1
+      `,
+      [instanceId]
+    );
+    const [row] = rowsFromPostgresResult<PostgresJobExecutionRow>(result);
+
+    return row ? toJobExecution(row) : undefined;
+  }
+
+  private async createWithClient(
+    client: PostgresClientLike,
+    execution: JobExecution
+  ): Promise<void> {
+    await client.query(
+      `
+        INSERT INTO ${this.tables.jobExecutions} (
+          id,
+          instance_id,
+          job_name,
+          status,
+          parameters,
+          created_at,
+          started_at,
+          ended_at,
+          failure_reason
+        )
+        VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9)
+      `,
+      [
+        execution.id,
+        execution.instanceId,
+        execution.jobName,
+        execution.status,
+        stringifyPostgresJson(execution.parameters),
+        execution.createdAt,
+        execution.startedAt ?? null,
+        execution.endedAt ?? null,
+        execution.failureReason ?? null
+      ]
+    );
+  }
+}

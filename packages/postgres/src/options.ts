@@ -3,11 +3,20 @@ export interface PostgresQueryResultLike<TRow = Record<string, unknown>> {
   readonly rowCount?: number | null;
 }
 
+export interface PostgresClientLike {
+  query<TRow = Record<string, unknown>>(
+    sql: string,
+    values?: readonly unknown[]
+  ): Promise<PostgresQueryResultLike<TRow> | unknown>;
+  release?(): void;
+}
+
 export interface PostgresPoolLike {
   query<TRow = Record<string, unknown>>(
     sql: string,
     values?: readonly unknown[]
   ): Promise<PostgresQueryResultLike<TRow> | unknown>;
+  connect?(): Promise<PostgresClientLike>;
   end?(): Promise<void>;
 }
 

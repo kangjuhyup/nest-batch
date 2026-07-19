@@ -14,6 +14,7 @@ interface PostgresCall {
 
 class FakePostgresPool {
   readonly calls: PostgresCall[] = [];
+  releasedConnections = 0;
   private readonly results: unknown[] = [];
 
   queueRows(rows: readonly Record<string, unknown>[]): void {
@@ -37,6 +38,15 @@ class FakePostgresPool {
     }
 
     return result ?? { rows: [], rowCount: 0 };
+  }
+
+  async connect(): Promise<{ query: FakePostgresPool["query"]; release(): void }> {
+    return {
+      query: (sql, values) => this.query(sql, values),
+      release: () => {
+        this.releasedConnections += 1;
+      }
+    };
   }
 }
 
@@ -316,6 +326,48 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
     });
     expect(pool.calls[3]?.sql).toContain("status = 'failed'");
     expect(pool.calls[3]?.sql).toContain("ORDER BY created_at DESC, id DESC");
+  });
+
+  it("creates execution attempts inside a postgres transaction / postgres transaction 안에서 execution attempt를 생성한다", async () => {
+    const pool = new FakePostgresPool();
+    const repository = new PostgresJobRepository({ pool, schema: "batch", tablePrefix: "nb" });
+    const createdAt = new Date("2026-07-19T00:00:00.000Z");
+
+    pool.queueResult(1);
+    pool.queueResult(1);
+    pool.queueRows([
+      {
+        id: "instance-1",
+        job_name: "daily-user-import",
+        parameters_hash: "sha256:parameters",
+        parameters: { tenant: "acme" },
+        created_at: createdAt
+      }
+    ]);
+    pool.queueRows([]);
+    pool.queueResult(1);
+    pool.queueResult(1);
+
+    await expect(
+      repository.createExecutionAttempt(
+        createInstance({ createdAt }),
+        createExecution({ createdAt })
+      )
+    ).resolves.toEqual({ instance: createInstance({ createdAt }) });
+
+    expect(pool.calls.map((call) => call.sql.trim().split(/\s+/)[0])).toEqual([
+      "BEGIN",
+      "INSERT",
+      "SELECT",
+      "SELECT",
+      "INSERT",
+      "COMMIT"
+    ]);
+    expect(pool.calls[1]?.sql).toContain('INSERT INTO "batch"."nb_job_instances"');
+    expect(pool.calls[1]?.sql).toContain("ON CONFLICT (job_name, parameters_hash) DO NOTHING");
+    expect(pool.calls[2]?.sql).toContain("FOR UPDATE");
+    expect(pool.calls[4]?.sql).toContain('INSERT INTO "batch"."nb_job_executions"');
+    expect(pool.releasedConnections).toBe(1);
   });
 
   it("stores and removes checkpoints through postgres upsert SQL / postgres upsert SQL로 checkpoint를 저장하고 삭제한다", async () => {

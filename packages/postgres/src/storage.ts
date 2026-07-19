@@ -1,9 +1,9 @@
 import { DatabaseBatchStorage } from "@nest-batch/core";
 import { PostgresCheckpointStore } from "./checkpoint-store.js";
 import { resolvePostgresPool } from "./driver.js";
-import { PostgresLockManager } from "./lock-manager.js";
+import { PostgresLockManager } from "./lock/lock-manager.js";
 import type { PostgresBatchOptions, PostgresPoolLike } from "./options.js";
-import { PostgresJobRepository } from "./repository.js";
+import { PostgresJobRepository } from "./repository/repository.js";
 import { ensurePostgresSchema } from "./schema.js";
 
 export class PostgresBatchStorage extends DatabaseBatchStorage {

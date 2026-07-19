@@ -25,6 +25,10 @@ class RecordingJobRepository implements JobRepository {
   readonly createdJobs: JobExecution[] = [];
   readonly updatedJobs: JobExecution[] = [];
   readonly createdInstances: JobInstance[] = [];
+  readonly executionAttempts: Array<{
+    readonly instance: JobInstance;
+    readonly execution: JobExecution;
+  }> = [];
   readonly createdSteps: StepExecution[] = [];
   readonly updatedSteps: StepExecution[] = [];
   private readonly jobs = new Map<BatchExecutionId, JobExecution>();
@@ -53,6 +57,25 @@ class RecordingJobRepository implements JobRepository {
     return [...this.jobs.values()]
       .filter((execution) => execution.instanceId === instanceId && execution.status === "failed")
       .sort(compareJobExecutionByCreatedAtDesc)[0];
+  }
+
+  async createExecutionAttempt(
+    instance: JobInstance,
+    execution: JobExecution
+  ): Promise<{ readonly instance: JobInstance; readonly activeExecution?: JobExecution }> {
+    this.executionAttempts.push({ instance, execution });
+    const existingInstance =
+      (await this.findJobInstance(instance.jobName, instance.parametersHash)) ??
+      (await this.createJobInstance(instance));
+    const activeExecution = await this.findActiveJobExecution(existingInstance.id);
+
+    if (activeExecution) {
+      return { instance: existingInstance, activeExecution };
+    }
+
+    await this.create(execution);
+
+    return { instance: existingInstance };
   }
 
   async create(execution: JobExecution): Promise<void> {
@@ -214,6 +237,7 @@ describe("default batch runner / 기본 batch runner", () => {
       }
     ]);
     expect(storage.repository.createdJobs).toHaveLength(1);
+    expect(storage.repository.executionAttempts).toHaveLength(1);
     expect(storage.repository.updatedJobs.map((jobExecution) => jobExecution.status)).toEqual([
       "running",
       "completed"
@@ -378,6 +402,65 @@ describe("default batch runner / 기본 batch runner", () => {
     ]);
   });
 
+  it("emits job and step lifecycle events / job과 step lifecycle event를 발행한다", async () => {
+    const storage = new RecordingStorage();
+    const events: string[] = [];
+    const runner = new DefaultBatchRunner(storage, {
+      generateExecutionId: () => "observed-execution",
+      generateStepExecutionId: ({ stepName }) => `observed-execution:${stepName}`,
+      generateOwnerId: () => "worker-1",
+      observer: {
+        onBatchEvent(event) {
+          events.push(event.type);
+        }
+      }
+    });
+    const job = defineJob({
+      name: "observed-job",
+      steps: [
+        defineStep({
+          name: "load-users",
+          execute() {
+            return "loaded";
+          }
+        })
+      ]
+    });
+
+    await runner.run(job, {});
+
+    expect(events).toEqual(["job.started", "step.started", "step.completed", "job.completed"]);
+  });
+
+  it("ignores observer failures during job execution / observer 실패가 job 실행을 실패시키지 않는다", async () => {
+    const storage = new RecordingStorage();
+    const runner = new DefaultBatchRunner(storage, {
+      generateExecutionId: () => "observer-failure-execution",
+      generateStepExecutionId: ({ stepName }) => `observer-failure-execution:${stepName}`,
+      generateOwnerId: () => "worker-1",
+      observer: {
+        onBatchEvent() {
+          throw new Error("observer unavailable");
+        }
+      }
+    });
+    const job = defineJob({
+      name: "observed-job",
+      steps: [
+        defineStep({
+          name: "load-users",
+          execute() {
+            return "loaded";
+          }
+        })
+      ]
+    });
+
+    const execution = await runner.run(job, {});
+
+    expect(execution.status).toBe("completed");
+  });
+
   it("runs chunk steps and checkpoints after successful writes / chunk write 성공 후 checkpoint를 저장한다", async () => {
     const storage = new RecordingStorage();
     storage.checkpointStore.set("execution-2", "copy-users", { cursor: 2 });
@@ -511,6 +594,118 @@ describe("default batch runner / 기본 batch runner", () => {
       "restart-execution"
     ]);
     expect(storage.repository.createdInstances).toHaveLength(1);
+  });
+
+  it("skips previously completed steps on restart / restart 시 이전에 완료된 step은 다시 실행하지 않는다", async () => {
+    const storage = new RecordingStorage();
+    const parameters = { tenant: "acme" };
+    const instance = createJobInstance("step-aware-restart-job", parameters);
+    await storage.repository.createJobInstance(instance);
+    await storage.repository.create({
+      id: "failed-execution",
+      instanceId: instance.id,
+      jobName: "step-aware-restart-job",
+      status: "failed",
+      parameters,
+      createdAt: new Date("2026-07-19T00:00:00.000Z"),
+      startedAt: new Date("2026-07-19T00:01:00.000Z"),
+      endedAt: new Date("2026-07-19T00:02:00.000Z"),
+      failureReason: "writer unavailable"
+    });
+    await storage.repository.createStepExecution({
+      id: "failed-execution:load-users",
+      jobExecutionId: "failed-execution",
+      stepName: "load-users",
+      status: "completed",
+      readCount: 10,
+      writeCount: 10,
+      skipCount: 0,
+      retryCount: 0,
+      createdAt: new Date("2026-07-19T00:00:10.000Z"),
+      startedAt: new Date("2026-07-19T00:00:11.000Z"),
+      endedAt: new Date("2026-07-19T00:00:12.000Z")
+    });
+    await storage.repository.createStepExecution({
+      id: "failed-execution:copy-users",
+      jobExecutionId: "failed-execution",
+      stepName: "copy-users",
+      status: "failed",
+      readCount: 1,
+      writeCount: 0,
+      skipCount: 0,
+      retryCount: 0,
+      createdAt: new Date("2026-07-19T00:00:20.000Z"),
+      startedAt: new Date("2026-07-19T00:00:21.000Z"),
+      endedAt: new Date("2026-07-19T00:00:22.000Z"),
+      failureReason: "writer unavailable"
+    });
+    storage.checkpointStore.set("failed-execution", "copy-users", { cursor: 1 });
+    let skippedStepRuns = 0;
+    const written: number[][] = [];
+    const seenCheckpoints: unknown[] = [];
+    const runner = new DefaultBatchRunner(storage, {
+      generateExecutionId: () => "restart-execution",
+      generateStepExecutionId: ({ stepName }) => `restart-execution:${stepName}`,
+      generateOwnerId: () => "worker-1"
+    });
+    const job = defineJob({
+      name: "step-aware-restart-job",
+      steps: [
+        defineStep({
+          name: "load-users",
+          execute() {
+            skippedStepRuns += 1;
+            return "loaded";
+          }
+        }),
+        defineChunkStep<number, number, { readonly cursor: number }>({
+          name: "copy-users",
+          chunkSize: 2,
+          reader: {
+            *read({ checkpoint }) {
+              seenCheckpoints.push(checkpoint);
+              const start = checkpoint?.cursor ?? 0;
+              for (let index = start; index < 3; index += 1) {
+                yield index + 1;
+              }
+            }
+          },
+          writer: {
+            write(items) {
+              written.push([...items]);
+            }
+          },
+          checkpoint({ checkpoint, readCount }) {
+            return { cursor: (checkpoint?.cursor ?? 0) + readCount };
+          }
+        })
+      ]
+    });
+
+    const execution = await runner.run(job, parameters, { restart: true });
+
+    expect(execution.status).toBe("completed");
+    expect(skippedStepRuns).toBe(0);
+    expect(seenCheckpoints).toEqual([{ cursor: 1 }]);
+    expect(written).toEqual([[2, 3]]);
+    await expect(storage.repository.findStepExecutions("restart-execution")).resolves.toEqual([
+      expect.objectContaining({
+        stepName: "load-users",
+        status: "completed",
+        readCount: 10,
+        writeCount: 10,
+        skipCount: 0,
+        retryCount: 0
+      }),
+      expect.objectContaining({
+        stepName: "copy-users",
+        status: "completed",
+        readCount: 2,
+        writeCount: 2,
+        skipCount: 0,
+        retryCount: 0
+      })
+    ]);
   });
 
   it("rejects restart without a failed execution / 실패 execution이 없으면 restart를 거부한다", async () => {

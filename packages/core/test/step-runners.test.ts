@@ -140,6 +140,69 @@ describe("step runners / step runner", () => {
     ]);
   });
 
+  it("emits chunk retry and skip events / chunk retry와 skip event를 발행한다", async () => {
+    const checkpointStore = new RecordingCheckpointStore();
+    const events: string[] = [];
+    let processAttempts = 0;
+    const step = defineChunkStep<string, string>({
+      name: "observed-chunk",
+      chunkSize: 2,
+      reader: {
+        *read() {
+          yield "retry-user";
+          yield "skip-user";
+        }
+      },
+      processor: {
+        process(item) {
+          if (item === "retry-user" && processAttempts === 0) {
+            processAttempts += 1;
+            throw new Error("temporary processor failure");
+          }
+
+          if (item === "skip-user") {
+            throw new Error("skip user");
+          }
+
+          return item.toUpperCase();
+        }
+      },
+      writer: {
+        write() {
+          return undefined;
+        }
+      },
+      retryPolicy: {
+        canRetry({ attempt, error }) {
+          return (
+            attempt < 2 &&
+            error instanceof Error &&
+            error.message === "temporary processor failure"
+          );
+        }
+      },
+      skipPolicy: {
+        canSkip({ error }) {
+          return error instanceof Error && error.message === "skip user";
+        }
+      }
+    });
+
+    await runChunkStep(
+      step,
+      createContext({
+        observer: {
+          onBatchEvent(event) {
+            events.push(event.type);
+          }
+        }
+      }),
+      checkpointStore
+    );
+
+    expect(events).toEqual(["retry", "item.skipped", "chunk.written"]);
+  });
+
   it("retries processor failures and records retry count / processor 실패를 재시도하고 retry count를 기록한다", async () => {
     const checkpointStore = new RecordingCheckpointStore();
     const written: string[][] = [];

@@ -1,7 +1,7 @@
 import { DatabaseBatchStorage } from "@nest-batch/core";
 import { InMemoryCheckpointStore } from "./checkpoint-store.js";
-import { InMemoryLockManager } from "./lock-manager.js";
-import { InMemoryJobRepository } from "./repository.js";
+import { InMemoryLockManager } from "./lock/lock-manager.js";
+import { InMemoryJobRepository } from "./repository/repository.js";
 
 export class InMemoryBatchStorage extends DatabaseBatchStorage {
   readonly repository = new InMemoryJobRepository();

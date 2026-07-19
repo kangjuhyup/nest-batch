@@ -1,9 +1,9 @@
 import { DatabaseBatchStorage } from "@nest-batch/core";
 import { MariaDbCheckpointStore } from "./checkpoint-store.js";
 import { resolveMariaDbPool } from "./driver.js";
-import { MariaDbLockManager } from "./lock-manager.js";
+import { MariaDbLockManager } from "./lock/lock-manager.js";
 import type { MariaDbBatchOptions, MariaDbPoolLike } from "./options.js";
-import { MariaDbJobRepository } from "./repository.js";
+import { MariaDbJobRepository } from "./repository/repository.js";
 import { ensureMariaDbSchema } from "./schema.js";
 
 export class MariaDbBatchStorage extends DatabaseBatchStorage {

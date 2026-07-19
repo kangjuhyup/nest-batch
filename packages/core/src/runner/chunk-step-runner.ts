@@ -7,6 +7,7 @@ import type {
   RetryPolicy,
   SkipPolicy
 } from "../types/index.js";
+import { emitBatchEvent } from "./events.js";
 import { toAsyncIterable } from "./iterables.js";
 import { delay, requireSignal } from "./signals.js";
 import type { StepRunContext, StepRunResult } from "./step-run-context.js";
@@ -46,6 +47,14 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
 
         if (isSkipItem(processed)) {
           skipCount += 1;
+          await emitBatchEvent(context.observer, {
+            type: "item.skipped",
+            jobExecutionId: context.jobExecutionId,
+            stepName: step.name,
+            item,
+            error: processed.cause,
+            reason: processed.reason
+          });
           return { skipped: true };
         }
 
@@ -65,6 +74,14 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
 
         if (await shouldRetry(step.retryPolicy, retryContext)) {
           retryCount += 1;
+          await emitBatchEvent(context.observer, {
+            type: "retry",
+            jobExecutionId: context.jobExecutionId,
+            stepName: step.name,
+            phase: "process",
+            attempt,
+            error
+          });
           await backoff(step.retryPolicy, retryContext, signal);
           attempt += 1;
           continue;
@@ -81,6 +98,13 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
           checkpoint
         })) {
           skipCount += 1;
+          await emitBatchEvent(context.observer, {
+            type: "item.skipped",
+            jobExecutionId: context.jobExecutionId,
+            stepName: step.name,
+            item,
+            error
+          });
           return { skipped: true };
         }
 
@@ -119,6 +143,14 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
         }
 
         retryCount += 1;
+        await emitBatchEvent(context.observer, {
+          type: "retry",
+          jobExecutionId: context.jobExecutionId,
+          stepName: step.name,
+          phase: "write",
+          attempt,
+          error
+        });
         await backoff(step.retryPolicy, retryContext, signal);
         attempt += 1;
       }
@@ -135,6 +167,16 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
     chunk = [];
     await writeWithRetry(items);
     writeCount += items.length;
+    await emitBatchEvent(context.observer, {
+      type: "chunk.written",
+      jobExecutionId: context.jobExecutionId,
+      stepName: step.name,
+      chunkIndex,
+      itemCount: items.length,
+      readCount,
+      writeCount,
+      skipCount
+    });
 
     if (step.checkpoint) {
       const nextCheckpoint = await step.checkpoint({

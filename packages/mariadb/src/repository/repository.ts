@@ -1,29 +1,26 @@
 import type {
   BatchExecutionId,
   JobExecution,
+  JobExecutionAttempt,
   JobInstance,
   JobInstanceId,
   JobParametersHash,
   JobRepository,
   StepExecution
 } from "@nest-batch/core";
-import { resolveMariaDbPool } from "./driver.js";
-import type { MariaDbBatchOptions } from "./options.js";
-import type { MariaDbPoolLike } from "./options.js";
+import { resolveMariaDbPool } from "../driver.js";
+import { toJobExecution, toJobInstance, toStepExecution } from "./mapper.js";
+import type { MariaDbBatchOptions } from "../options.js";
+import type { MariaDbConnectionLike, MariaDbPoolLike } from "../options.js";
 import {
   createMariaDbTables,
-  parseMariaDbJobParameters,
-  parseMariaDbJobStatus,
-  parseMariaDbOptionalDate,
-  parseMariaDbRequiredDate,
-  parseMariaDbStepStatus,
   rowsFromMariaDbResult,
   stringifyMariaDbJson,
   type MariaDbJobExecutionRow,
   type MariaDbJobInstanceRow,
   type MariaDbStepExecutionRow,
   type MariaDbTables
-} from "./sql.js";
+} from "../sql.js";
 
 export class MariaDbJobRepository implements JobRepository {
   private readonly pool: MariaDbPoolLike;
@@ -131,6 +128,59 @@ export class MariaDbJobRepository implements JobRepository {
     const [row] = rowsFromMariaDbResult<MariaDbJobExecutionRow>(result);
 
     return row ? toJobExecution(row) : undefined;
+  }
+
+  async createExecutionAttempt(
+    instance: JobInstance,
+    execution: JobExecution
+  ): Promise<JobExecutionAttempt> {
+    return this.withTransaction(async (connection) => {
+      await connection.query(
+        `
+          INSERT IGNORE INTO ${this.tables.jobInstances} (
+            id,
+            job_name,
+            parameters_hash,
+            parameters,
+            created_at
+          )
+          VALUES (?, ?, ?, ?, ?)
+        `,
+        [
+          instance.id,
+          instance.jobName,
+          instance.parametersHash,
+          stringifyMariaDbJson(instance.parameters),
+          instance.createdAt
+        ]
+      );
+
+      const storedInstance = await this.findJobInstanceWithConnection(
+        connection,
+        instance.jobName,
+        instance.parametersHash
+      );
+
+      if (!storedInstance) {
+        throw new Error(`Failed to create job instance "${instance.id}".`);
+      }
+
+      const activeExecution = await this.findActiveJobExecutionWithConnection(
+        connection,
+        storedInstance.id
+      );
+
+      if (activeExecution) {
+        return { instance: storedInstance, activeExecution };
+      }
+
+      await this.createWithConnection(connection, {
+        ...execution,
+        instanceId: storedInstance.id
+      });
+
+      return { instance: storedInstance };
+    });
   }
 
   async create(execution: JobExecution): Promise<void> {
@@ -315,49 +365,115 @@ export class MariaDbJobRepository implements JobRepository {
 
     return rowsFromMariaDbResult<MariaDbStepExecutionRow>(result).map(toStepExecution);
   }
-}
 
-const toJobInstance = (row: MariaDbJobInstanceRow): JobInstance => ({
-  id: row.id,
-  jobName: row.job_name,
-  parametersHash: row.parameters_hash,
-  parameters: parseMariaDbJobParameters(row.parameters),
-  createdAt: parseMariaDbRequiredDate(row.created_at, "created_at")
-});
+  private async withTransaction<T>(
+    operation: (connection: MariaDbExecutor) => Promise<T>
+  ): Promise<T> {
+    if (!this.pool.getConnection) {
+      return operation(this.pool);
+    }
 
-const toJobExecution = (row: MariaDbJobExecutionRow): JobExecution => ({
-  id: row.id,
-  instanceId: row.instance_id,
-  jobName: row.job_name,
-  status: parseMariaDbJobStatus(row.status),
-  parameters: parseMariaDbJobParameters(row.parameters),
-  createdAt: parseMariaDbRequiredDate(row.created_at, "created_at"),
-  startedAt: parseMariaDbOptionalDate(row.started_at),
-  endedAt: parseMariaDbOptionalDate(row.ended_at),
-  failureReason: typeof row.failure_reason === "string" ? row.failure_reason : undefined
-});
+    const connection = await this.pool.getConnection();
 
-const toStepExecution = (row: MariaDbStepExecutionRow): StepExecution => ({
-  id: row.id,
-  jobExecutionId: row.job_execution_id,
-  stepName: row.step_name,
-  status: parseMariaDbStepStatus(row.status),
-  readCount: parseMariaDbCount(row.read_count, "read_count"),
-  writeCount: parseMariaDbCount(row.write_count, "write_count"),
-  skipCount: parseMariaDbCount(row.skip_count, "skip_count"),
-  retryCount: parseMariaDbCount(row.retry_count, "retry_count"),
-  createdAt: parseMariaDbRequiredDate(row.created_at, "created_at"),
-  startedAt: parseMariaDbOptionalDate(row.started_at),
-  endedAt: parseMariaDbOptionalDate(row.ended_at),
-  failureReason: typeof row.failure_reason === "string" ? row.failure_reason : undefined
-});
-
-const parseMariaDbCount = (value: unknown, fieldName: string): number => {
-  const count = typeof value === "number" ? value : Number(value);
-
-  if (!Number.isSafeInteger(count) || count < 0) {
-    throw new TypeError(`Invalid MariaDB ${fieldName} count.`);
+    try {
+      await connection.beginTransaction();
+      const result = await operation(connection);
+      await connection.commit();
+      return result;
+    } catch (error) {
+      await connection.rollback().catch(() => undefined);
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
-  return count;
-};
+  private async findJobInstanceWithConnection(
+    connection: MariaDbExecutor,
+    jobName: string,
+    parametersHash: JobParametersHash
+  ): Promise<JobInstance | undefined> {
+    const result = await connection.query(
+      `
+        SELECT
+          id,
+          job_name,
+          parameters_hash,
+          parameters,
+          created_at
+        FROM ${this.tables.jobInstances}
+        WHERE job_name = ?
+          AND parameters_hash = ?
+        FOR UPDATE
+      `,
+      [jobName, parametersHash]
+    );
+    const [row] = rowsFromMariaDbResult<MariaDbJobInstanceRow>(result);
+
+    return row ? toJobInstance(row) : undefined;
+  }
+
+  private async findActiveJobExecutionWithConnection(
+    connection: MariaDbExecutor,
+    instanceId: JobInstanceId
+  ): Promise<JobExecution | undefined> {
+    const result = await connection.query(
+      `
+        SELECT
+          id,
+          instance_id,
+          job_name,
+          status,
+          parameters,
+          created_at,
+          started_at,
+          ended_at,
+          failure_reason
+        FROM ${this.tables.jobExecutions}
+        WHERE instance_id = ?
+          AND status IN ('created', 'running')
+        ORDER BY created_at ASC, id ASC
+        LIMIT 1
+      `,
+      [instanceId]
+    );
+    const [row] = rowsFromMariaDbResult<MariaDbJobExecutionRow>(result);
+
+    return row ? toJobExecution(row) : undefined;
+  }
+
+  private async createWithConnection(
+    connection: MariaDbExecutor,
+    execution: JobExecution
+  ): Promise<void> {
+    await connection.query(
+      `
+        INSERT INTO ${this.tables.jobExecutions} (
+          id,
+          instance_id,
+          job_name,
+          status,
+          parameters,
+          created_at,
+          started_at,
+          ended_at,
+          failure_reason
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        execution.id,
+        execution.instanceId,
+        execution.jobName,
+        execution.status,
+        stringifyMariaDbJson(execution.parameters),
+        execution.createdAt,
+        execution.startedAt ?? null,
+        execution.endedAt ?? null,
+        execution.failureReason ?? null
+      ]
+    );
+  }
+}
+
+type MariaDbExecutor = Pick<MariaDbConnectionLike, "query">;

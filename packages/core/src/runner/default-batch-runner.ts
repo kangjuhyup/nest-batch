@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createJobInstanceId, hashJobParameters } from "../parameters.js";
 import type {
   BatchExecutionId,
+  BatchObserver,
   BatchRunOptions,
   BatchRunner,
   BatchStepExecutionId,
@@ -9,10 +10,15 @@ import type {
   JobDefinition,
   JobExecution,
   JobInstance,
-  JobParameters
+  JobParameters,
+  StepExecution
 } from "../types/index.js";
 import { errorToFailureReason, isAbortError } from "./errors.js";
-import { runStepExecution } from "./step-execution-runner.js";
+import { emitBatchEvent } from "./events.js";
+import {
+  recordCompletedRestartStepExecution,
+  runStepExecution
+} from "./step-execution-runner.js";
 
 export interface DefaultBatchRunnerOptions {
   readonly generateExecutionId?: () => BatchExecutionId;
@@ -23,6 +29,7 @@ export interface DefaultBatchRunnerOptions {
   }) => BatchStepExecutionId;
   readonly generateOwnerId?: () => string;
   readonly now?: () => Date;
+  readonly observer?: BatchObserver;
 }
 
 export class DefaultBatchRunner implements BatchRunner {
@@ -36,6 +43,7 @@ export class DefaultBatchRunner implements BatchRunner {
     parameters: Parameters,
     options: BatchRunOptions = {}
   ): Promise<JobExecution<Parameters>> {
+    const observer = options.observer ?? this.options.observer;
     const executionId = options.executionId ?? this.generateExecutionId();
     const ownerId = options.ownerId ?? this.generateOwnerId();
     const parametersHash = hashJobParameters(parameters);
@@ -65,18 +73,10 @@ export class DefaultBatchRunner implements BatchRunner {
             candidateInstance.jobName,
             candidateInstance.parametersHash
           )) as JobInstance<Parameters> | undefined)
-        : await this.findOrCreateJobInstance(candidateInstance);
+        : candidateInstance;
 
       if (!instance) {
         throw new Error(`Job instance "${instanceId}" has no failed execution to restart.`);
-      }
-
-      const activeExecution = await this.storage.repository.findActiveJobExecution(instance.id);
-
-      if (activeExecution) {
-        throw new Error(
-          `Job instance "${instance.id}" already has active execution "${activeExecution.id}".`
-        );
       }
 
       const restartExecution = options.restart
@@ -88,6 +88,10 @@ export class DefaultBatchRunner implements BatchRunner {
       }
 
       const checkpointExecutionId = restartExecution?.id ?? executionId;
+      const restartStepExecutions = restartExecution
+        ? await this.storage.repository.findStepExecutions(restartExecution.id)
+        : [];
+      const restartStepExecutionsByName = toLatestStepExecutionByName(restartStepExecutions);
 
       execution = {
         id: executionId,
@@ -97,7 +101,18 @@ export class DefaultBatchRunner implements BatchRunner {
         parameters,
         createdAt: this.now()
       };
-      await this.storage.repository.create(execution);
+      const attempt = await this.storage.repository.createExecutionAttempt(instance, execution);
+
+      if (attempt.activeExecution) {
+        throw new Error(
+          `Job instance "${attempt.instance.id}" already has active execution "${attempt.activeExecution.id}".`
+        );
+      }
+
+      execution = {
+        ...execution,
+        instanceId: attempt.instance.id
+      };
       created = true;
       options.signal?.throwIfAborted();
 
@@ -107,11 +122,39 @@ export class DefaultBatchRunner implements BatchRunner {
         startedAt: this.now()
       };
       await this.storage.repository.update(execution);
+      await emitBatchEvent(observer, { type: "job.started", execution });
 
       let input: unknown;
+      let reachedRestartStartStep = !restartExecution;
 
       for (const [stepIndex, step] of job.steps.entries()) {
         options.signal?.throwIfAborted();
+        const restartStepExecution = restartStepExecutionsByName.get(step.name);
+        const shouldSkipCompletedRestartStep =
+          !reachedRestartStartStep && restartStepExecution?.status === "completed";
+
+        if (shouldSkipCompletedRestartStep) {
+          await recordCompletedRestartStepExecution(
+            restartStepExecution,
+            {
+              jobExecutionId: executionId,
+              checkpointExecutionId,
+              stepIndex,
+              input,
+              signal: options.signal,
+              observer
+            },
+            {
+              storage: this.storage,
+              generateStepExecutionId: (context) => this.generateStepExecutionId(context),
+              now: () => this.now()
+            }
+          );
+          input = undefined;
+          continue;
+        }
+
+        reachedRestartStartStep = true;
         const result = await runStepExecution(
           step,
           {
@@ -119,7 +162,8 @@ export class DefaultBatchRunner implements BatchRunner {
             checkpointExecutionId,
             stepIndex,
             input,
-            signal: options.signal
+            signal: options.signal,
+            observer
           },
           {
             storage: this.storage,
@@ -136,6 +180,7 @@ export class DefaultBatchRunner implements BatchRunner {
         endedAt: this.now()
       };
       await this.storage.repository.update(execution);
+      await emitBatchEvent(observer, { type: "job.completed", execution });
 
       return execution;
     } catch (error) {
@@ -150,26 +195,15 @@ export class DefaultBatchRunner implements BatchRunner {
         failureReason: errorToFailureReason(error)
       };
       await this.storage.repository.update(execution);
+      await emitBatchEvent(observer, {
+        type: execution.status === "cancelled" ? "job.cancelled" : "job.failed",
+        execution
+      });
 
       return execution;
     } finally {
       await this.storage.lockManager.release(lock);
     }
-  }
-
-  private async findOrCreateJobInstance<Parameters extends JobParameters>(
-    instance: JobInstance<Parameters>
-  ): Promise<JobInstance<Parameters>> {
-    const existing = await this.storage.repository.findJobInstance(
-      instance.jobName,
-      instance.parametersHash
-    );
-
-    if (existing) {
-      return existing as JobInstance<Parameters>;
-    }
-
-    return (await this.storage.repository.createJobInstance(instance)) as JobInstance<Parameters>;
   }
 
   private generateExecutionId(): BatchExecutionId {
@@ -195,3 +229,24 @@ export class DefaultBatchRunner implements BatchRunner {
     return this.options.now?.() ?? new Date();
   }
 }
+
+const toLatestStepExecutionByName = (
+  stepExecutions: readonly StepExecution[]
+): ReadonlyMap<string, StepExecution> => {
+  const executionsByName = new Map<string, StepExecution>();
+
+  for (const execution of stepExecutions) {
+    const current = executionsByName.get(execution.stepName);
+
+    if (!current || compareStepExecutionByCreatedAtAsc(current, execution) <= 0) {
+      executionsByName.set(execution.stepName, execution);
+    }
+  }
+
+  return executionsByName;
+};
+
+const compareStepExecutionByCreatedAtAsc = (left: StepExecution, right: StepExecution): number => {
+  const diff = left.createdAt.getTime() - right.createdAt.getTime();
+  return diff === 0 ? left.id.localeCompare(right.id) : diff;
+};

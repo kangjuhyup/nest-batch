@@ -7,6 +7,8 @@ export type { DefaultBatchRunnerOptions } from "./runner.js";
 export type {
   AnyStepDefinition,
   BatchExecutionId,
+  BatchEvent,
+  BatchObserver,
   BatchRunOptions,
   BatchStepExecutionId,
   BatchRunner,
@@ -27,6 +29,7 @@ export type {
   ChunkWriteContext,
   JobDefinition,
   JobExecution,
+  JobExecutionAttempt,
   JobExecutionStatus,
   JobInstance,
   JobInstanceId,

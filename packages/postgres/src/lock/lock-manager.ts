@@ -1,13 +1,14 @@
 import type { LockAcquireOptions, LockHandle, LockManager } from "@nest-batch/core";
-import { resolvePostgresPool } from "./driver.js";
-import type { PostgresBatchOptions } from "./options.js";
-import type { PostgresPoolLike } from "./options.js";
+import { resolvePostgresPool } from "../driver.js";
+import type { PostgresBatchOptions } from "../options.js";
+import type { PostgresPoolLike } from "../options.js";
 import {
   createPostgresTables,
   isPostgresUniqueViolation,
   rowCountFromPostgresResult,
   type PostgresTables
-} from "./sql.js";
+} from "../sql.js";
+import { createLockHandle, createLockTimes } from "./lock-state.js";
 
 export class PostgresLockManager implements LockManager {
   private readonly pool: PostgresPoolLike;
@@ -85,19 +86,3 @@ export class PostgresLockManager implements LockManager {
     );
   }
 }
-
-const createLockTimes = (ttlMs?: number): { readonly acquiredAt: Date; readonly expiresAt?: Date } => {
-  if (ttlMs !== undefined && (!Number.isSafeInteger(ttlMs) || ttlMs <= 0)) {
-    throw new TypeError("Postgres lock ttlMs must be a positive safe integer.");
-  }
-
-  const acquiredAt = new Date();
-  return {
-    acquiredAt,
-    expiresAt: ttlMs ? new Date(acquiredAt.getTime() + ttlMs) : undefined
-  };
-};
-
-const createLockHandle = (resource: string, ownerId: string, expiresAt?: Date): LockHandle => {
-  return expiresAt ? { resource, ownerId, expiresAt } : { resource, ownerId };
-};
