@@ -51,27 +51,46 @@ Postgres와 이후 database package는 repository, lock, checkpoint contract를
 
 ```ts
 import { defineChunkStep, skipItem } from "@nest-batch/core";
+import type { ChunkStepExecutionContext, Processor, Reader, Writer } from "@nest-batch/core";
 
-const importUsers = defineChunkStep({
-  name: "import-users",
-  chunkSize: 100,
+interface SourceUser {
+  readonly id: string;
+  readonly active: boolean;
+}
 
-  reader: async function* ({ signal, checkpoint }) {
+interface ImportedUser {
+  readonly id: string;
+}
+
+class UserReader implements Reader<SourceUser> {
+  async *read({ signal }: ChunkStepExecutionContext) {
     signal.throwIfAborted();
     yield { id: "user-1", active: true };
-  },
+  }
+}
 
-  processor: async (user, context) => {
+class UserProcessor implements Processor<SourceUser, ImportedUser> {
+  async process(user: SourceUser) {
     if (!user.active) {
       return skipItem("inactive user");
     }
 
     return { id: user.id };
-  },
+  }
+}
 
-  writer: async (users, context) => {
+class UserWriter implements Writer<ImportedUser> {
+  async write(users: readonly ImportedUser[]) {
     await saveUsers(users);
   }
+}
+
+const importUsers = defineChunkStep({
+  name: "import-users",
+  chunkSize: 100,
+  reader: new UserReader(),
+  processor: new UserProcessor(),
+  writer: new UserWriter()
 });
 ```
 
@@ -88,6 +107,10 @@ const copyUsers = defineChunkStep({
 
 `processor`가 없으면 runtime은 reader item을 그대로 writer에 넘깁니다. 이 경우
 `Input`과 `Output`은 같은 타입입니다.
+
+`Reader`, `Processor`, `Writer`는 class가 구현하기 쉬운 method 기반 object
+contract로 둡니다. `core`는 class 생성이나 DI를 담당하지 않고, NestJS 같은
+integration package가 provider를 조립합니다.
 
 ## Core 타입
 
@@ -111,19 +134,26 @@ export interface ChunkWriteContext<TCheckpoint = unknown>
   readonly attempt: number;
 }
 
-export type ChunkReader<Input, TCheckpoint = unknown> = (
-  context: ChunkStepExecutionContext<TCheckpoint>
-) => AsyncIterable<Input> | Iterable<Input>;
+export interface Reader<Input, TCheckpoint = unknown> {
+  read(context: ChunkStepExecutionContext<TCheckpoint>): AsyncIterable<Input> | Iterable<Input>;
+}
 
-export type ChunkProcessor<Input, Output, TCheckpoint = unknown> = (
-  item: Input,
-  context: ChunkItemContext<Input, TCheckpoint>
-) => Output | SkipItem | Promise<Output | SkipItem>;
+export interface Processor<Input, Output, TCheckpoint = unknown> {
+  process(
+    item: Input,
+    context: ChunkItemContext<Input, TCheckpoint>
+  ): Output | SkipItem | Promise<Output | SkipItem>;
+}
 
-export type ChunkWriter<Output, TCheckpoint = unknown> = (
-  items: readonly Output[],
-  context: ChunkWriteContext<TCheckpoint>
-) => void | Promise<void>;
+export interface Writer<Output, TCheckpoint = unknown> {
+  write(items: readonly Output[], context: ChunkWriteContext<TCheckpoint>): void | Promise<void>;
+}
+
+export type ChunkReader<Input, TCheckpoint = unknown> = Reader<Input, TCheckpoint>;
+
+export type ChunkProcessor<Input, Output, TCheckpoint = unknown> = Processor<Input, Output, TCheckpoint>;
+
+export type ChunkWriter<Output, TCheckpoint = unknown> = Writer<Output, TCheckpoint>;
 
 export interface TaskletStepDefinition<Input = unknown, Output = unknown> {
   readonly kind?: "tasklet";

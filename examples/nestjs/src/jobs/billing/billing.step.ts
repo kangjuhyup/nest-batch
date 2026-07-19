@@ -1,34 +1,55 @@
+import { Injectable } from "@nestjs/common";
 import { defineChunkStep, skipItem } from "@nest-batch/core";
-import type { ChunkProcessor, ChunkReader, ChunkWriter } from "@nest-batch/core";
+import type {
+  ChunkStepDefinition,
+  ChunkStepExecutionContext,
+  Processor,
+  Reader,
+  Writer
+} from "@nest-batch/core";
 import type { BillingAccount, BillingCharge } from "./billing.types.js";
 
 export const writtenCharges: BillingCharge[] = [];
 
-const chargeAccountsReader: ChunkReader<BillingAccount> = async function* ({ signal }) {
-  signal.throwIfAborted();
-  yield { id: "account-1", status: "active", amount: 1200 };
-  yield { id: "account-2", status: "paused", amount: 9900 };
-};
-
-const chargeAccountsProcessor: ChunkProcessor<BillingAccount, BillingCharge> = (account) => {
-  if (account.status !== "active") {
-    return skipItem("account is not chargeable");
+@Injectable()
+export class ChargeAccountsReader implements Reader<BillingAccount> {
+  async *read({ signal }: ChunkStepExecutionContext): AsyncIterable<BillingAccount> {
+    signal.throwIfAborted();
+    yield { id: "account-1", status: "active", amount: 1200 };
+    yield { id: "account-2", status: "paused", amount: 9900 };
   }
+}
 
-  return {
-    accountId: account.id,
-    amount: account.amount
-  };
-};
+@Injectable()
+export class ChargeAccountsProcessor implements Processor<BillingAccount, BillingCharge> {
+  process(account: BillingAccount) {
+    if (account.status !== "active") {
+      return skipItem("account is not chargeable");
+    }
 
-const chargeAccountsWriter: ChunkWriter<BillingCharge> = (charges) => {
-  writtenCharges.push(...charges);
-};
+    return {
+      accountId: account.id,
+      amount: account.amount
+    };
+  }
+}
 
-export const chargeAccountsStep = defineChunkStep<BillingAccount, BillingCharge>({
-  name: "charge-accounts",
-  chunkSize: 50,
-  reader: chargeAccountsReader,
-  processor: chargeAccountsProcessor,
-  writer: chargeAccountsWriter
-});
+@Injectable()
+export class BillingChargeWriter implements Writer<BillingCharge> {
+  write(charges: readonly BillingCharge[]) {
+    writtenCharges.push(...charges);
+  }
+}
+
+export const createChargeAccountsStep = (
+  reader: Reader<BillingAccount>,
+  processor: Processor<BillingAccount, BillingCharge>,
+  writer: Writer<BillingCharge>
+): ChunkStepDefinition<BillingAccount, BillingCharge> =>
+  defineChunkStep<BillingAccount, BillingCharge>({
+    name: "charge-accounts",
+    chunkSize: 50,
+    reader,
+    processor,
+    writer
+  });

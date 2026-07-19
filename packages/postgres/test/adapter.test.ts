@@ -1,4 +1,4 @@
-import type { JobExecution } from "@nest-batch/core";
+import type { JobExecution, StepExecution } from "@nest-batch/core";
 import { describe, expect, it } from "vitest";
 import {
   PostgresCheckpointStore,
@@ -45,6 +45,19 @@ const createExecution = (overrides: Partial<JobExecution> = {}): JobExecution =>
   jobName: "daily-user-import",
   status: "created",
   parameters: { tenant: "acme" },
+  createdAt: new Date("2026-07-19T00:00:00.000Z"),
+  ...overrides
+});
+
+const createStepExecution = (overrides: Partial<StepExecution> = {}): StepExecution => ({
+  id: "step-execution-1",
+  jobExecutionId: "execution-1",
+  stepName: "load-users",
+  status: "created",
+  readCount: 0,
+  writeCount: 0,
+  skipCount: 0,
+  retryCount: 0,
   createdAt: new Date("2026-07-19T00:00:00.000Z"),
   ...overrides
 });
@@ -118,6 +131,91 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
       startedAt,
       endedAt
     });
+
+    const stepCreatedAt = new Date("2026-07-19T00:03:00.000Z");
+    const stepStartedAt = new Date("2026-07-19T00:04:00.000Z");
+    const stepEndedAt = new Date("2026-07-19T00:05:00.000Z");
+
+    pool.queueResult(1);
+    await repository.createStepExecution(createStepExecution({ createdAt: stepCreatedAt }));
+
+    expect(pool.calls[3]?.sql).toContain('INSERT INTO "batch"."nb_step_executions"');
+    expect(pool.calls[3]?.values).toEqual([
+      "step-execution-1",
+      "execution-1",
+      "load-users",
+      "created",
+      0,
+      0,
+      0,
+      0,
+      stepCreatedAt,
+      null,
+      null,
+      null
+    ]);
+
+    pool.queueResult(1);
+    await repository.updateStepExecution(
+      createStepExecution({
+        status: "completed",
+        readCount: 3,
+        writeCount: 2,
+        skipCount: 1,
+        createdAt: stepCreatedAt,
+        startedAt: stepStartedAt,
+        endedAt: stepEndedAt
+      })
+    );
+
+    expect(pool.calls[4]?.sql).toContain('UPDATE "batch"."nb_step_executions"');
+    expect(pool.calls[4]?.values).toEqual([
+      "execution-1",
+      "load-users",
+      "completed",
+      3,
+      2,
+      1,
+      0,
+      stepCreatedAt,
+      stepStartedAt,
+      stepEndedAt,
+      null,
+      "step-execution-1"
+    ]);
+
+    pool.queueRows([
+      {
+        id: "step-execution-1",
+        job_execution_id: "execution-1",
+        step_name: "load-users",
+        status: "completed",
+        read_count: 3,
+        write_count: 2,
+        skip_count: 1,
+        retry_count: 0,
+        created_at: stepCreatedAt,
+        started_at: stepStartedAt,
+        ended_at: stepEndedAt,
+        failure_reason: null
+      }
+    ]);
+
+    await expect(repository.findStepExecutions("execution-1")).resolves.toEqual([
+      {
+        id: "step-execution-1",
+        jobExecutionId: "execution-1",
+        stepName: "load-users",
+        status: "completed",
+        readCount: 3,
+        writeCount: 2,
+        skipCount: 1,
+        retryCount: 0,
+        createdAt: stepCreatedAt,
+        startedAt: stepStartedAt,
+        endedAt: stepEndedAt
+      }
+    ]);
   });
 
   it("stores and removes checkpoints through postgres upsert SQL / postgres upsert SQL로 checkpoint를 저장하고 삭제한다", async () => {
@@ -181,12 +279,15 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
     pool.queueResult(1);
     pool.queueResult(1);
     pool.queueResult(1);
+    pool.queueResult(1);
     await ensurePostgresSchema({ pool, schema: "batch", tablePrefix: "nb" });
 
     expect(pool.calls.map((call) => call.sql)).toEqual([
       expect.stringContaining('CREATE SCHEMA IF NOT EXISTS "batch"'),
       expect.stringContaining('CREATE TABLE IF NOT EXISTS "batch"."nb_job_executions"'),
       expect.stringContaining('CREATE INDEX IF NOT EXISTS "idx_nb_job_executions_job_status"'),
+      expect.stringContaining('CREATE TABLE IF NOT EXISTS "batch"."nb_step_executions"'),
+      expect.stringContaining('CREATE INDEX IF NOT EXISTS "idx_nb_step_executions_job_step_status"'),
       expect.stringContaining('CREATE TABLE IF NOT EXISTS "batch"."nb_checkpoints"'),
       expect.stringContaining('CREATE TABLE IF NOT EXISTS "batch"."nb_locks"'),
       expect.stringContaining('CREATE INDEX IF NOT EXISTS "idx_nb_locks_expires_at"')

@@ -34,10 +34,11 @@ describe("mysql batch storage / mysql batch storage를 검증한다", () => {
     await storage.initialize();
     await storage.close();
 
-    expect(pool.calls).toHaveLength(3);
+    expect(pool.calls).toHaveLength(4);
     expect(pool.calls[0]).toContain("CREATE TABLE IF NOT EXISTS `batch`.`nb_job_executions`");
-    expect(pool.calls[1]).toContain("CREATE TABLE IF NOT EXISTS `batch`.`nb_checkpoints`");
-    expect(pool.calls[2]).toContain("CREATE TABLE IF NOT EXISTS `batch`.`nb_locks`");
+    expect(pool.calls[1]).toContain("CREATE TABLE IF NOT EXISTS `batch`.`nb_step_executions`");
+    expect(pool.calls[2]).toContain("CREATE TABLE IF NOT EXISTS `batch`.`nb_checkpoints`");
+    expect(pool.calls[3]).toContain("CREATE TABLE IF NOT EXISTS `batch`.`nb_locks`");
     expect(pool.closed).toBe(false);
   });
 });

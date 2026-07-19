@@ -1,4 +1,4 @@
-import type { JobExecutionStatus, JobParameters } from "@nest-batch/core";
+import type { JobExecutionStatus, JobParameters, StepExecutionStatus } from "@nest-batch/core";
 import type { PostgresBatchOptions } from "./options.js";
 
 const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -7,9 +7,11 @@ const DEFAULT_TABLE_PREFIX = "nest_batch";
 export interface PostgresTables {
   readonly schema?: string;
   readonly jobExecutions: string;
+  readonly stepExecutions: string;
   readonly checkpoints: string;
   readonly locks: string;
   readonly jobStatusIndex: string;
+  readonly stepStatusIndex: string;
   readonly locksExpiresAtIndex: string;
 }
 
@@ -18,6 +20,21 @@ export interface PostgresJobExecutionRow {
   readonly job_name: string;
   readonly status: string;
   readonly parameters: unknown;
+  readonly created_at: unknown;
+  readonly started_at: unknown;
+  readonly ended_at: unknown;
+  readonly failure_reason: unknown;
+}
+
+export interface PostgresStepExecutionRow {
+  readonly id: string;
+  readonly job_execution_id: string;
+  readonly step_name: string;
+  readonly status: string;
+  readonly read_count: unknown;
+  readonly write_count: unknown;
+  readonly skip_count: unknown;
+  readonly retry_count: unknown;
   readonly created_at: unknown;
   readonly started_at: unknown;
   readonly ended_at: unknown;
@@ -37,9 +54,11 @@ export const createPostgresTables = (
   return {
     schema,
     jobExecutions: qualify("job_executions"),
+    stepExecutions: qualify("step_executions"),
     checkpoints: qualify("checkpoints"),
     locks: qualify("locks"),
     jobStatusIndex: quotePostgresIdentifier(`idx_${tablePrefix}_job_executions_job_status`),
+    stepStatusIndex: quotePostgresIdentifier(`idx_${tablePrefix}_step_executions_job_step_status`),
     locksExpiresAtIndex: quotePostgresIdentifier(`idx_${tablePrefix}_locks_expires_at`)
   };
 };
@@ -108,6 +127,10 @@ export const parsePostgresJobStatus = (value: unknown): JobExecutionStatus => {
   }
 
   throw new TypeError("Invalid Postgres job execution status.");
+};
+
+export const parsePostgresStepStatus = (value: unknown): StepExecutionStatus => {
+  return parsePostgresJobStatus(value);
 };
 
 export const rowsFromPostgresResult = <TRow>(result: unknown): readonly TRow[] => {

@@ -7,7 +7,7 @@ import {
   isSkipItem,
   skipItem
 } from "../src/index.js";
-import type { CheckpointStore, JobRepository, LockManager } from "../src/index.js";
+import type { CheckpointStore, JobRepository, LockManager, Processor, Reader, Writer } from "../src/index.js";
 
 class FakeDatabaseBatchStorage extends DatabaseBatchStorage {
   constructor(
@@ -53,17 +53,23 @@ describe("core definitions / core 정의", () => {
 
   it("defines a chunk step without a processor / processor 없이 chunk step을 정의한다", async () => {
     const written: Array<readonly { id: string }[]> = [];
+    class CopyUsersReader implements Reader<{ id: string }> {
+      async *read() {
+        yield { id: "user-1" };
+        yield { id: "user-2" };
+      }
+    }
+    class CopyUsersWriter implements Writer<{ id: string }> {
+      write(items: readonly { id: string }[]) {
+        written.push([...items]);
+      }
+    }
 
     const step = defineChunkStep({
       name: " copy-users ",
       chunkSize: 2,
-      reader: async function* () {
-        yield { id: "user-1" };
-        yield { id: "user-2" };
-      },
-      writer(items) {
-        written.push([...items]);
-      }
+      reader: new CopyUsersReader(),
+      writer: new CopyUsersWriter()
     });
 
     const job = defineJob({
@@ -71,7 +77,7 @@ describe("core definitions / core 정의", () => {
       steps: [step]
     });
 
-    await step.writer([{ id: "user-1" }, { id: "user-2" }], {
+    await step.writer.write([{ id: "user-1" }, { id: "user-2" }], {
       attempt: 1,
       chunkIndex: 0,
       signal: new AbortController().signal
@@ -86,25 +92,35 @@ describe("core definitions / core 정의", () => {
   });
 
   it("defines a chunk step with a processor and explicit skip / processor와 명시적 skip이 있는 chunk step을 정의한다", async () => {
-    const step = defineChunkStep({
-      name: "filter-users",
-      chunkSize: 10,
-      reader: function* () {
+    class FilterUsersReader implements Reader<{ id: string; active: boolean }> {
+      *read() {
         yield { id: "user-1", active: false };
-      },
-      processor(user) {
+      }
+    }
+    class FilterUsersProcessor implements Processor<{ id: string; active: boolean }, { id: string }> {
+      process(user: { id: string; active: boolean }) {
         if (!user.active) {
           return skipItem("inactive user");
         }
 
         return { id: user.id };
-      },
-      writer() {
+      }
+    }
+    class FilterUsersWriter implements Writer<{ id: string }> {
+      write() {
         return undefined;
       }
+    }
+
+    const step = defineChunkStep({
+      name: "filter-users",
+      chunkSize: 10,
+      reader: new FilterUsersReader(),
+      processor: new FilterUsersProcessor(),
+      writer: new FilterUsersWriter()
     });
 
-    const result = await step.processor?.(
+    const result = await step.processor?.process(
       { id: "user-1", active: false },
       {
         index: 0,
@@ -117,41 +133,90 @@ describe("core definitions / core 정의", () => {
     expect(result).toMatchObject({ kind: "skip", reason: "inactive user" });
   });
 
+  it("accepts Reader Processor Writer classes / Reader Processor Writer class 구현체를 받는다", async () => {
+    const written: Array<readonly { externalId: string }[]> = [];
+    class UserReader implements Reader<{ id: string }> {
+      *read() {
+        yield { id: "user-1" };
+      }
+    }
+    class UserProcessor implements Processor<{ id: string }, { externalId: string }> {
+      process(item: { id: string }) {
+        return { externalId: item.id };
+      }
+    }
+    class UserWriter implements Writer<{ externalId: string }> {
+      write(items: readonly { externalId: string }[]) {
+        written.push([...items]);
+      }
+    }
+
+    const step = defineChunkStep({
+      name: "interface-users",
+      chunkSize: 1,
+      reader: new UserReader(),
+      processor: new UserProcessor(),
+      writer: new UserWriter()
+    });
+
+    const signal = new AbortController().signal;
+    const items = step.reader.read({ signal }) as Iterable<{ id: string }>;
+    const processed = await step.processor?.process([...items][0], {
+      index: 0,
+      item: { id: "user-1" },
+      signal
+    });
+
+    await step.writer.write([processed as { externalId: string }], {
+      attempt: 1,
+      chunkIndex: 0,
+      signal
+    });
+
+    expect(written).toEqual([[{ externalId: "user-1" }]]);
+  });
+
   it("keeps null and undefined as valid processor outputs / null과 undefined를 유효한 processor output으로 유지한다", async () => {
+    const reader: Reader<{ id: string }> = {
+      *read() {
+        yield { id: "user-1" };
+      }
+    };
+    const writer: Writer<null | undefined> = {
+      write() {
+        return undefined;
+      }
+    };
     const nullableStep = defineChunkStep<{ id: string }, null>({
       name: "nullable-users",
       chunkSize: 1,
-      reader: function* () {
-        yield { id: "user-1" };
+      reader,
+      processor: {
+        process() {
+          return null;
+        }
       },
-      processor() {
-        return null;
-      },
-      writer() {
-        return undefined;
-      }
+      writer
     });
 
     const undefinedStep = defineChunkStep<{ id: string }, undefined>({
       name: "undefined-users",
       chunkSize: 1,
-      reader: function* () {
-        yield { id: "user-1" };
+      reader,
+      processor: {
+        process() {
+          return undefined;
+        }
       },
-      processor() {
-        return undefined;
-      },
-      writer() {
-        return undefined;
-      }
+      writer
     });
 
     const signal = new AbortController().signal;
-    const nullableResult = await nullableStep.processor?.(
+    const nullableResult = await nullableStep.processor?.process(
       { id: "user-1" },
       { index: 0, item: { id: "user-1" }, signal }
     );
-    const undefinedResult = await undefinedStep.processor?.(
+    const undefinedResult = await undefinedStep.processor?.process(
       { id: "user-1" },
       { index: 0, item: { id: "user-1" }, signal }
     );
@@ -184,9 +249,13 @@ describe("core definitions / core 정의", () => {
         defineChunkStep({
           name: "invalid-chunk",
           chunkSize,
-          reader: [],
-          writer() {
-            return undefined;
+          reader: {
+            *read() {}
+          },
+          writer: {
+            write() {
+              return undefined;
+            }
           }
         })
       ).toThrow("Chunk size must be a positive integer.");
@@ -213,9 +282,13 @@ describe("core definitions / core 정의", () => {
       defineChunkStep({
         name: " ",
         chunkSize: 1,
-        reader: [],
-        writer() {
-          return undefined;
+        reader: {
+          *read() {}
+        },
+        writer: {
+          write() {
+            return undefined;
+          }
         }
       })
     ).toThrow("Step name is required.");

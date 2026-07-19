@@ -17,7 +17,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run --root ../.. --config vitest.config.ts packages/mariadb/test/adapter.test.ts"
+    "test": "vitest run --root ../.. --config vitest.config.ts packages/mariadb/test"
   },
   "dependencies": {
     "@nest-batch/core": "workspace:*",

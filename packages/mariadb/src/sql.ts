@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import type { JobExecutionStatus, JobParameters } from "@nest-batch/core";
+import type { JobExecutionStatus, JobParameters, StepExecutionStatus } from "@nest-batch/core";
 import type { MariaDbBatchOptions } from "./options.js";
 
 const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -7,6 +7,7 @@ const DEFAULT_TABLE_PREFIX = "nest_batch";
 
 export interface MariaDbTables {
   readonly jobExecutions: string;
+  readonly stepExecutions: string;
   readonly checkpoints: string;
   readonly locks: string;
 }
@@ -16,6 +17,21 @@ export interface MariaDbJobExecutionRow {
   readonly job_name: string;
   readonly status: string;
   readonly parameters: unknown;
+  readonly created_at: unknown;
+  readonly started_at: unknown;
+  readonly ended_at: unknown;
+  readonly failure_reason: unknown;
+}
+
+export interface MariaDbStepExecutionRow {
+  readonly id: string;
+  readonly job_execution_id: string;
+  readonly step_name: string;
+  readonly status: string;
+  readonly read_count: unknown;
+  readonly write_count: unknown;
+  readonly skip_count: unknown;
+  readonly retry_count: unknown;
   readonly created_at: unknown;
   readonly started_at: unknown;
   readonly ended_at: unknown;
@@ -34,6 +50,7 @@ export const createMariaDbTables = (
 
   return {
     jobExecutions: qualify("job_executions"),
+    stepExecutions: qualify("step_executions"),
     checkpoints: qualify("checkpoints"),
     locks: qualify("locks")
   };
@@ -107,6 +124,10 @@ export const parseMariaDbJobStatus = (value: unknown): JobExecutionStatus => {
   }
 
   throw new TypeError("Invalid MariaDB job execution status.");
+};
+
+export const parseMariaDbStepStatus = (value: unknown): StepExecutionStatus => {
+  return parseMariaDbJobStatus(value);
 };
 
 export const rowsFromMariaDbResult = <TRow>(result: unknown): TRow[] => {

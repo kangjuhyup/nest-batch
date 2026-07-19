@@ -6,11 +6,13 @@ import type {
   JobRepository,
   LockAcquireOptions,
   LockHandle,
-  LockManager
+  LockManager,
+  StepExecution
 } from "@nest-batch/core";
 
 class InMemoryJobRepository implements JobRepository {
   private readonly executions = new Map<BatchExecutionId, JobExecution>();
+  private readonly stepExecutions = new Map<BatchExecutionId, StepExecution[]>();
 
   async create(execution: JobExecution): Promise<void> {
     this.executions.set(execution.id, execution);
@@ -22,6 +24,25 @@ class InMemoryJobRepository implements JobRepository {
 
   async findById(id: BatchExecutionId): Promise<JobExecution | undefined> {
     return this.executions.get(id);
+  }
+
+  async createStepExecution(execution: StepExecution): Promise<void> {
+    this.stepExecutions.set(execution.jobExecutionId, [
+      ...(this.stepExecutions.get(execution.jobExecutionId) ?? []),
+      execution
+    ]);
+  }
+
+  async updateStepExecution(execution: StepExecution): Promise<void> {
+    const executions = this.stepExecutions.get(execution.jobExecutionId) ?? [];
+    this.stepExecutions.set(
+      execution.jobExecutionId,
+      executions.map((candidate) => (candidate.id === execution.id ? execution : candidate))
+    );
+  }
+
+  async findStepExecutions(jobExecutionId: BatchExecutionId): Promise<readonly StepExecution[]> {
+    return this.stepExecutions.get(jobExecutionId) ?? [];
   }
 }
 

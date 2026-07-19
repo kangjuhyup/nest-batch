@@ -1,4 +1,4 @@
-import type { BatchExecutionId, JobExecution, JobRepository } from "@nest-batch/core";
+import type { BatchExecutionId, JobExecution, JobRepository, StepExecution } from "@nest-batch/core";
 import { resolvePostgresPool } from "./driver.js";
 import type { PostgresBatchOptions } from "./options.js";
 import type { PostgresPoolLike } from "./options.js";
@@ -8,9 +8,11 @@ import {
   parsePostgresJobStatus,
   parsePostgresOptionalDate,
   parsePostgresRequiredDate,
+  parsePostgresStepStatus,
   rowsFromPostgresResult,
   stringifyPostgresJson,
   type PostgresJobExecutionRow,
+  type PostgresStepExecutionRow,
   type PostgresTables
 } from "./sql.js";
 
@@ -112,4 +114,126 @@ export class PostgresJobRepository implements JobRepository {
       failureReason: typeof row.failure_reason === "string" ? row.failure_reason : undefined
     };
   }
+
+  async createStepExecution(execution: StepExecution): Promise<void> {
+    await this.pool.query(
+      `
+        INSERT INTO ${this.tables.stepExecutions} (
+          id,
+          job_execution_id,
+          step_name,
+          status,
+          read_count,
+          write_count,
+          skip_count,
+          retry_count,
+          created_at,
+          started_at,
+          ended_at,
+          failure_reason
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `,
+      [
+        execution.id,
+        execution.jobExecutionId,
+        execution.stepName,
+        execution.status,
+        execution.readCount,
+        execution.writeCount,
+        execution.skipCount,
+        execution.retryCount,
+        execution.createdAt,
+        execution.startedAt ?? null,
+        execution.endedAt ?? null,
+        execution.failureReason ?? null
+      ]
+    );
+  }
+
+  async updateStepExecution(execution: StepExecution): Promise<void> {
+    await this.pool.query(
+      `
+        UPDATE ${this.tables.stepExecutions}
+        SET
+          job_execution_id = $1,
+          step_name = $2,
+          status = $3,
+          read_count = $4,
+          write_count = $5,
+          skip_count = $6,
+          retry_count = $7,
+          created_at = $8,
+          started_at = $9,
+          ended_at = $10,
+          failure_reason = $11
+        WHERE id = $12
+      `,
+      [
+        execution.jobExecutionId,
+        execution.stepName,
+        execution.status,
+        execution.readCount,
+        execution.writeCount,
+        execution.skipCount,
+        execution.retryCount,
+        execution.createdAt,
+        execution.startedAt ?? null,
+        execution.endedAt ?? null,
+        execution.failureReason ?? null,
+        execution.id
+      ]
+    );
+  }
+
+  async findStepExecutions(jobExecutionId: BatchExecutionId): Promise<readonly StepExecution[]> {
+    const result = await this.pool.query<PostgresStepExecutionRow>(
+      `
+        SELECT
+          id,
+          job_execution_id,
+          step_name,
+          status,
+          read_count,
+          write_count,
+          skip_count,
+          retry_count,
+          created_at,
+          started_at,
+          ended_at,
+          failure_reason
+        FROM ${this.tables.stepExecutions}
+        WHERE job_execution_id = $1
+        ORDER BY created_at ASC, id ASC
+      `,
+      [jobExecutionId]
+    );
+
+    return rowsFromPostgresResult<PostgresStepExecutionRow>(result).map(toStepExecution);
+  }
 }
+
+const toStepExecution = (row: PostgresStepExecutionRow): StepExecution => ({
+  id: row.id,
+  jobExecutionId: row.job_execution_id,
+  stepName: row.step_name,
+  status: parsePostgresStepStatus(row.status),
+  readCount: parsePostgresCount(row.read_count, "read_count"),
+  writeCount: parsePostgresCount(row.write_count, "write_count"),
+  skipCount: parsePostgresCount(row.skip_count, "skip_count"),
+  retryCount: parsePostgresCount(row.retry_count, "retry_count"),
+  createdAt: parsePostgresRequiredDate(row.created_at, "created_at"),
+  startedAt: parsePostgresOptionalDate(row.started_at),
+  endedAt: parsePostgresOptionalDate(row.ended_at),
+  failureReason: typeof row.failure_reason === "string" ? row.failure_reason : undefined
+});
+
+const parsePostgresCount = (value: unknown, fieldName: string): number => {
+  const count = typeof value === "number" ? value : Number(value);
+
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new TypeError(`Invalid Postgres ${fieldName} count.`);
+  }
+
+  return count;
+};

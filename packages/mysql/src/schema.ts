@@ -22,6 +22,25 @@ export const ensureMySqlSchema = async (options: MySqlBatchOptions): Promise<voi
   `);
 
   await pool.execute(`
+    CREATE TABLE IF NOT EXISTS ${tables.stepExecutions} (
+      id VARCHAR(191) NOT NULL,
+      job_execution_id VARCHAR(191) NOT NULL,
+      step_name VARCHAR(255) NOT NULL,
+      status VARCHAR(32) NOT NULL,
+      read_count INT NOT NULL,
+      write_count INT NOT NULL,
+      skip_count INT NOT NULL,
+      retry_count INT NOT NULL,
+      created_at DATETIME(3) NOT NULL,
+      started_at DATETIME(3) NULL,
+      ended_at DATETIME(3) NULL,
+      failure_reason TEXT NULL,
+      PRIMARY KEY (id),
+      KEY idx_step_executions_job_step_status (job_execution_id, step_name, status)
+    ) ENGINE=InnoDB
+  `);
+
+  await pool.execute(`
     CREATE TABLE IF NOT EXISTS ${tables.checkpoints} (
       execution_id VARCHAR(191) NOT NULL,
       step_name VARCHAR(255) NOT NULL,

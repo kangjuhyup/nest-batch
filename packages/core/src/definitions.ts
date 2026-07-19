@@ -5,10 +5,8 @@ import type {
   ChunkStepWithoutProcessorOptions,
   JobDefinition,
   JobParameters,
-  SkipItem,
   TaskletStepDefinition
-} from "./types.js";
-import { SKIP_ITEM } from "./types.js";
+} from "./types/index.js";
 
 const assertName = (kind: "Job" | "Step", name: string): void => {
   if (name.trim().length === 0) {
@@ -20,22 +18,6 @@ const assertChunkSize = (chunkSize: number): void => {
   if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
     throw new Error("Chunk size must be a positive integer.");
   }
-};
-
-export const skipItem = (reason?: string, cause?: unknown): SkipItem =>
-  Object.freeze({
-    kind: "skip",
-    reason,
-    cause,
-    [SKIP_ITEM]: true
-  });
-
-export const isSkipItem = (value: unknown): value is SkipItem => {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-
-  return (value as { readonly [SKIP_ITEM]?: unknown })[SKIP_ITEM] === true;
 };
 
 export const defineStep = <Input = unknown, Output = unknown>(
