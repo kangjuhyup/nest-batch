@@ -11,6 +11,7 @@ Core owns:
 
 - job and step definitions
 - tasklet step and chunk step contracts
+- reader session contracts and generic reader helpers
 - job instance, execution identifiers, and status types
 - repository and checkpoint contracts
 - lock manager contracts
@@ -72,7 +73,11 @@ Runtime work should treat failure and restart as normal paths:
 - step execution can be checkpointed
 - job, step, retry, skip, and chunk write lifecycle events can be observed without changing execution semantics
 - cancellation uses `AbortSignal`
-- chunk step readers are `AsyncIterable`-first and checkpoints are saved at chunk boundaries after writer success
+- chunk step readers open one `ReaderSession` per execution and expose items through `AsyncIterable`
+- reader provider instances must stay stateless; execution-specific cursor or offset state belongs to `ReaderSession`
+- step-level checkpoint callbacks take precedence over `ReaderSession.checkpoint()`
+- checkpoints are saved at chunk boundaries after writer success
+- ORM-specific readers belong to ORM integration packages, not `@nest-batch/core`
 - chunk retry policy covers processor and writer failures; skip policy currently covers processor failures only
 - distributed execution assumes at-least-once delivery
 - SQL adapter locks store `ownerId`, `acquiredAt`, and optional `expiresAt`; stale lock recovery is TTL based

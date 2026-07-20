@@ -14,5 +14,6 @@ src/
 ```
 
 `import-users.step.ts`는 `Reader`, `Processor`, `Writer` class 구현체를 만든 뒤
-`defineChunkStep`에서 조립합니다. 아직 durable execution을 직접 실행하지는
-않습니다.
+`defineChunkStep`에서 조립합니다. `Reader`는 `open()`에서 실행마다
+`ReaderSession`을 만들고, cursor나 offset 같은 실행 상태는 session 안에 둡니다.
+아직 durable execution을 직접 실행하지는 않습니다.

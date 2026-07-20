@@ -4,6 +4,7 @@ import type {
   ChunkStepExecutionContext,
   Processor,
   Reader,
+  ReaderSession,
   Writer
 } from "@nest-batch/core";
 import { BatchProcessor, BatchReader, BatchWriter } from "@nest-batch/nest";
@@ -13,10 +14,14 @@ export const writtenCharges: BillingCharge[] = [];
 
 @BatchReader("charge-accounts-reader")
 export class ChargeAccountsReader implements Reader<BillingAccount> {
-  async *read({ signal }: ChunkStepExecutionContext): AsyncIterable<BillingAccount> {
-    signal.throwIfAborted();
-    yield { id: "account-1", status: "active", amount: 1200 };
-    yield { id: "account-2", status: "paused", amount: 9900 };
+  open({ signal }: ChunkStepExecutionContext): ReaderSession<BillingAccount> {
+    return {
+      async *[Symbol.asyncIterator]() {
+        signal.throwIfAborted();
+        yield { id: "account-1", status: "active", amount: 1200 };
+        yield { id: "account-2", status: "paused", amount: 9900 };
+      }
+    };
   }
 }
 

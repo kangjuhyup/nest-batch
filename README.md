@@ -195,11 +195,12 @@ await postgresStorage.close();
 name과 parameters를 안정적으로 hash해 `JobInstance`를 찾거나 만들고,
 `job-instance:{instanceId}` lock으로 같은 instance의 active execution을
 거부합니다. 이후 job/step 상태 전이를 repository에 저장합니다. chunk step은
-writer가 성공한 뒤 `checkpoint()` callback이 반환한 값을 `CheckpointStore`에
-저장합니다. `restart: true`를 넘기면 같은 instance의 최신 failed execution에서
-checkpoint를 읽고, 이전 execution에서 이미 completed 상태였던 step은 새
-execution에 completed 기록만 남긴 뒤 다시 실행하지 않습니다. 재시작된 step은 새
-execution id로 checkpoint를 다시 저장합니다.
+writer가 성공한 뒤 step-level `checkpoint()` callback이 있으면 그 값을, 없으면
+`ReaderSession.checkpoint()` 값을 `CheckpointStore`에 저장합니다. `restart:
+true`를 넘기면 같은 instance의 최신 failed execution에서 checkpoint를 읽고,
+이전 execution에서 이미 completed 상태였던 step은 새 execution에 completed
+기록만 남긴 뒤 다시 실행하지 않습니다. 재시작된 step은 새 execution id로
+checkpoint를 다시 저장합니다.
 
 ```ts
 import { DefaultBatchRunner, defineJob, defineStep } from "@nest-batch/core";
@@ -297,15 +298,17 @@ export const job = defineJob({
 
 ## Chunk Step Example
 
-`defineChunkStep`은 item을 streaming으로 읽고, optional processor를 거친 뒤,
-writer에 chunk 단위로 전달합니다. `null`과 `undefined`는 유효한 output이며,
-명시적 skip은 `skipItem()`으로 표현합니다. `retryPolicy`는 processor와 writer
-실패에 적용되고, `skipPolicy`는 processor 실패 item을 건너뛰는 데만 적용됩니다.
-writer 실패 skip은 데이터 손실 의미가 커서 아직 지원하지 않습니다.
+`defineChunkStep`은 `Reader.open()`으로 execution-scoped `ReaderSession`을
+열고 item을 streaming으로 읽은 뒤, optional processor를 거쳐 writer에 chunk
+단위로 전달합니다. session은 optional `checkpoint()`와 `close()`를 가질 수
+있습니다. `null`과 `undefined`는 유효한 output이며, 명시적 skip은 `skipItem()`으로
+표현합니다. `retryPolicy`는 processor와 writer 실패에 적용되고, `skipPolicy`는
+processor 실패 item을 건너뛰는 데만 적용됩니다. writer 실패 skip은 데이터 손실
+의미가 커서 아직 지원하지 않습니다.
 
 ```ts
 import { defineChunkStep, skipItem } from "@nest-batch/core";
-import type { ChunkStepExecutionContext, Processor, Reader, Writer } from "@nest-batch/core";
+import type { ChunkStepExecutionContext, Processor, Reader, ReaderSession, Writer } from "@nest-batch/core";
 
 interface SourceUser {
   readonly id: string;
@@ -317,9 +320,13 @@ interface ImportedUser {
 }
 
 class UserReader implements Reader<SourceUser> {
-  async *read({ signal }: ChunkStepExecutionContext) {
-    signal.throwIfAborted();
-    yield { id: "user-1", active: true };
+  open({ signal }: ChunkStepExecutionContext): ReaderSession<SourceUser> {
+    return {
+      async *[Symbol.asyncIterator]() {
+        signal.throwIfAborted();
+        yield { id: "user-1", active: true };
+      }
+    };
   }
 }
 
