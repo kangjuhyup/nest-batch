@@ -192,6 +192,7 @@ page 기반 reader는 source ordering이 실행 중 바뀌면 중복이나 누�
 
 Nest provider나 class 기반 reader가 필요하면 `Reader.open()`에서 session을 새로
 만듭니다. 실행 상태는 class field가 아니라 closure 또는 session object 안에 둡니다.
+실제 Nest provider 예제는 `examples/nestjs/src/jobs/reader-examples`에 있습니다.
 
 ```ts
 import type { ChunkStepExecutionContext, Reader, ReaderSession } from "@nest-batch/core";

@@ -14,6 +14,9 @@ src/
       billing.step.ts
       billing.tokens.ts
       billing.types.ts
+    reader-examples/
+      reader-examples.module.ts
+      reader-examples.reader.ts
 ```
 
 `BillingModule`은 `@BatchReader`, `@BatchProcessor`, `@BatchWriter`가 붙은
@@ -23,6 +26,9 @@ provider에서 core `defineChunkStep`으로 chunk step을 조립합니다.
 Nest provider는 singleton으로 재사용될 수 있으므로 `Reader` instance field에
 cursor나 offset을 저장하지 않고, `open()`이 반환하는 `ReaderSession` 안에서
 실행 상태를 관리합니다.
+`ReaderExamplesModule`은 `createIterableReader`, `createFunctionReader`,
+`createCursorReader`, `createPagingReader`를 Nest `@BatchReader` provider로 감싼
+예제를 제공합니다.
 
 현재 repository는 scaffold 단계입니다. decorator discovery와 durable runtime
 execution은 아직 구현되지 않았으므로, 이 예제는 실제 실행 엔진보다 module/provider
