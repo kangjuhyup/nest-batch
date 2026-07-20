@@ -1,9 +1,9 @@
 import { Module } from "@nestjs/common";
+import { InMemoryBatchStorage } from "@nest-batch/inmemory";
 import { NestBatchModule } from "@nest-batch/nest";
-import { exampleBatchStorage } from "./infrastructure/batch/example-batch-storage.js";
 import { BillingModule } from "./jobs/billing/billing.module.js";
 
 @Module({
-  imports: [NestBatchModule.forRoot({ storage: exampleBatchStorage }), BillingModule]
+  imports: [NestBatchModule.forRoot({ storage: new InMemoryBatchStorage() }), BillingModule]
 })
 export class AppModule {}

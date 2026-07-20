@@ -7,9 +7,6 @@
 src/
   main.ts
   app.module.ts
-  infrastructure/
-    batch/
-      example-batch-storage.ts
   jobs/
     billing/
       billing.module.ts
