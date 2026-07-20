@@ -309,7 +309,8 @@ export const job = defineJob({
 있습니다. `null`과 `undefined`는 유효한 output이며, 명시적 skip은 `skipItem()`으로
 표현합니다. `retryPolicy`는 processor와 writer 실패에 적용되고, `skipPolicy`는
 processor 실패 item을 건너뛰는 데만 적용됩니다. writer 실패 skip은 데이터 손실
-의미가 커서 아직 지원하지 않습니다.
+의미가 커서 아직 지원하지 않습니다. Reader helper별 예제는
+`docs/readers-kr.md`를 참고하세요.
 
 ```ts
 import { defineChunkStep, skipItem } from "@nest-batch/core";
