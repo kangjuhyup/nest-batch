@@ -1,4 +1,4 @@
-import { createJsonlFileReader, createLineFileReader } from "@nest-batch/core";
+import { createJsonlFileReader, createJsonHttpReader, createLineFileReader } from "@nest-batch/core";
 import type {
   CursorReaderDefinition,
   FileReaderDefinition,
@@ -145,6 +145,35 @@ export const jsonlFileReaderExample = createJsonlFileReader<ReaderExampleUser>({
   lines: users.map((user) => JSON.stringify(user))
 });
 
+export const jsonHttpReaderExample = createJsonHttpReader<
+  ReaderExampleUser,
+  number,
+  { readonly data: readonly ReaderExampleUser[]; readonly next?: number }
+>({
+  pageSize: 2,
+  initialPage: 0,
+  request({ page = 0, pageSize, signal }) {
+    signal.throwIfAborted();
+    const startIndex = page * pageSize;
+    const data = users.slice(startIndex, startIndex + pageSize);
+    const next = startIndex + pageSize < users.length ? page + 1 : undefined;
+
+    return {
+      ok: true,
+      status: 200,
+      json() {
+        return next === undefined ? { data } : { data, next };
+      }
+    };
+  },
+  selectItems(body) {
+    return body.data;
+  },
+  selectNextPage(body) {
+    return body.next;
+  }
+});
+
 export const readerExamples = {
   iterable: iterableReaderExample,
   function: functionReaderExample,
@@ -154,5 +183,6 @@ export const readerExamples = {
   http: httpReaderExample,
   file: fileReaderExample,
   lineFile: lineFileReaderExample,
-  jsonlFile: jsonlFileReaderExample
+  jsonlFile: jsonlFileReaderExample,
+  jsonHttp: jsonHttpReaderExample
 };

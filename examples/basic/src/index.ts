@@ -13,6 +13,7 @@ export {
   functionReaderExample,
   httpReaderExample,
   iterableReaderExample,
+  jsonHttpReaderExample,
   jsonlFileReaderExample,
   lineFileReaderExample,
   pageReaderExample,

@@ -24,6 +24,7 @@ import type {
   IterableReaderDefinition,
   ItemSkippedBatchEvent,
   JsonlFileReaderOptions,
+  JsonHttpReaderOptions,
   JobBatchEvent,
   JobExecution,
   JobRepository,
@@ -159,6 +160,21 @@ describe("core type module exports / core type module export", () => {
     const jsonlFileReaderOptions: JsonlFileReaderOptions<{ readonly id: string }> = {
       lines: ['{"id":"user-1"}']
     };
+    const jsonHttpReaderOptions: JsonHttpReaderOptions<{ readonly id: string }> = {
+      pageSize: 1,
+      request() {
+        return {
+          ok: true,
+          status: 200,
+          json() {
+            return { data: [{ id: "user-1" }] };
+          }
+        };
+      },
+      selectItems(body) {
+        return (body as { readonly data: readonly { readonly id: string }[] }).data;
+      }
+    };
     const readerDefinitions: readonly ReaderDefinition<string>[] = [
       iterableReaderDefinition,
       functionReaderDefinition,
@@ -185,6 +201,7 @@ describe("core type module exports / core type module export", () => {
     expect(await collectReader(fileReader)).toEqual(["user-1"]);
     expect(lineFileReaderOptions.lines).toEqual(["line-1"]);
     expect(jsonlFileReaderOptions.lines).toEqual(['{"id":"user-1"}']);
+    expect(jsonHttpReaderOptions.pageSize).toBe(1);
     expect(readerDefinitions.map((definition) => definition.kind)).toEqual([
       "iterable",
       "function",

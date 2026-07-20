@@ -8,6 +8,7 @@ import {
   createFunctionReader,
   createIterableReader,
   createJsonlFileReader,
+  createJsonHttpReader,
   createLineFileReader,
   createPagingReader,
   getReaderCheckpoint,
@@ -362,5 +363,71 @@ describe("reader contract / reader contract를 검증한다", () => {
 
     await expect(getReaderCheckpoint(opened)).resolves.toEqual({ offset: 2 });
     expect(ids).toEqual(["user-1", "user-2"]);
+  });
+
+  it("creates JSON HTTP readers with body selectors / body selector로 JSON HTTP reader를 만든다", async () => {
+    const requestedPages: Array<number | undefined> = [];
+    const reader = createJsonHttpReader<
+      { readonly id: string },
+      number,
+      { readonly data: readonly { readonly id: string }[]; readonly next?: number }
+    >({
+      pageSize: 2,
+      initialPage: 0,
+      request({ page }) {
+        requestedPages.push(page);
+
+        return {
+          ok: true,
+          status: 200,
+          json() {
+            return page === 0
+              ? { data: [{ id: "user-1" }, { id: "user-2" }], next: 1 }
+              : { data: [{ id: "user-3" }, { id: "user-4" }] };
+          }
+        };
+      },
+      selectItems(body) {
+        return body.data;
+      },
+      selectNextPage(body) {
+        return body.next;
+      }
+    });
+    const opened = await openReader(reader, createContext());
+    const ids: string[] = [];
+
+    for await (const item of opened) {
+      ids.push(item.id);
+    }
+
+    await expect(getReaderCheckpoint(opened)).resolves.toEqual({ page: 1, offset: 2 });
+    expect(ids).toEqual(["user-1", "user-2", "user-3", "user-4"]);
+    expect(requestedPages).toEqual([0, 1]);
+  });
+
+  it("fails JSON HTTP readers on non ok responses / JSON HTTP reader는 non ok response를 실패로 처리한다", async () => {
+    const reader = createJsonHttpReader<string>({
+      pageSize: 1,
+      request() {
+        return {
+          ok: false,
+          status: 429,
+          statusText: "Too Many Requests",
+          json() {
+            return {};
+          }
+        };
+      },
+      selectItems() {
+        return [];
+      }
+    });
+    const opened = await openReader(reader, createContext());
+    const iterator = opened[Symbol.asyncIterator]();
+
+    await expect(iterator.next()).rejects.toThrow(
+      "HTTP reader request failed with status 429 Too Many Requests."
+    );
   });
 });

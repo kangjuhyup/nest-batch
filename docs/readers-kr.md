@@ -277,6 +277,32 @@ const reader: HttpReaderDefinition<ApiUser, string, UserApiCheckpoint> = {
 checkpoint는 `{ page, offset }`입니다. page는 현재 읽는 token이고, page 안에서
 성공한 item 위치는 offset으로 저장됩니다.
 
+JSON API는 `createJsonHttpReader()`로 response status 확인과 `json()` parsing을
+helper에 맡길 수 있습니다.
+
+```ts
+import { createJsonHttpReader } from "@nest-batch/core";
+
+interface ApiResponse {
+  readonly data: readonly ApiUser[];
+  readonly next?: string;
+}
+
+const reader = createJsonHttpReader<ApiUser, string, ApiResponse>({
+  pageSize: 100,
+  initialPage: "/users?limit=100",
+  request({ page, pageSize, signal }) {
+    return fetch(page ?? `/users?limit=${pageSize}`, { signal });
+  },
+  selectItems(body) {
+    return body.data;
+  },
+  selectNextPage(body) {
+    return body.next;
+  }
+});
+```
+
 ## File Reader
 
 파일, object storage, 압축 해제 stream처럼 순서가 있는 source를 읽을 때 사용합니다.

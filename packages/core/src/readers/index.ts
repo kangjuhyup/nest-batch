@@ -33,12 +33,16 @@ export {
 } from "./file-reader.js";
 export {
   createHttpReader,
+  createJsonHttpReader,
   type HttpReader,
   type HttpReaderCheckpoint,
   type HttpReaderDefinition,
   type HttpReaderOptions,
   type HttpReaderRequestContext,
-  type HttpReaderResponse
+  type HttpReaderResponse,
+  type JsonHttpReaderBodyContext,
+  type JsonHttpReaderOptions,
+  type JsonHttpReaderResponse
 } from "./http-reader.js";
 export {
   createIterableReader,

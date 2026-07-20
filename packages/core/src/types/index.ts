@@ -18,6 +18,7 @@ export type {
   FunctionReaderDefinition,
   HttpReader,
   HttpReaderDefinition,
+  JsonHttpReaderOptions,
   IterableReader,
   IterableReaderDefinition,
   LineFileReaderOptions,
