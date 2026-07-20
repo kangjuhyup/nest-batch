@@ -201,6 +201,8 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
     chunkIndex += 1;
   };
 
+  let runError: unknown;
+
   try {
     for await (const item of readerSession) {
       signal.throwIfAborted();
@@ -219,8 +221,20 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
     }
 
     await flush();
-  } finally {
+  } catch (error) {
+    runError = error;
+  }
+
+  try {
     await closeReader(readerSession);
+  } catch (closeError) {
+    if (runError === undefined) {
+      throw closeError;
+    }
+  }
+
+  if (runError !== undefined) {
+    throw runError;
   }
 
   return {
