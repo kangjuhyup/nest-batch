@@ -247,6 +247,11 @@ const runner = new DefaultBatchRunner(storage, {
 });
 ```
 
+`event.type`은 `BatchEventType`이며, 전체 값은 `BATCH_EVENT_TYPES`로 export됩니다.
+현재 값은 `job.started`, `job.completed`, `job.failed`, `job.cancelled`,
+`step.started`, `step.completed`, `step.failed`, `step.cancelled`,
+`chunk.written`, `retry`, `item.skipped`입니다.
+
 ## Operational CLI
 
 `@nest-batch/cli` exposes `runCli(args, { storage, jobs })` for application-owned
