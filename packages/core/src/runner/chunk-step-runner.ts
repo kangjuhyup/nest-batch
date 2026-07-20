@@ -9,6 +9,7 @@ import type {
   SkipPolicy
 } from "../types/index.js";
 import { emitBatchEvent } from "./events.js";
+import { errorToFailureReason, isAbortError } from "./errors.js";
 import { delay, requireSignal } from "./signals.js";
 import type { StepRunContext, StepRunResult } from "./step-run-context.js";
 
@@ -158,6 +159,7 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
   };
 
   const readerSession = await openReader(step.reader, readerContext);
+  const readerIterator = readerSession[Symbol.asyncIterator]();
 
   const flush = async (): Promise<void> => {
     if (chunk.length === 0) {
@@ -204,7 +206,14 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
   let runError: unknown;
 
   try {
-    for await (const item of readerSession) {
+    while (true) {
+      const next = await readNext(readerIterator, signal);
+
+      if (next.done) {
+        break;
+      }
+
+      const item = next.value;
       signal.throwIfAborted();
       readCount += 1;
       const result = await processItem(item);
@@ -223,6 +232,14 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
     await flush();
   } catch (error) {
     runError = error;
+  }
+
+  if (runError !== undefined && typeof readerIterator.return === "function") {
+    try {
+      await readerIterator.return();
+    } catch {
+      // Preserve the original chunk failure. closeReader below still runs.
+    }
   }
 
   try {
@@ -244,6 +261,30 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
     retryCount
   };
 };
+
+const readNext = async <Input>(
+  iterator: AsyncIterator<Input>,
+  signal: AbortSignal
+): Promise<IteratorResult<Input>> => {
+  try {
+    return await iterator.next();
+  } catch (error) {
+    if (signal.aborted || isAbortError(error)) {
+      throw error;
+    }
+
+    throw new ChunkReadFailure(error);
+  }
+};
+
+class ChunkReadFailure extends Error {
+  readonly phase = "read" as const;
+
+  constructor(error: unknown) {
+    super(`Reader failed during read phase: ${errorToFailureReason(error)}`);
+    this.name = "ChunkReadFailure";
+  }
+}
 
 const shouldRetry = async <Input, Output, TCheckpoint>(
   policy: RetryPolicy<Input, Output, TCheckpoint> | undefined,

@@ -12,6 +12,10 @@ core는 이 definition을 실행 시점에 `Reader`로 변환합니다.
 step-level `checkpoint()` callback을 따로 정의하면 그 값이
 `ReaderSession.checkpoint()`보다 우선합니다.
 
+reader가 item을 읽는 중 실패하면 step과 job의 `failureReason`은
+`Reader failed during read phase: ...` 형태로 기록됩니다. 이 경우에도 열린
+`ReaderSession.close()`는 호출됩니다.
+
 ## Iterable Reader
 
 작은 고정 목록이나 테스트 fixture처럼 전체 item이 이미 준비된 경우 사용합니다.

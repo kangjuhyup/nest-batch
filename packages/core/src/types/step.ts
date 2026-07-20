@@ -2,7 +2,7 @@ import type { SkipItem } from "../skip-item.js";
 import type { ChunkReader } from "../readers/reader.js";
 import type { BatchExecutionId } from "./common.js";
 
-export type ChunkFailurePhase = "process" | "write";
+export type ChunkFailurePhase = "read" | "process" | "write";
 
 export interface ChunkRetryContext<Input = unknown, Output = unknown, TCheckpoint = unknown>
   extends ChunkStepExecutionContext<TCheckpoint> {

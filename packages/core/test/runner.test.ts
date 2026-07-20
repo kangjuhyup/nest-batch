@@ -784,6 +784,56 @@ describe("default batch runner / 기본 batch runner", () => {
       }
     ]);
   });
+
+  it("marks reader failures with read phase context / reader 실패를 read phase 문맥으로 기록한다", async () => {
+    const storage = new RecordingStorage();
+    const stepFailureReasons: Array<string | undefined> = [];
+    const runner = new DefaultBatchRunner(storage, {
+      generateExecutionId: () => "reader-failure-execution",
+      generateStepExecutionId: ({ stepName }) => `reader-failure-execution:${stepName}`,
+      generateOwnerId: () => "worker-1",
+      observer: {
+        onBatchEvent(event) {
+          if (event.type === "step.failed") {
+            stepFailureReasons.push(event.execution.failureReason);
+          }
+        }
+      }
+    });
+    const job = defineJob({
+      name: "reader-failure-job",
+      steps: [
+        defineChunkStep<string>({
+          name: "read-users",
+          chunkSize: 2,
+          reader: {
+            async *read() {
+              throw new Error("source unavailable");
+            }
+          },
+          writer: {
+            write() {
+              return undefined;
+            }
+          }
+        })
+      ]
+    });
+
+    const execution = await runner.run(job, {});
+
+    expect(execution).toMatchObject({
+      id: "reader-failure-execution",
+      status: "failed",
+      failureReason: "Reader failed during read phase: source unavailable"
+    });
+    expect(storage.repository.updatedSteps.at(-1)).toMatchObject({
+      stepName: "read-users",
+      status: "failed",
+      failureReason: "Reader failed during read phase: source unavailable"
+    });
+    expect(stepFailureReasons).toEqual(["Reader failed during read phase: source unavailable"]);
+  });
 });
 
 const createClock = (isoDates: readonly string[]): (() => Date) => {

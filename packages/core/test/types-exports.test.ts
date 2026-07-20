@@ -10,6 +10,7 @@ import type {
   BatchEvent,
   BatchEventType,
   CheckpointStore,
+  ChunkFailurePhase,
   ChunkWrittenBatchEvent,
   CursorReader,
   CursorReaderDefinition,
@@ -209,6 +210,7 @@ describe("core type module exports / core type module export", () => {
       "retry",
       "item.skipped"
     ];
+    const expectedFailurePhases: readonly ChunkFailurePhase[] = ["read", "process", "write"];
     const jobEvent: JobBatchEvent = {
       type: "job.started",
       execution: {} as JobExecution
@@ -263,6 +265,7 @@ describe("core type module exports / core type module export", () => {
       "step.cancelled"
     ]);
     expect(BATCH_EVENT_TYPES).toEqual(expectedTypes);
+    expect(expectedFailurePhases).toEqual(["read", "process", "write"]);
     expect(events.map((event) => event.type)).toEqual([
       "job.started",
       "step.completed",
