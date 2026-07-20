@@ -25,12 +25,12 @@ export const openReader = async <Item, TCheckpoint = unknown>(
   reader: ChunkReader<Item, TCheckpoint>,
   context: ChunkStepExecutionContext<TCheckpoint>
 ): Promise<ReaderSession<Item, TCheckpoint>> => {
-  if (isSessionReader(reader)) {
-    return reader.open(context);
-  }
-
   if (isReaderDefinition(reader)) {
     return createReader(reader).open(context);
+  }
+
+  if (isSessionReader(reader)) {
+    return reader.open(context);
   }
 
   return createIterableSession(reader.read(context));

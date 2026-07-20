@@ -1,8 +1,11 @@
 import type {
   CursorReaderDefinition,
+  FileReaderDefinition,
   FunctionReaderDefinition,
+  HttpReaderDefinition,
   IterableReaderDefinition,
-  PageReaderDefinition
+  PageReaderDefinition,
+  SqlReaderDefinition
 } from "@nest-batch/core";
 
 export interface ReaderExampleUser {
@@ -16,6 +19,15 @@ export interface ReaderExampleCursorCheckpoint {
 
 export interface ReaderExamplePageCheckpoint {
   readonly page: number;
+  readonly offset?: number;
+}
+
+export interface ReaderExampleHttpCheckpoint {
+  readonly page?: number;
+  readonly offset?: number;
+}
+
+export interface ReaderExampleFileCheckpoint {
   readonly offset?: number;
 }
 
@@ -72,9 +84,56 @@ export const pageReaderExample: PageReaderDefinition<
   }
 };
 
+export const sqlReaderExample: SqlReaderDefinition<
+  ReaderExampleUser,
+  ReaderExamplePageCheckpoint
+> = {
+  kind: "sql",
+  pageSize: 2,
+  query({ offset, pageSize, signal }) {
+    signal.throwIfAborted();
+
+    return users.slice(offset, offset + pageSize);
+  }
+};
+
+export const httpReaderExample: HttpReaderDefinition<
+  ReaderExampleUser,
+  number,
+  ReaderExampleHttpCheckpoint
+> = {
+  kind: "http",
+  pageSize: 2,
+  initialPage: 0,
+  request({ page = 0, pageSize, signal }) {
+    signal.throwIfAborted();
+    const startIndex = page * pageSize;
+    const items = users.slice(startIndex, startIndex + pageSize);
+    const nextPage = startIndex + pageSize < users.length ? page + 1 : undefined;
+
+    return nextPage === undefined ? { items } : { items, nextPage };
+  }
+};
+
+export const fileReaderExample: FileReaderDefinition<
+  ReaderExampleUser,
+  ReaderExampleFileCheckpoint
+> = {
+  kind: "file",
+  async *open({ signal }) {
+    for (const user of users) {
+      signal.throwIfAborted();
+      yield user;
+    }
+  }
+};
+
 export const readerExamples = {
   iterable: iterableReaderExample,
   function: functionReaderExample,
   cursor: cursorReaderExample,
-  page: pageReaderExample
+  page: pageReaderExample,
+  sql: sqlReaderExample,
+  http: httpReaderExample,
+  file: fileReaderExample
 };

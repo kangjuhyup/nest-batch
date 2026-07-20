@@ -5,9 +5,12 @@ import { describe, expect, it } from "vitest";
 import {
   cursorReaderExample,
   dailyUserImport,
+  fileReaderExample,
   functionReaderExample,
+  httpReaderExample,
   iterableReaderExample,
   pageReaderExample,
+  sqlReaderExample,
   writtenUsers,
   type ReaderExampleUser
 } from "../src/index.js";
@@ -57,6 +60,18 @@ describe("basic example e2e / basic example e2e를 검증한다", () => {
     await expect(readUserIds(pageReaderExample)).resolves.toEqual({
       ids: ["user-1", "user-2", "user-3", "user-4"],
       checkpoint: { page: 2, offset: 0 }
+    });
+    await expect(readUserIds(sqlReaderExample)).resolves.toEqual({
+      ids: ["user-1", "user-2", "user-3", "user-4"],
+      checkpoint: { page: 2, offset: 0 }
+    });
+    await expect(readUserIds(httpReaderExample)).resolves.toEqual({
+      ids: ["user-1", "user-2", "user-3", "user-4"],
+      checkpoint: { page: 1, offset: 2 }
+    });
+    await expect(readUserIds(fileReaderExample)).resolves.toEqual({
+      ids: ["user-1", "user-2", "user-3", "user-4"],
+      checkpoint: { offset: 4 }
     });
   });
 });

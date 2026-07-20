@@ -14,9 +14,12 @@ import { BillingJob } from "../src/jobs/billing/billing.job.js";
 import { writtenCharges } from "../src/jobs/billing/billing.step.js";
 import {
   CursorReaderExample,
+  FileReaderExample,
   FunctionReaderExample,
+  HttpReaderExample,
   IterableReaderExample,
   PageReaderExample,
+  SqlReaderExample,
   type ReaderExampleUser
 } from "../src/jobs/reader-examples/reader-examples.reader.js";
 
@@ -72,6 +75,18 @@ describe("nestjs example e2e / nestjs example e2e를 검증한다", () => {
       await expect(readUserIds(app.get(PageReaderExample))).resolves.toEqual({
         ids: ["user-1", "user-2", "user-3", "user-4"],
         checkpoint: { page: 2, offset: 0 }
+      });
+      await expect(readUserIds(app.get(SqlReaderExample))).resolves.toEqual({
+        ids: ["user-1", "user-2", "user-3", "user-4"],
+        checkpoint: { page: 2, offset: 0 }
+      });
+      await expect(readUserIds(app.get(HttpReaderExample))).resolves.toEqual({
+        ids: ["user-1", "user-2", "user-3", "user-4"],
+        checkpoint: { page: 1, offset: 2 }
+      });
+      await expect(readUserIds(app.get(FileReaderExample))).resolves.toEqual({
+        ids: ["user-1", "user-2", "user-3", "user-4"],
+        checkpoint: { offset: 4 }
       });
     } finally {
       await app.close();

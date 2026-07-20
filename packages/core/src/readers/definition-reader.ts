@@ -9,6 +9,18 @@ import {
   type FunctionReaderDefinition
 } from "./function-reader.js";
 import {
+  createFileReader,
+  type FileReaderCheckpoint,
+  type FileReaderDefinition,
+  type FileReaderOptions
+} from "./file-reader.js";
+import {
+  createHttpReader,
+  type HttpReaderCheckpoint,
+  type HttpReaderDefinition,
+  type HttpReaderOptions
+} from "./http-reader.js";
+import {
   createIterableReader,
   type IterableReaderDefinition
 } from "./iterable-reader.js";
@@ -20,13 +32,22 @@ import {
   type PagingReaderOptions
 } from "./paging-reader.js";
 import type { ChunkReader, Reader } from "./reader.js";
+import {
+  createSqlReader,
+  type SqlReaderCheckpoint,
+  type SqlReaderDefinition,
+  type SqlReaderOptions
+} from "./sql-reader.js";
 
 export type ReaderDefinition<Item, TCheckpoint = unknown> =
   | IterableReaderDefinition<Item, TCheckpoint>
   | FunctionReaderDefinition<Item, TCheckpoint>
   | CursorReaderDefinition<Item, unknown, CursorReaderCheckpoint<unknown>>
   | PagingReaderDefinition<Item, PagingReaderCheckpoint>
-  | PageReaderDefinition<Item, PagingReaderCheckpoint>;
+  | PageReaderDefinition<Item, PagingReaderCheckpoint>
+  | SqlReaderDefinition<Item, SqlReaderCheckpoint>
+  | HttpReaderDefinition<Item, unknown, HttpReaderCheckpoint<unknown>>
+  | FileReaderDefinition<Item, FileReaderCheckpoint>;
 
 export const normalizeReader = <Item, TCheckpoint = unknown>(
   reader: ChunkReader<Item, TCheckpoint>
@@ -51,6 +72,18 @@ export const createReader = <Item, TCheckpoint = unknown>(
       return createPagingReader(
         definition as PagingReaderOptions<Item, PagingReaderCheckpoint>
       ) as Reader<Item, TCheckpoint>;
+    case "sql":
+      return createSqlReader(
+        definition as SqlReaderOptions<Item, SqlReaderCheckpoint>
+      ) as Reader<Item, TCheckpoint>;
+    case "http":
+      return createHttpReader(
+        definition as HttpReaderOptions<Item, unknown, HttpReaderCheckpoint<unknown>>
+      ) as Reader<Item, TCheckpoint>;
+    case "file":
+      return createFileReader(
+        definition as FileReaderOptions<Item, FileReaderCheckpoint>
+      ) as Reader<Item, TCheckpoint>;
   }
 };
 
@@ -65,6 +98,9 @@ export const isReaderDefinition = <Item, TCheckpoint = unknown>(
       reader.kind === "function" ||
       reader.kind === "cursor" ||
       reader.kind === "page" ||
-      reader.kind === "paging")
+      reader.kind === "paging" ||
+      reader.kind === "sql" ||
+      reader.kind === "http" ||
+      reader.kind === "file")
   );
 };

@@ -13,8 +13,12 @@ import type {
   ChunkWrittenBatchEvent,
   CursorReader,
   CursorReaderDefinition,
+  FileReader,
+  FileReaderDefinition,
   FunctionReader,
   FunctionReaderDefinition,
+  HttpReader,
+  HttpReaderDefinition,
   IterableReader,
   IterableReaderDefinition,
   ItemSkippedBatchEvent,
@@ -29,6 +33,8 @@ import type {
   Reader,
   ReaderDefinition,
   RetryBatchEvent,
+  SqlReader,
+  SqlReaderDefinition,
   StepBatchEvent,
   StepExecution,
   Writer
@@ -85,6 +91,9 @@ describe("core type module exports / core type module export", () => {
       }
     };
     const pagingReader: PagingReader<string> = pageReader;
+    const sqlReader: SqlReader<string> = pageReader;
+    const httpReader: HttpReader<string, number> = reader;
+    const fileReader: FileReader<string> = reader;
     const iterableReaderDefinition: IterableReaderDefinition<string> = {
       kind: "iterable",
       source: ["iterable-user"]
@@ -118,12 +127,38 @@ describe("core type module exports / core type module export", () => {
         return page === 0 ? ["paging-definition-user"] : [];
       }
     };
+    const sqlReaderDefinition: SqlReaderDefinition<string> = {
+      kind: "sql",
+      pageSize: 1,
+      query({ offset }) {
+        return offset === 0 ? ["sql-definition-user"] : [];
+      }
+    };
+    const httpReaderDefinition: HttpReaderDefinition<string, number> = {
+      kind: "http",
+      pageSize: 1,
+      initialPage: 0,
+      request({ page }) {
+        return page === 0
+          ? { items: ["http-definition-user"], nextPage: 1 }
+          : { items: [] };
+      }
+    };
+    const fileReaderDefinition: FileReaderDefinition<string> = {
+      kind: "file",
+      open() {
+        return ["file-definition-user"];
+      }
+    };
     const readerDefinitions: readonly ReaderDefinition<string>[] = [
       iterableReaderDefinition,
       functionReaderDefinition,
       cursorReaderDefinition,
       pageReaderDefinition,
-      pagingReaderDefinition
+      pagingReaderDefinition,
+      sqlReaderDefinition,
+      httpReaderDefinition,
+      fileReaderDefinition
     ];
 
     expect(storage.repository).toBe(repository);
@@ -136,12 +171,18 @@ describe("core type module exports / core type module export", () => {
     expect(functionReader).toBe(reader);
     expect(await collectReader(cursorReader)).toEqual(["cursor-user"]);
     expect(await collectReader(pagingReader)).toEqual(["page-user"]);
+    expect(await collectReader(sqlReader)).toEqual(["page-user"]);
+    expect(await collectReader(httpReader)).toEqual(["user-1"]);
+    expect(await collectReader(fileReader)).toEqual(["user-1"]);
     expect(readerDefinitions.map((definition) => definition.kind)).toEqual([
       "iterable",
       "function",
       "cursor",
       "page",
-      "paging"
+      "paging",
+      "sql",
+      "http",
+      "file"
     ]);
     expect(writer.write(["user-1"], { attempt: 1, chunkIndex: 0, signal: new AbortController().signal })).toBeUndefined();
   });

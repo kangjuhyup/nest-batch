@@ -16,6 +16,24 @@ export {
   type ReaderFunction
 } from "./function-reader.js";
 export {
+  createFileReader,
+  type FileReader,
+  type FileReaderCheckpoint,
+  type FileReaderDefinition,
+  type FileReaderOpenContext,
+  type FileReaderOptions,
+  type FileReaderSource
+} from "./file-reader.js";
+export {
+  createHttpReader,
+  type HttpReader,
+  type HttpReaderCheckpoint,
+  type HttpReaderDefinition,
+  type HttpReaderOptions,
+  type HttpReaderRequestContext,
+  type HttpReaderResponse
+} from "./http-reader.js";
+export {
   createIterableReader,
   type IterableReader,
   type IterableReaderDefinition,
@@ -41,3 +59,11 @@ export {
   type Reader,
   type ReaderSession
 } from "./reader.js";
+export {
+  createSqlReader,
+  type SqlReader,
+  type SqlReaderCheckpoint,
+  type SqlReaderDefinition,
+  type SqlReaderOptions,
+  type SqlReaderQueryContext
+} from "./sql-reader.js";

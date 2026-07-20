@@ -3,10 +3,13 @@ export { createJobInstanceId, hashJobParameters } from "./parameters.js";
 export {
   closeReader,
   createCursorReader,
+  createFileReader,
   createFunctionReader,
+  createHttpReader,
   createIterableReader,
   createIterableSession,
   createPagingReader,
+  createSqlReader,
   getReaderCheckpoint,
   openReader
 } from "./readers/index.js";
@@ -90,8 +93,20 @@ export type {
   CursorReaderDefinition,
   CursorReaderFetchContext,
   CursorReaderOptions,
+  FileReader,
+  FileReaderCheckpoint,
+  FileReaderDefinition,
+  FileReaderOpenContext,
+  FileReaderOptions,
+  FileReaderSource,
   FunctionReader,
   FunctionReaderDefinition,
+  HttpReader,
+  HttpReaderCheckpoint,
+  HttpReaderDefinition,
+  HttpReaderOptions,
+  HttpReaderRequestContext,
+  HttpReaderResponse,
   IterableReader,
   IterableReaderDefinition,
   IterableReaderSource,
@@ -106,5 +121,10 @@ export type {
   Reader,
   ReaderDefinition,
   ReaderFunction,
-  ReaderSession
+  ReaderSession,
+  SqlReader,
+  SqlReaderCheckpoint,
+  SqlReaderDefinition,
+  SqlReaderOptions,
+  SqlReaderQueryContext
 } from "./readers/index.js";

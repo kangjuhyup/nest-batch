@@ -1,10 +1,16 @@
 import type {
   CursorReaderDefinition,
   CursorReaderFetchContext,
+  FileReaderDefinition,
+  FileReaderOpenContext,
   FunctionReaderDefinition,
+  HttpReaderDefinition,
+  HttpReaderRequestContext,
   IterableReaderDefinition,
   PageReaderDefinition,
-  PagingReaderFetchContext
+  PagingReaderFetchContext,
+  SqlReaderDefinition,
+  SqlReaderQueryContext
 } from "@nest-batch/core";
 import { BatchReader } from "@nest-batch/nest";
 
@@ -19,6 +25,15 @@ export interface ReaderExampleCursorCheckpoint {
 
 export interface ReaderExamplePageCheckpoint {
   readonly page: number;
+  readonly offset?: number;
+}
+
+export interface ReaderExampleHttpCheckpoint {
+  readonly page?: number;
+  readonly offset?: number;
+}
+
+export interface ReaderExampleFileCheckpoint {
   readonly offset?: number;
 }
 
@@ -80,5 +95,55 @@ export class PageReaderExample implements PageReaderDefinition<
     const startIndex = page * pageSize;
 
     return users.slice(startIndex, startIndex + pageSize);
+  }
+}
+
+@BatchReader("sql-reader-example")
+export class SqlReaderExample implements SqlReaderDefinition<
+  ReaderExampleUser,
+  ReaderExamplePageCheckpoint
+> {
+  readonly kind = "sql";
+  readonly pageSize = 2;
+
+  query({ offset, pageSize, signal }: SqlReaderQueryContext<ReaderExamplePageCheckpoint>) {
+    signal.throwIfAborted();
+
+    return users.slice(offset, offset + pageSize);
+  }
+}
+
+@BatchReader("http-reader-example")
+export class HttpReaderExample implements HttpReaderDefinition<
+  ReaderExampleUser,
+  number,
+  ReaderExampleHttpCheckpoint
+> {
+  readonly kind = "http";
+  readonly pageSize = 2;
+  readonly initialPage = 0;
+
+  request({ page = 0, pageSize, signal }: HttpReaderRequestContext<number, ReaderExampleHttpCheckpoint>) {
+    signal.throwIfAborted();
+    const startIndex = page * pageSize;
+    const items = users.slice(startIndex, startIndex + pageSize);
+    const nextPage = startIndex + pageSize < users.length ? page + 1 : undefined;
+
+    return nextPage === undefined ? { items } : { items, nextPage };
+  }
+}
+
+@BatchReader("file-reader-example")
+export class FileReaderExample implements FileReaderDefinition<
+  ReaderExampleUser,
+  ReaderExampleFileCheckpoint
+> {
+  readonly kind = "file";
+
+  async *open({ signal }: FileReaderOpenContext<ReaderExampleFileCheckpoint>) {
+    for (const user of users) {
+      signal.throwIfAborted();
+      yield user;
+    }
   }
 }

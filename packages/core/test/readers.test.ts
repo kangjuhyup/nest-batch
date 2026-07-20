@@ -229,4 +229,91 @@ describe("reader contract / reader contract를 검증한다", () => {
       "Paging reader checkpoint.offset must be a non-negative safe integer."
     );
   });
+
+  it("opens SQL reader definitions with offset checkpoints / offset checkpoint를 지원하는 SQL reader 정의를 연다", async () => {
+    const rows = ["user-1", "user-2", "user-3", "user-4"];
+    const queriedOffsets: number[] = [];
+    const opened = await openReader(
+      {
+        kind: "sql",
+        pageSize: 2,
+        query({ offset, pageSize }) {
+          queriedOffsets.push(offset);
+          return rows.slice(offset, offset + pageSize);
+        }
+      },
+      createContext()
+    );
+
+    const items: string[] = [];
+    for await (const item of opened) {
+      items.push(item);
+    }
+
+    await expect(getReaderCheckpoint(opened)).resolves.toEqual({ page: 2, offset: 0 });
+    expect(items).toEqual(rows);
+    expect(queriedOffsets).toEqual([0, 2, 4]);
+  });
+
+  it("opens HTTP reader definitions with next page checkpoints / 다음 page checkpoint를 지원하는 HTTP reader 정의를 연다", async () => {
+    const requestedPages: Array<number | undefined> = [];
+    const opened = await openReader(
+      {
+        kind: "http",
+        pageSize: 2,
+        initialPage: 0,
+        request({ page }) {
+          requestedPages.push(page);
+
+          if (page === 0) {
+            return { items: ["user-1", "user-2"], nextPage: 1 };
+          }
+
+          return { items: ["user-3", "user-4"] };
+        }
+      },
+      createContext({ page: 1, offset: 1 })
+    );
+
+    const items: string[] = [];
+    for await (const item of opened) {
+      items.push(item);
+    }
+
+    await expect(getReaderCheckpoint(opened)).resolves.toEqual({ page: 1, offset: 2 });
+    expect(items).toEqual(["user-4"]);
+    expect(requestedPages).toEqual([1]);
+  });
+
+  it("opens file reader definitions with offset checkpoints / offset checkpoint를 지원하는 file reader 정의를 연다", async () => {
+    let closed = false;
+    const opened = await openReader(
+      {
+        kind: "file",
+        open() {
+          return {
+            async *[Symbol.asyncIterator]() {
+              yield "line-1";
+              yield "line-2";
+              yield "line-3";
+            },
+            close() {
+              closed = true;
+            }
+          };
+        }
+      },
+      createContext({ offset: 1 })
+    );
+
+    const items: string[] = [];
+    for await (const item of opened) {
+      items.push(item);
+    }
+    await closeReader(opened);
+
+    await expect(getReaderCheckpoint(opened)).resolves.toEqual({ offset: 3 });
+    expect(items).toEqual(["line-2", "line-3"]);
+    expect(closed).toBe(true);
+  });
 });

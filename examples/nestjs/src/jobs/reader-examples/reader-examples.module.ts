@@ -1,9 +1,12 @@
 import { Module } from "@nestjs/common";
 import {
   CursorReaderExample,
+  FileReaderExample,
   FunctionReaderExample,
+  HttpReaderExample,
   IterableReaderExample,
-  PageReaderExample
+  PageReaderExample,
+  SqlReaderExample
 } from "./reader-examples.reader.js";
 
 @Module({
@@ -11,13 +14,19 @@ import {
     IterableReaderExample,
     FunctionReaderExample,
     CursorReaderExample,
-    PageReaderExample
+    PageReaderExample,
+    SqlReaderExample,
+    HttpReaderExample,
+    FileReaderExample
   ],
   exports: [
     IterableReaderExample,
     FunctionReaderExample,
     CursorReaderExample,
-    PageReaderExample
+    PageReaderExample,
+    SqlReaderExample,
+    HttpReaderExample,
+    FileReaderExample
   ]
 })
 export class ReaderExamplesModule {}

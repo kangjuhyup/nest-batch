@@ -11,8 +11,12 @@ export type {
   ChunkReader,
   CursorReader,
   CursorReaderDefinition,
+  FileReader,
+  FileReaderDefinition,
   FunctionReader,
   FunctionReaderDefinition,
+  HttpReader,
+  HttpReaderDefinition,
   IterableReader,
   IterableReaderDefinition,
   LegacyReader,
@@ -22,6 +26,8 @@ export type {
   PagingReaderDefinition,
   Reader,
   ReaderDefinition,
-  ReaderSession
+  ReaderSession,
+  SqlReader,
+  SqlReaderDefinition
 } from "../readers/index.js";
 export type { SkipItem } from "../skip-item.js";
