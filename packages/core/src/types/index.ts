@@ -7,5 +7,15 @@ export type * from "./runner.js";
 export { BATCH_EVENT_TYPES, JOB_BATCH_EVENT_TYPES, STEP_BATCH_EVENT_TYPES } from "./runner.js";
 export type * from "./step.js";
 export { DatabaseBatchStorage } from "./storage.js";
-export type { ChunkReader, LegacyReader, Reader, ReaderSession } from "../readers/index.js";
+export type {
+  ChunkReader,
+  CursorReader,
+  FunctionReader,
+  IterableReader,
+  LegacyReader,
+  PageReader,
+  PagingReader,
+  Reader,
+  ReaderSession
+} from "../readers/index.js";
 export type { SkipItem } from "../skip-item.js";

@@ -21,13 +21,19 @@ export interface CursorReaderOptions<
   readonly getCursor: (item: Item) => Cursor;
 }
 
+export interface CursorReader<
+  Item,
+  Cursor,
+  TCheckpoint extends CursorReaderCheckpoint<Cursor> = CursorReaderCheckpoint<Cursor>
+> extends Reader<Item, TCheckpoint> {}
+
 export const createCursorReader = <
   Item,
   Cursor,
   TCheckpoint extends CursorReaderCheckpoint<Cursor> = CursorReaderCheckpoint<Cursor>
 >(
   options: CursorReaderOptions<Item, Cursor, TCheckpoint>
-): Reader<Item, TCheckpoint> => ({
+): CursorReader<Item, Cursor, TCheckpoint> => ({
   open(context) {
     let currentCursor = context.checkpoint?.cursor;
     let currentCheckpoint: TCheckpoint | undefined = context.checkpoint;

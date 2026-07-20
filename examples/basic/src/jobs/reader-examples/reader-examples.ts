@@ -4,6 +4,12 @@ import {
   createIterableReader,
   createPagingReader
 } from "@nest-batch/core";
+import type {
+  CursorReader,
+  FunctionReader,
+  IterableReader,
+  PageReader
+} from "@nest-batch/core";
 
 export interface ReaderExampleUser {
   readonly id: string;
@@ -26,22 +32,22 @@ const users: readonly ReaderExampleUser[] = [
   { id: "user-4", email: "user-4@example.com" }
 ];
 
-export const iterableReaderExample = createIterableReader<ReaderExampleUser>(users);
+export const iterableReaderExample: IterableReader<ReaderExampleUser> =
+  createIterableReader<ReaderExampleUser>(users);
 
-export const functionReaderExample = createFunctionReader<ReaderExampleUser>(async function* ({
-  signal
-}) {
-  for (const user of users) {
-    signal.throwIfAborted();
-    yield user;
-  }
-});
+export const functionReaderExample: FunctionReader<ReaderExampleUser> =
+  createFunctionReader<ReaderExampleUser>(async function* ({ signal }) {
+    for (const user of users) {
+      signal.throwIfAborted();
+      yield user;
+    }
+  });
 
-export const cursorReaderExample = createCursorReader<
+export const cursorReaderExample: CursorReader<
   ReaderExampleUser,
   string,
   ReaderExampleCursorCheckpoint
->({
+> = createCursorReader<ReaderExampleUser, string, ReaderExampleCursorCheckpoint>({
   fetch({ cursor, signal }) {
     signal.throwIfAborted();
     const startIndex = cursor ? users.findIndex((user) => user.id === cursor) + 1 : 0;
@@ -53,10 +59,10 @@ export const cursorReaderExample = createCursorReader<
   }
 });
 
-export const pageReaderExample = createPagingReader<
+export const pageReaderExample: PageReader<
   ReaderExampleUser,
   ReaderExamplePageCheckpoint
->({
+> = createPagingReader<ReaderExampleUser, ReaderExamplePageCheckpoint>({
   pageSize: 2,
   fetch({ page, pageSize, signal }) {
     signal.throwIfAborted();

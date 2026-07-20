@@ -11,11 +11,16 @@ import type {
   BatchEventType,
   CheckpointStore,
   ChunkWrittenBatchEvent,
+  CursorReader,
+  FunctionReader,
+  IterableReader,
   ItemSkippedBatchEvent,
   JobBatchEvent,
   JobExecution,
   JobRepository,
   LockManager,
+  PageReader,
+  PagingReader,
   Reader,
   RetryBatchEvent,
   StepBatchEvent,
@@ -53,6 +58,27 @@ describe("core type module exports / core type module export", () => {
         return undefined;
       }
     };
+    const iterableReader: IterableReader<string> = reader;
+    const functionReader: FunctionReader<string> = reader;
+    const cursorReader: CursorReader<string, string> = {
+      open() {
+        return {
+          async *[Symbol.asyncIterator]() {
+            yield "cursor-user";
+          }
+        };
+      }
+    };
+    const pageReader: PageReader<string> = {
+      open() {
+        return {
+          async *[Symbol.asyncIterator]() {
+            yield "page-user";
+          }
+        };
+      }
+    };
+    const pagingReader: PagingReader<string> = pageReader;
 
     expect(storage.repository).toBe(repository);
     const items: string[] = [];
@@ -60,6 +86,10 @@ describe("core type module exports / core type module export", () => {
       items.push(item);
     }
     expect(items).toEqual(["user-1"]);
+    expect(iterableReader).toBe(reader);
+    expect(functionReader).toBe(reader);
+    expect(await collectReader(cursorReader)).toEqual(["cursor-user"]);
+    expect(await collectReader(pagingReader)).toEqual(["page-user"]);
     expect(writer.write(["user-1"], { attempt: 1, chunkIndex: 0, signal: new AbortController().signal })).toBeUndefined();
   });
 
@@ -148,3 +178,19 @@ describe("core type module exports / core type module export", () => {
     ]);
   });
 });
+
+const collectReader = async <TCheckpoint>(
+  reader: Reader<string, TCheckpoint>,
+  checkpoint?: TCheckpoint
+): Promise<readonly string[]> => {
+  const items: string[] = [];
+
+  for await (const item of await reader.open({
+    signal: new AbortController().signal,
+    checkpoint
+  })) {
+    items.push(item);
+  }
+
+  return items;
+};

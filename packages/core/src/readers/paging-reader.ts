@@ -23,12 +23,22 @@ export interface PagingReaderOptions<
   ) => readonly Item[] | Promise<readonly Item[]>;
 }
 
+export interface PagingReader<
+  Item,
+  TCheckpoint extends PagingReaderCheckpoint = PagingReaderCheckpoint
+> extends Reader<Item, TCheckpoint> {}
+
+export interface PageReader<
+  Item,
+  TCheckpoint extends PagingReaderCheckpoint = PagingReaderCheckpoint
+> extends PagingReader<Item, TCheckpoint> {}
+
 export const createPagingReader = <
   Item,
   TCheckpoint extends PagingReaderCheckpoint = PagingReaderCheckpoint
 >(
   options: PagingReaderOptions<Item, TCheckpoint>
-): Reader<Item, TCheckpoint> => {
+): PagingReader<Item, TCheckpoint> => {
   validatePositiveInteger(options.pageSize, "pageSize");
   const initialPage = options.initialPage ?? 0;
   validateNonNegativeInteger(initialPage, "initialPage");

@@ -85,11 +85,16 @@ export type {
 } from "./types/index.js";
 export type {
   ChunkReader,
+  CursorReader,
   CursorReaderCheckpoint,
   CursorReaderFetchContext,
   CursorReaderOptions,
+  FunctionReader,
+  IterableReader,
   IterableReaderSource,
   LegacyReader,
+  PageReader,
+  PagingReader,
   PagingReaderCheckpoint,
   PagingReaderFetchContext,
   PagingReaderOptions,

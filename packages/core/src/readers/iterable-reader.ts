@@ -1,6 +1,8 @@
 import type { ChunkStepExecutionContext } from "../types/step.js";
 import { createIterableSession, type Reader } from "./reader.js";
 
+export interface IterableReader<Item, TCheckpoint = unknown> extends Reader<Item, TCheckpoint> {}
+
 export type IterableReaderSource<Item, TCheckpoint = unknown> =
   | AsyncIterable<Item>
   | Iterable<Item>
@@ -10,7 +12,7 @@ export type IterableReaderSource<Item, TCheckpoint = unknown> =
 
 export const createIterableReader = <Item, TCheckpoint = unknown>(
   source: IterableReaderSource<Item, TCheckpoint>
-): Reader<Item, TCheckpoint> => ({
+): IterableReader<Item, TCheckpoint> => ({
   async open(context) {
     const items = typeof source === "function" ? await source(context) : source;
     return createIterableSession<Item, TCheckpoint>(items);

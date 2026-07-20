@@ -1,6 +1,8 @@
 import type { ChunkStepExecutionContext } from "../types/step.js";
 import { createIterableSession, type Reader, type ReaderSession } from "./reader.js";
 
+export interface FunctionReader<Item, TCheckpoint = unknown> extends Reader<Item, TCheckpoint> {}
+
 export type ReaderFunction<Item, TCheckpoint = unknown> = (
   context: ChunkStepExecutionContext<TCheckpoint>
 ) =>
@@ -11,7 +13,7 @@ export type ReaderFunction<Item, TCheckpoint = unknown> = (
 
 export const createFunctionReader = <Item, TCheckpoint = unknown>(
   read: ReaderFunction<Item, TCheckpoint>
-): Reader<Item, TCheckpoint> => ({
+): FunctionReader<Item, TCheckpoint> => ({
   async open(context) {
     const result = await read(context);
 

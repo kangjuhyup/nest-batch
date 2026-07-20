@@ -14,14 +14,14 @@ step-level `checkpoint()` callback을 따로 정의하면 그 값이
 
 ```ts
 import { createIterableReader, defineChunkStep } from "@nest-batch/core";
-import type { Writer } from "@nest-batch/core";
+import type { IterableReader, Writer } from "@nest-batch/core";
 
 interface SourceUser {
   readonly id: string;
   readonly active: boolean;
 }
 
-const reader = createIterableReader<SourceUser>([
+const reader: IterableReader<SourceUser> = createIterableReader<SourceUser>([
   { id: "user-1", active: true },
   { id: "user-2", active: false }
 ]);
@@ -44,15 +44,17 @@ export const importUsersStep = defineChunkStep({
 
 ```ts
 import { createIterableReader } from "@nest-batch/core";
+import type { IterableReader } from "@nest-batch/core";
 
 interface UserCheckpoint {
   readonly start?: number;
 }
 
-const reader = createIterableReader<number, UserCheckpoint>(({ checkpoint }) => {
-  const start = checkpoint?.start ?? 0;
-  return [start, start + 1, start + 2];
-});
+const reader: IterableReader<number, UserCheckpoint> =
+  createIterableReader<number, UserCheckpoint>(({ checkpoint }) => {
+    const start = checkpoint?.start ?? 0;
+    return [start, start + 1, start + 2];
+  });
 ```
 
 ## Function Reader
@@ -62,6 +64,7 @@ const reader = createIterableReader<number, UserCheckpoint>(({ checkpoint }) => 
 
 ```ts
 import { createFunctionReader } from "@nest-batch/core";
+import type { FunctionReader } from "@nest-batch/core";
 
 interface SourceUser {
   readonly id: string;
@@ -71,30 +74,34 @@ interface UserCheckpoint {
   readonly cursor?: string;
 }
 
-const reader = createFunctionReader<SourceUser, UserCheckpoint>(async function* ({
-  checkpoint,
-  signal
-}) {
-  const users = await fetchUsersAfter(checkpoint?.cursor);
+const reader: FunctionReader<SourceUser, UserCheckpoint> =
+  createFunctionReader<SourceUser, UserCheckpoint>(async function* ({
+    checkpoint,
+    signal
+  }) {
+    const users = await fetchUsersAfter(checkpoint?.cursor);
 
-  for (const user of users) {
-    signal.throwIfAborted();
-    yield user;
-  }
-});
+    for (const user of users) {
+      signal.throwIfAborted();
+      yield user;
+    }
+  });
 ```
 
 resource 정리가 필요하면 session을 반환합니다.
 
 ```ts
 import { createFunctionReader } from "@nest-batch/core";
+import type { FunctionReader } from "@nest-batch/core";
 
 interface LogRow {
   readonly id: string;
   readonly message: string;
 }
 
-const reader = createFunctionReader<LogRow>(async ({ signal }) => {
+const reader: FunctionReader<LogRow> = createFunctionReader<LogRow>(async ({
+  signal
+}) => {
   const connection = await openLogConnection();
 
   return {
@@ -119,6 +126,7 @@ mutable data나 중간 삽입이 있는 source는 page 기반 reader보다 curso
 
 ```ts
 import { createCursorReader } from "@nest-batch/core";
+import type { CursorReader } from "@nest-batch/core";
 
 interface SourceUser {
   readonly id: string;
@@ -129,7 +137,8 @@ interface UserCursorCheckpoint {
   readonly cursor?: string;
 }
 
-const reader = createCursorReader<SourceUser, string, UserCursorCheckpoint>({
+const reader: CursorReader<SourceUser, string, UserCursorCheckpoint> =
+  createCursorReader<SourceUser, string, UserCursorCheckpoint>({
   async fetch({ cursor, signal }) {
     signal.throwIfAborted();
 
@@ -142,7 +151,7 @@ const reader = createCursorReader<SourceUser, string, UserCursorCheckpoint>({
   getCursor(user) {
     return user.id;
   }
-});
+  });
 ```
 
 `fetch()`가 빈 배열을 반환하면 reader가 종료됩니다. `checkpoint()`는 마지막으로
@@ -155,6 +164,7 @@ API 이름은 `createPagingReader`입니다.
 
 ```ts
 import { createPagingReader } from "@nest-batch/core";
+import type { PageReader } from "@nest-batch/core";
 
 interface Invoice {
   readonly id: string;
@@ -166,7 +176,8 @@ interface InvoicePageCheckpoint {
   readonly offset?: number;
 }
 
-const reader = createPagingReader<Invoice, InvoicePageCheckpoint>({
+const reader: PageReader<Invoice, InvoicePageCheckpoint> =
+  createPagingReader<Invoice, InvoicePageCheckpoint>({
   pageSize: 100,
   async fetch({ page, pageSize, signal }) {
     signal.throwIfAborted();
@@ -177,7 +188,7 @@ const reader = createPagingReader<Invoice, InvoicePageCheckpoint>({
       orderBy: "id"
     });
   }
-});
+  });
 ```
 
 checkpoint는 zero-based `{ page, offset }`입니다. 예를 들어 page 0에서 첫 item을
