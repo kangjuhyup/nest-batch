@@ -107,9 +107,27 @@ system schema는 해당 prefix로 시작해야 합니다. MySQL과 MariaDB full-
 
 ### Performance Tests
 
-performance test도 기본 `pnpm test` 명령에서 제외됩니다. 현재는 adapter
-micro-benchmark부터 시작하며, 일반 테스트 경로를 바꾸지 않고 더 무거운 database
-concurrency scenario로 확장하는 것을 전제로 둡니다.
+performance test도 기본 `pnpm test` 명령에서 제외됩니다. 일반 테스트 경로를
+바꾸지 않고 반복 가능한 core runtime baseline과 adapter micro-benchmark를
+검증합니다.
+
+```bash
+pnpm test:perf
+```
+
+core runtime baseline은 Docker 없이 실행됩니다. machine별 throughput 숫자를
+고정하지 않고 chunk throughput, checkpoint overhead, retry/skip overhead를
+측정합니다. 기록된 baseline 결과는 [`docs/performance.md`](docs/performance.md)에
+남깁니다. local run은 다음 환경 변수로 조정합니다.
+
+```bash
+NEST_BATCH_PERF_ITEMS=20000 \
+NEST_BATCH_PERF_CHUNK_SIZE=250 \
+pnpm test:perf -- packages/core/test/performance-baseline.perf.test.ts
+```
+
+adapter performance test는 외부 service가 필요할 수 있습니다. Postgres는 다음처럼
+실행합니다.
 
 ```bash
 docker compose up -d postgres

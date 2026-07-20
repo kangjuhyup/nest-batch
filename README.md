@@ -103,8 +103,25 @@ variables when needed.
 ### Performance Tests
 
 Performance tests are also excluded from the default `pnpm test` command. They
-start with adapter micro-benchmarks and are intended to grow into heavier
-database concurrency scenarios without changing the normal test path.
+cover repeatable core runtime baselines and adapter micro-benchmarks without
+changing the normal test path.
+
+```bash
+pnpm test:perf
+```
+
+The core runtime baseline does not require Docker. It measures chunk throughput,
+checkpoint overhead, and retry/skip overhead without asserting
+machine-specific throughput numbers. Recorded baseline runs are kept in
+[`docs/performance.md`](docs/performance.md). Tune local runs with:
+
+```bash
+NEST_BATCH_PERF_ITEMS=20000 \
+NEST_BATCH_PERF_CHUNK_SIZE=250 \
+pnpm test:perf -- packages/core/test/performance-baseline.perf.test.ts
+```
+
+Adapter performance tests may require external services. For Postgres:
 
 ```bash
 docker compose up -d postgres
