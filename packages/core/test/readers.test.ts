@@ -1,9 +1,14 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   closeReader,
   createCursorReader,
   createFunctionReader,
   createIterableReader,
+  createJsonlFileReader,
+  createLineFileReader,
   createPagingReader,
   getReaderCheckpoint,
   openReader,
@@ -315,5 +320,47 @@ describe("reader contract / reader contract를 검증한다", () => {
     await expect(getReaderCheckpoint(opened)).resolves.toEqual({ offset: 3 });
     expect(items).toEqual(["line-2", "line-3"]);
     expect(closed).toBe(true);
+  });
+
+  it("creates line file readers from paths with offset checkpoints / path 기반 line file reader를 offset checkpoint로 연다", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "nest-batch-reader-"));
+    const path = join(directory, "users.txt");
+    await writeFile(path, "user-1\nuser-2\nuser-3\n", "utf8");
+
+    try {
+      const reader = createLineFileReader({
+        path,
+        map(line, { lineNumber }) {
+          return `${lineNumber}:${line}`;
+        }
+      });
+      const opened = await openReader(reader, createContext({ offset: 1 }));
+      const items: string[] = [];
+
+      for await (const item of opened) {
+        items.push(item);
+      }
+      await closeReader(opened);
+
+      await expect(getReaderCheckpoint(opened)).resolves.toEqual({ offset: 3 });
+      expect(items).toEqual(["2:user-2", "3:user-3"]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("creates JSONL file readers from line sources / line source 기반 JSONL reader를 만든다", async () => {
+    const reader = createJsonlFileReader<{ readonly id: string }>({
+      lines: ['{"id":"user-1"}', '{"id":"user-2"}']
+    });
+    const opened = await openReader(reader, createContext());
+    const ids: string[] = [];
+
+    for await (const item of opened) {
+      ids.push(item.id);
+    }
+
+    await expect(getReaderCheckpoint(opened)).resolves.toEqual({ offset: 2 });
+    expect(ids).toEqual(["user-1", "user-2"]);
   });
 });

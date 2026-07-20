@@ -1,3 +1,4 @@
+import { createJsonlFileReader, createLineFileReader } from "@nest-batch/core";
 import type {
   CursorReaderDefinition,
   FileReaderDefinition,
@@ -128,6 +129,22 @@ export const fileReaderExample: FileReaderDefinition<
   }
 };
 
+export const lineFileReaderExample = createLineFileReader<ReaderExampleUser>({
+  lines: users.map((user) => `${user.id},${user.email}`),
+  map(line) {
+    const [id, email] = line.split(",");
+
+    return {
+      id: id ?? "",
+      email: email ?? ""
+    };
+  }
+});
+
+export const jsonlFileReaderExample = createJsonlFileReader<ReaderExampleUser>({
+  lines: users.map((user) => JSON.stringify(user))
+});
+
 export const readerExamples = {
   iterable: iterableReaderExample,
   function: functionReaderExample,
@@ -135,5 +152,7 @@ export const readerExamples = {
   page: pageReaderExample,
   sql: sqlReaderExample,
   http: httpReaderExample,
-  file: fileReaderExample
+  file: fileReaderExample,
+  lineFile: lineFileReaderExample,
+  jsonlFile: jsonlFileReaderExample
 };

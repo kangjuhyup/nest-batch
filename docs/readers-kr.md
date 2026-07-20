@@ -304,6 +304,34 @@ const reader: FileReaderDefinition<LogLine> = {
 설정합니다. 이 경우 library는 앞 item을 다시 skip하지 않고 checkpoint offset부터
 이어 읽습니다.
 
+line 단위 파일은 `createLineFileReader()`를 사용합니다.
+
+```ts
+import { createLineFileReader } from "@nest-batch/core";
+
+const reader = createLineFileReader({
+  path: "/var/log/app.log",
+  map(line, { lineNumber }) {
+    return { lineNumber, line };
+  }
+});
+```
+
+JSONL 파일은 `createJsonlFileReader()`를 사용합니다. 각 줄을 `JSON.parse()`하고,
+parse 실패는 reader read phase 실패로 기록됩니다.
+
+```ts
+import { createJsonlFileReader } from "@nest-batch/core";
+
+interface UserEvent {
+  readonly id: string;
+}
+
+const reader = createJsonlFileReader<UserEvent>({
+  path: "./events.jsonl"
+});
+```
+
 ## Custom Reader Class
 
 Nest provider나 class 기반 reader가 필요하면 `Reader.open()`에서 session을 새로

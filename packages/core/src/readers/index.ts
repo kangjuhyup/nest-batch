@@ -17,12 +17,19 @@ export {
 } from "./function-reader.js";
 export {
   createFileReader,
+  createJsonlFileReader,
+  createLineFileReader,
   type FileReader,
   type FileReaderCheckpoint,
   type FileReaderDefinition,
   type FileReaderOpenContext,
   type FileReaderOptions,
-  type FileReaderSource
+  type FileReaderSource,
+  type JsonlFileReaderOptions,
+  type JsonlFileReaderParseContext,
+  type LineFileReaderMapContext,
+  type LineFileReaderOptions,
+  type LineFileReaderSource
 } from "./file-reader.js";
 export {
   createHttpReader,

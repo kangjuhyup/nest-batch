@@ -23,10 +23,12 @@ import type {
   IterableReader,
   IterableReaderDefinition,
   ItemSkippedBatchEvent,
+  JsonlFileReaderOptions,
   JobBatchEvent,
   JobExecution,
   JobRepository,
   LockManager,
+  LineFileReaderOptions,
   PageReader,
   PageReaderDefinition,
   PagingReader,
@@ -151,6 +153,12 @@ describe("core type module exports / core type module export", () => {
         return ["file-definition-user"];
       }
     };
+    const lineFileReaderOptions: LineFileReaderOptions = {
+      lines: ["line-1"]
+    };
+    const jsonlFileReaderOptions: JsonlFileReaderOptions<{ readonly id: string }> = {
+      lines: ['{"id":"user-1"}']
+    };
     const readerDefinitions: readonly ReaderDefinition<string>[] = [
       iterableReaderDefinition,
       functionReaderDefinition,
@@ -175,6 +183,8 @@ describe("core type module exports / core type module export", () => {
     expect(await collectReader(sqlReader)).toEqual(["page-user"]);
     expect(await collectReader(httpReader)).toEqual(["user-1"]);
     expect(await collectReader(fileReader)).toEqual(["user-1"]);
+    expect(lineFileReaderOptions.lines).toEqual(["line-1"]);
+    expect(jsonlFileReaderOptions.lines).toEqual(['{"id":"user-1"}']);
     expect(readerDefinitions.map((definition) => definition.kind)).toEqual([
       "iterable",
       "function",
