@@ -1,4 +1,5 @@
 import { isSkipItem } from "../skip-item.js";
+import { closeReader, getReaderCheckpoint, openReader } from "../readers/index.js";
 import type {
   CheckpointStore,
   ChunkRetryContext,
@@ -8,7 +9,6 @@ import type {
   SkipPolicy
 } from "../types/index.js";
 import { emitBatchEvent } from "./events.js";
-import { toAsyncIterable } from "./iterables.js";
 import { delay, requireSignal } from "./signals.js";
 import type { StepRunContext, StepRunResult } from "./step-run-context.js";
 
@@ -157,6 +157,8 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
     }
   };
 
+  const readerSession = await openReader(step.reader, readerContext);
+
   const flush = async (): Promise<void> => {
     if (chunk.length === 0) {
       return;
@@ -178,8 +180,8 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
       skipCount
     });
 
-    if (step.checkpoint) {
-      const nextCheckpoint = await step.checkpoint({
+    const nextCheckpoint = step.checkpoint
+      ? await step.checkpoint({
         executionId: context.jobExecutionId,
         stepName: step.name,
         chunkIndex,
@@ -188,34 +190,38 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
         skipCount,
         signal,
         checkpoint
-      });
+      })
+      : await getReaderCheckpoint(readerSession);
 
-      if (nextCheckpoint !== undefined) {
-        checkpoint = nextCheckpoint;
-        await checkpointStore.write(context.jobExecutionId, step.name, checkpoint);
-      }
+    if (nextCheckpoint !== undefined) {
+      checkpoint = nextCheckpoint;
+      await checkpointStore.write(context.jobExecutionId, step.name, checkpoint);
     }
 
     chunkIndex += 1;
   };
 
-  for await (const item of toAsyncIterable(step.reader.read(readerContext))) {
-    signal.throwIfAborted();
-    readCount += 1;
-    const result = await processItem(item);
+  try {
+    for await (const item of readerSession) {
+      signal.throwIfAborted();
+      readCount += 1;
+      const result = await processItem(item);
 
-    if (result.skipped) {
-      continue;
+      if (result.skipped) {
+        continue;
+      }
+
+      chunk.push(result.output);
+
+      if (chunk.length >= step.chunkSize) {
+        await flush();
+      }
     }
 
-    chunk.push(result.output);
-
-    if (chunk.length >= step.chunkSize) {
-      await flush();
-    }
+    await flush();
+  } finally {
+    await closeReader(readerSession);
   }
-
-  await flush();
 
   return {
     readCount,

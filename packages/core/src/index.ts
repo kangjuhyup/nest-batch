@@ -1,5 +1,15 @@
 export { defineChunkStep, defineJob, defineStep } from "./definitions.js";
 export { createJobInstanceId, hashJobParameters } from "./parameters.js";
+export {
+  closeReader,
+  createCursorReader,
+  createFunctionReader,
+  createIterableReader,
+  createIterableSession,
+  createPagingReader,
+  getReaderCheckpoint,
+  openReader
+} from "./readers/index.js";
 export { DefaultBatchRunner } from "./runner.js";
 export { SKIP_ITEM, isSkipItem, skipItem } from "./skip-item.js";
 export { DatabaseBatchStorage } from "./types/index.js";
@@ -13,11 +23,10 @@ export type {
   BatchStepExecutionId,
   BatchRunner,
   CheckpointStore,
-  ChunkCheckpointContext,
   ChunkFailurePhase,
   ChunkItemContext,
   ChunkProcessor,
-  ChunkReader,
+  ChunkCheckpointContext,
   ChunkRetryContext,
   ChunkSkipContext,
   ChunkStepDefinition,
@@ -40,7 +49,6 @@ export type {
   LockHandle,
   LockManager,
   Processor,
-  Reader,
   RetryPolicy,
   SkipItem,
   SkipPolicy,
@@ -51,3 +59,17 @@ export type {
   TaskletStepDefinition,
   Writer
 } from "./types/index.js";
+export type {
+  ChunkReader,
+  CursorReaderCheckpoint,
+  CursorReaderFetchContext,
+  CursorReaderOptions,
+  IterableReaderSource,
+  LegacyReader,
+  PagingReaderCheckpoint,
+  PagingReaderFetchContext,
+  PagingReaderOptions,
+  Reader,
+  ReaderFunction,
+  ReaderSession
+} from "./readers/index.js";

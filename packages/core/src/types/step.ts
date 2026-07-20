@@ -1,4 +1,5 @@
 import type { SkipItem } from "../skip-item.js";
+import type { ChunkReader } from "../readers/reader.js";
 import type { BatchExecutionId } from "./common.js";
 
 export type ChunkFailurePhase = "process" | "write";
@@ -70,10 +71,6 @@ export interface ChunkCheckpointContext<TCheckpoint = unknown>
   readonly skipCount: number;
 }
 
-export interface Reader<Input, TCheckpoint = unknown> {
-  read(context: ChunkStepExecutionContext<TCheckpoint>): AsyncIterable<Input> | Iterable<Input>;
-}
-
 export interface Processor<Input, Output, TCheckpoint = unknown> {
   process(
     item: Input,
@@ -84,8 +81,6 @@ export interface Processor<Input, Output, TCheckpoint = unknown> {
 export interface Writer<Output, TCheckpoint = unknown> {
   write(items: readonly Output[], context: ChunkWriteContext<TCheckpoint>): Promise<void> | void;
 }
-
-export type ChunkReader<Input, TCheckpoint = unknown> = Reader<Input, TCheckpoint>;
 
 export type ChunkProcessor<Input, Output, TCheckpoint = unknown> = Processor<Input, Output, TCheckpoint>;
 

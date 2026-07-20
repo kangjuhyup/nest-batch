@@ -338,4 +338,128 @@ describe("step runners / step runner", () => {
     });
     expect(writerAttempts).toEqual([1, 2]);
   });
+
+  it("writes reader session checkpoints and closes sessions / reader session checkpoint를 저장하고 session을 닫는다", async () => {
+    const checkpointStore = new RecordingCheckpointStore();
+    const written: string[][] = [];
+    let closed = false;
+    let cursor: string | undefined;
+    const step = defineChunkStep<string, string, { readonly cursor: string }>({
+      name: "session-reader",
+      chunkSize: 1,
+      reader: {
+        open() {
+          return {
+            async *[Symbol.asyncIterator]() {
+              cursor = "user-1";
+              yield "user-1";
+              cursor = "user-2";
+              yield "user-2";
+            },
+            checkpoint() {
+              return cursor ? { cursor } : undefined;
+            },
+            close() {
+              closed = true;
+            }
+          };
+        }
+      },
+      writer: {
+        write(items) {
+          written.push([...items]);
+        }
+      }
+    });
+
+    const result = await runChunkStep(step, createContext(), checkpointStore);
+
+    expect(result).toMatchObject({
+      readCount: 2,
+      writeCount: 2,
+      skipCount: 0,
+      retryCount: 0
+    });
+    expect(written).toEqual([["user-1"], ["user-2"]]);
+    expect(checkpointStore.writes).toEqual([
+      {
+        executionId: "execution-1",
+        stepName: "session-reader",
+        checkpoint: { cursor: "user-1" }
+      },
+      {
+        executionId: "execution-1",
+        stepName: "session-reader",
+        checkpoint: { cursor: "user-2" }
+      }
+    ]);
+    expect(closed).toBe(true);
+  });
+
+  it("prefers step checkpoints over reader checkpoints / step checkpoint를 reader checkpoint보다 우선한다", async () => {
+    const checkpointStore = new RecordingCheckpointStore();
+    const step = defineChunkStep<string, string, { readonly cursor: string }>({
+      name: "step-checkpoint",
+      chunkSize: 1,
+      reader: {
+        open() {
+          return {
+            async *[Symbol.asyncIterator]() {
+              yield "user-1";
+            },
+            checkpoint() {
+              return { cursor: "reader" };
+            }
+          };
+        }
+      },
+      writer: {
+        write() {
+          return undefined;
+        }
+      },
+      checkpoint() {
+        return { cursor: "step" };
+      }
+    });
+
+    await runChunkStep(step, createContext(), checkpointStore);
+
+    expect(checkpointStore.writes).toEqual([
+      {
+        executionId: "execution-1",
+        stepName: "step-checkpoint",
+        checkpoint: { cursor: "step" }
+      }
+    ]);
+  });
+
+  it("closes reader sessions when chunk steps fail / chunk step 실패 시 reader session을 닫는다", async () => {
+    const checkpointStore = new RecordingCheckpointStore();
+    let closed = false;
+    const step = defineChunkStep<string>({
+      name: "close-on-failure",
+      chunkSize: 1,
+      reader: {
+        open() {
+          return {
+            async *[Symbol.asyncIterator]() {
+              yield "user-1";
+            },
+            close() {
+              closed = true;
+            }
+          };
+        }
+      },
+      writer: {
+        write() {
+          throw new Error("writer failed");
+        }
+      }
+    });
+
+    await expect(runChunkStep(step, createContext(), checkpointStore)).rejects.toThrow("writer failed");
+    expect(closed).toBe(true);
+  });
 });

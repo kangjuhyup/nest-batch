@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  createIterableSession,
   DatabaseBatchStorage,
   defineChunkStep,
   defineJob,
   defineStep,
   isSkipItem,
+  openReader,
   skipItem
 } from "../src/index.js";
 import type { CheckpointStore, JobRepository, LockManager, Processor, Reader, Writer } from "../src/index.js";
@@ -54,9 +56,8 @@ describe("core definitions / core 정의", () => {
   it("defines a chunk step without a processor / processor 없이 chunk step을 정의한다", async () => {
     const written: Array<readonly { id: string }[]> = [];
     class CopyUsersReader implements Reader<{ id: string }> {
-      async *read() {
-        yield { id: "user-1" };
-        yield { id: "user-2" };
+      open() {
+        return createIterableSession([{ id: "user-1" }, { id: "user-2" }]);
       }
     }
     class CopyUsersWriter implements Writer<{ id: string }> {
@@ -93,8 +94,8 @@ describe("core definitions / core 정의", () => {
 
   it("defines a chunk step with a processor and explicit skip / processor와 명시적 skip이 있는 chunk step을 정의한다", async () => {
     class FilterUsersReader implements Reader<{ id: string; active: boolean }> {
-      *read() {
-        yield { id: "user-1", active: false };
+      open() {
+        return createIterableSession([{ id: "user-1", active: false }]);
       }
     }
     class FilterUsersProcessor implements Processor<{ id: string; active: boolean }, { id: string }> {
@@ -136,8 +137,8 @@ describe("core definitions / core 정의", () => {
   it("accepts Reader Processor Writer classes / Reader Processor Writer class 구현체를 받는다", async () => {
     const written: Array<readonly { externalId: string }[]> = [];
     class UserReader implements Reader<{ id: string }> {
-      *read() {
-        yield { id: "user-1" };
+      open() {
+        return createIterableSession([{ id: "user-1" }]);
       }
     }
     class UserProcessor implements Processor<{ id: string }, { externalId: string }> {
@@ -160,7 +161,11 @@ describe("core definitions / core 정의", () => {
     });
 
     const signal = new AbortController().signal;
-    const items = step.reader.read({ signal }) as Iterable<{ id: string }>;
+    const readerSession = await openReader(step.reader, { signal });
+    const items: Array<{ id: string }> = [];
+    for await (const item of readerSession) {
+      items.push(item);
+    }
     const processed = await step.processor?.process([...items][0], {
       index: 0,
       item: { id: "user-1" },
@@ -178,8 +183,8 @@ describe("core definitions / core 정의", () => {
 
   it("keeps null and undefined as valid processor outputs / null과 undefined를 유효한 processor output으로 유지한다", async () => {
     const reader: Reader<{ id: string }> = {
-      *read() {
-        yield { id: "user-1" };
+      open() {
+        return createIterableSession([{ id: "user-1" }]);
       }
     };
     const writer: Writer<null | undefined> = {

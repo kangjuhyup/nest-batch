@@ -6,4 +6,5 @@ export type * from "./repository.js";
 export type * from "./runner.js";
 export type * from "./step.js";
 export { DatabaseBatchStorage } from "./storage.js";
+export type { ChunkReader, LegacyReader, Reader, ReaderSession } from "../readers/index.js";
 export type { SkipItem } from "../skip-item.js";

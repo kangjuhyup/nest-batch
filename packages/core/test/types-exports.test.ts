@@ -14,14 +14,18 @@ class FakeDatabaseBatchStorage extends DatabaseBatchStorage {
 }
 
 describe("core type module exports / core type module export", () => {
-  it("exports split type modules through the types barrel / 분리된 type module을 types barrel로 export한다", () => {
+  it("exports split type modules through the types barrel / 분리된 type module을 types barrel로 export한다", async () => {
     const repository = {} as JobRepository;
     const checkpointStore = {} as CheckpointStore;
     const lockManager = {} as LockManager;
     const storage = new FakeDatabaseBatchStorage(repository, checkpointStore, lockManager);
     const reader: Reader<string> = {
-      *read() {
-        yield "user-1";
+      open() {
+        return {
+          async *[Symbol.asyncIterator]() {
+            yield "user-1";
+          }
+        };
       }
     };
     const writer: Writer<string> = {
@@ -31,7 +35,11 @@ describe("core type module exports / core type module export", () => {
     };
 
     expect(storage.repository).toBe(repository);
-    expect([...reader.read({ signal: new AbortController().signal })]).toEqual(["user-1"]);
+    const items: string[] = [];
+    for await (const item of await reader.open({ signal: new AbortController().signal })) {
+      items.push(item);
+    }
+    expect(items).toEqual(["user-1"]);
     expect(writer.write(["user-1"], { attempt: 1, chunkIndex: 0, signal: new AbortController().signal })).toBeUndefined();
   });
 
