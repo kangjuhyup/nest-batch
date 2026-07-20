@@ -69,7 +69,7 @@ E2E tests are excluded from the default `pnpm test` command. Start the needed
 database first, then run the e2e script explicitly.
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres mysql mariadb
 pnpm test:e2e
 pnpm test:e2e:adapters
 pnpm test:e2e:system
@@ -92,9 +92,13 @@ NEST_BATCH_E2E_POSTGRES_SCHEMA=batch_e2e_local \
 pnpm test:e2e:postgres
 ```
 
-System Postgres e2e tests use a separate disposable schema named
-`batch_system_e2e` by default. Custom system schemas must start with
-`batch_system_e2e`.
+System e2e tests include a full runtime flow across in-memory, Postgres, MySQL,
+and MariaDB storage. Postgres system tests use disposable schemas named
+`batch_system_e2e` and `batch_full_e2e` by default. Custom system schemas must
+start with the matching prefix. MySQL and MariaDB full-flow tests drop only
+tables whose prefix starts with `nb_full_e2e`; override the defaults with
+`NEST_BATCH_FULL_E2E_MYSQL_*` and `NEST_BATCH_FULL_E2E_MARIADB_*` environment
+variables when needed.
 
 ### Performance Tests
 

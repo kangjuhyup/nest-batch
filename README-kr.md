@@ -74,7 +74,7 @@ E2E test는 기본 `pnpm test` 명령에서 제외됩니다. 필요한 database�
 실행한 뒤 e2e script를 명시적으로 실행합니다.
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres mysql mariadb
 pnpm test:e2e
 pnpm test:e2e:adapters
 pnpm test:e2e:system
@@ -97,9 +97,13 @@ NEST_BATCH_E2E_POSTGRES_SCHEMA=batch_e2e_local \
 pnpm test:e2e:postgres
 ```
 
-System Postgres e2e test는 기본적으로 `batch_system_e2e`라는 별도 disposable
-schema를 사용합니다. custom system schema는 `batch_system_e2e`로 시작해야
-합니다.
+System e2e test는 in-memory, Postgres, MySQL, MariaDB storage 전체를 같은
+runtime flow로 검증합니다. Postgres system test는 기본적으로
+`batch_system_e2e`, `batch_full_e2e` disposable schema를 사용합니다. custom
+system schema는 해당 prefix로 시작해야 합니다. MySQL과 MariaDB full-flow test는
+`nb_full_e2e`로 시작하는 table prefix의 table만 drop합니다. 필요하면
+`NEST_BATCH_FULL_E2E_MYSQL_*`, `NEST_BATCH_FULL_E2E_MARIADB_*` 환경 변수로 기본
+값을 바꿉니다.
 
 ### Performance Tests
 
