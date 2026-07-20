@@ -7,6 +7,8 @@ export type {
   PostgresPoolOptions,
   PostgresQueryResultLike
 } from "./options.js";
+export { createPostgresCursorReader } from "./reader.js";
+export type { PostgresCursorReaderOptions } from "./reader.js";
 export { PostgresJobRepository } from "./repository/repository.js";
 export { ensurePostgresSchema } from "./schema.js";
 export { PostgresBatchStorage } from "./storage.js";

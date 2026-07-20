@@ -262,6 +262,79 @@ const reader = createSqlCursorReader<UserRow, string>({
 });
 ```
 
+adapter 패키지를 사용하면 기본 cursor SQL 생성과 driver result row 추출을 helper에
+맡길 수 있습니다. `table`, `cursorColumn`, `columns`는 dot-separated identifier만
+허용합니다. 복잡한 join, expression, vendor function이 필요하면 core의
+`createSqlCursorReader()`를 직접 사용합니다.
+
+Postgres는 `$1`, `$2` placeholder를 사용합니다.
+
+```ts
+import { createPostgresCursorReader } from "@nest-batch/postgres";
+
+const reader = createPostgresCursorReader<UserRow, string>({
+  pool,
+  table: "public.users",
+  cursorColumn: "id",
+  columns: ["id", "email"],
+  where: "active = $1",
+  values: [true],
+  pageSize: 100,
+  getCursor(row) {
+    return row.id;
+  }
+});
+```
+
+MySQL과 MariaDB는 `?` placeholder를 사용합니다.
+
+```ts
+import { createMySqlCursorReader } from "@nest-batch/mysql";
+
+const reader = createMySqlCursorReader<UserRow, string>({
+  pool,
+  table: "batch.users",
+  cursorColumn: "id",
+  columns: ["id", "email"],
+  where: "active = ?",
+  values: [true],
+  pageSize: 100,
+  getCursor(row) {
+    return row.id;
+  }
+});
+```
+
+```ts
+import { createMariaDbCursorReader } from "@nest-batch/mariadb";
+
+const reader = createMariaDbCursorReader<UserRow, string>({
+  pool,
+  table: "batch.users",
+  cursorColumn: "id",
+  columns: ["id", "email"],
+  where: "active = ?",
+  values: [true],
+  pageSize: 100,
+  getCursor(row) {
+    return row.id;
+  }
+});
+```
+
+adapter cursor helper는 다음 형태의 SQL을 만듭니다.
+
+```sql
+SELECT <columns>
+FROM <table>
+WHERE (<where>) AND <cursorColumn> > <cursor>
+ORDER BY <cursorColumn> ASC
+LIMIT <pageSize>
+```
+
+cursor column에는 unique하거나 단조 증가하는 값을 사용하고, 운영 테이블에서는
+`WHERE` 조건과 `cursorColumn`에 맞는 index를 준비합니다.
+
 ## HTTP Reader
 
 HTTP API가 page token 또는 next URL을 반환할 때 사용합니다. `request()`는 item 배열과
