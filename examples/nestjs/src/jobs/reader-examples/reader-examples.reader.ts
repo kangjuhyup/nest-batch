@@ -1,16 +1,10 @@
-import {
-  createCursorReader,
-  createFunctionReader,
-  createIterableReader,
-  createPagingReader
-} from "@nest-batch/core";
 import type {
-  ChunkStepExecutionContext,
-  CursorReader,
-  FunctionReader,
-  IterableReader,
-  PageReader,
-  ReaderSession
+  CursorReaderDefinition,
+  CursorReaderFetchContext,
+  FunctionReaderDefinition,
+  IterableReaderDefinition,
+  PageReaderDefinition,
+  PagingReaderFetchContext
 } from "@nest-batch/core";
 import { BatchReader } from "@nest-batch/nest";
 
@@ -36,80 +30,55 @@ const users: readonly ReaderExampleUser[] = [
 ];
 
 @BatchReader("iterable-reader-example")
-export class IterableReaderExample implements IterableReader<ReaderExampleUser> {
-  private readonly reader: IterableReader<ReaderExampleUser> =
-    createIterableReader<ReaderExampleUser>(users);
-
-  open(context: ChunkStepExecutionContext): ReaderSession<ReaderExampleUser> | Promise<ReaderSession<ReaderExampleUser>> {
-    return this.reader.open(context);
-  }
+export class IterableReaderExample implements IterableReaderDefinition<ReaderExampleUser> {
+  readonly kind = "iterable";
+  readonly source = users;
 }
 
 @BatchReader("function-reader-example")
-export class FunctionReaderExample implements FunctionReader<ReaderExampleUser> {
-  private readonly reader: FunctionReader<ReaderExampleUser> =
-    createFunctionReader<ReaderExampleUser>(async function* ({ signal }) {
-      for (const user of users) {
-        signal.throwIfAborted();
-        yield user;
-      }
-    });
+export class FunctionReaderExample implements FunctionReaderDefinition<ReaderExampleUser> {
+  readonly kind = "function";
 
-  open(context: ChunkStepExecutionContext): ReaderSession<ReaderExampleUser> | Promise<ReaderSession<ReaderExampleUser>> {
-    return this.reader.open(context);
+  async *read({ signal }: Parameters<FunctionReaderDefinition<ReaderExampleUser>["read"]>[0]) {
+    for (const user of users) {
+      signal.throwIfAborted();
+      yield user;
+    }
   }
 }
 
 @BatchReader("cursor-reader-example")
-export class CursorReaderExample implements CursorReader<
+export class CursorReaderExample implements CursorReaderDefinition<
   ReaderExampleUser,
   string,
   ReaderExampleCursorCheckpoint
 > {
-  private readonly reader: CursorReader<
-    ReaderExampleUser,
-    string,
-    ReaderExampleCursorCheckpoint
-  > = createCursorReader<ReaderExampleUser, string, ReaderExampleCursorCheckpoint>({
-    fetch({ cursor, signal }) {
-      signal.throwIfAborted();
-      const startIndex = cursor ? users.findIndex((user) => user.id === cursor) + 1 : 0;
+  readonly kind = "cursor";
 
-      return users.slice(startIndex, startIndex + 2);
-    },
-    getCursor(user) {
-      return user.id;
-    }
-  });
+  fetch({ cursor, signal }: CursorReaderFetchContext<string, ReaderExampleCursorCheckpoint>) {
+    signal.throwIfAborted();
+    const startIndex = cursor ? users.findIndex((user) => user.id === cursor) + 1 : 0;
 
-  open(
-    context: ChunkStepExecutionContext<ReaderExampleCursorCheckpoint>
-  ): ReaderSession<ReaderExampleUser, ReaderExampleCursorCheckpoint> | Promise<ReaderSession<ReaderExampleUser, ReaderExampleCursorCheckpoint>> {
-    return this.reader.open(context);
+    return users.slice(startIndex, startIndex + 2);
+  }
+
+  getCursor(user: ReaderExampleUser) {
+    return user.id;
   }
 }
 
 @BatchReader("page-reader-example")
-export class PageReaderExample implements PageReader<
+export class PageReaderExample implements PageReaderDefinition<
   ReaderExampleUser,
   ReaderExamplePageCheckpoint
 > {
-  private readonly reader: PageReader<
-    ReaderExampleUser,
-    ReaderExamplePageCheckpoint
-  > = createPagingReader<ReaderExampleUser, ReaderExamplePageCheckpoint>({
-    pageSize: 2,
-    fetch({ page, pageSize, signal }) {
-      signal.throwIfAborted();
-      const startIndex = page * pageSize;
+  readonly kind = "page";
+  readonly pageSize = 2;
 
-      return users.slice(startIndex, startIndex + pageSize);
-    }
-  });
+  fetch({ page, pageSize, signal }: PagingReaderFetchContext<ReaderExamplePageCheckpoint>) {
+    signal.throwIfAborted();
+    const startIndex = page * pageSize;
 
-  open(
-    context: ChunkStepExecutionContext<ReaderExamplePageCheckpoint>
-  ): ReaderSession<ReaderExampleUser, ReaderExamplePageCheckpoint> | Promise<ReaderSession<ReaderExampleUser, ReaderExamplePageCheckpoint>> {
-    return this.reader.open(context);
+    return users.slice(startIndex, startIndex + pageSize);
   }
 }

@@ -33,6 +33,20 @@ export interface PageReader<
   TCheckpoint extends PagingReaderCheckpoint = PagingReaderCheckpoint
 > extends PagingReader<Item, TCheckpoint> {}
 
+export interface PagingReaderDefinition<
+  Item,
+  TCheckpoint extends PagingReaderCheckpoint = PagingReaderCheckpoint
+> extends PagingReaderOptions<Item, TCheckpoint> {
+  readonly kind: "paging";
+}
+
+export interface PageReaderDefinition<
+  Item,
+  TCheckpoint extends PagingReaderCheckpoint = PagingReaderCheckpoint
+> extends PagingReaderOptions<Item, TCheckpoint> {
+  readonly kind: "page";
+}
+
 export const createPagingReader = <
   Item,
   TCheckpoint extends PagingReaderCheckpoint = PagingReaderCheckpoint

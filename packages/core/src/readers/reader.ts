@@ -1,4 +1,5 @@
 import type { ChunkStepExecutionContext } from "../types/step.js";
+import { createReader, isReaderDefinition, type ReaderDefinition } from "./definition-reader.js";
 
 export interface ReaderSession<Item, TCheckpoint = unknown> extends AsyncIterable<Item> {
   checkpoint?(): TCheckpoint | undefined | Promise<TCheckpoint | undefined>;
@@ -17,7 +18,8 @@ export interface LegacyReader<Item, TCheckpoint = unknown> {
 
 export type ChunkReader<Item, TCheckpoint = unknown> =
   | Reader<Item, TCheckpoint>
-  | LegacyReader<Item, TCheckpoint>;
+  | LegacyReader<Item, TCheckpoint>
+  | ReaderDefinition<Item, TCheckpoint>;
 
 export const openReader = async <Item, TCheckpoint = unknown>(
   reader: ChunkReader<Item, TCheckpoint>,
@@ -25,6 +27,10 @@ export const openReader = async <Item, TCheckpoint = unknown>(
 ): Promise<ReaderSession<Item, TCheckpoint>> => {
   if (isSessionReader(reader)) {
     return reader.open(context);
+  }
+
+  if (isReaderDefinition(reader)) {
+    return createReader(reader).open(context);
   }
 
   return createIterableSession(reader.read(context));

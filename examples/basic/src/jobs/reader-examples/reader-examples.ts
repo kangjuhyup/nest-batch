@@ -1,14 +1,8 @@
-import {
-  createCursorReader,
-  createFunctionReader,
-  createIterableReader,
-  createPagingReader
-} from "@nest-batch/core";
 import type {
-  CursorReader,
-  FunctionReader,
-  IterableReader,
-  PageReader
+  CursorReaderDefinition,
+  FunctionReaderDefinition,
+  IterableReaderDefinition,
+  PageReaderDefinition
 } from "@nest-batch/core";
 
 export interface ReaderExampleUser {
@@ -32,22 +26,27 @@ const users: readonly ReaderExampleUser[] = [
   { id: "user-4", email: "user-4@example.com" }
 ];
 
-export const iterableReaderExample: IterableReader<ReaderExampleUser> =
-  createIterableReader<ReaderExampleUser>(users);
+export const iterableReaderExample: IterableReaderDefinition<ReaderExampleUser> = {
+  kind: "iterable",
+  source: users
+};
 
-export const functionReaderExample: FunctionReader<ReaderExampleUser> =
-  createFunctionReader<ReaderExampleUser>(async function* ({ signal }) {
+export const functionReaderExample: FunctionReaderDefinition<ReaderExampleUser> = {
+  kind: "function",
+  async *read({ signal }) {
     for (const user of users) {
       signal.throwIfAborted();
       yield user;
     }
-  });
+  }
+};
 
-export const cursorReaderExample: CursorReader<
+export const cursorReaderExample: CursorReaderDefinition<
   ReaderExampleUser,
   string,
   ReaderExampleCursorCheckpoint
-> = createCursorReader<ReaderExampleUser, string, ReaderExampleCursorCheckpoint>({
+> = {
+  kind: "cursor",
   fetch({ cursor, signal }) {
     signal.throwIfAborted();
     const startIndex = cursor ? users.findIndex((user) => user.id === cursor) + 1 : 0;
@@ -57,12 +56,13 @@ export const cursorReaderExample: CursorReader<
   getCursor(user) {
     return user.id;
   }
-});
+};
 
-export const pageReaderExample: PageReader<
+export const pageReaderExample: PageReaderDefinition<
   ReaderExampleUser,
   ReaderExamplePageCheckpoint
-> = createPagingReader<ReaderExampleUser, ReaderExamplePageCheckpoint>({
+> = {
+  kind: "page",
   pageSize: 2,
   fetch({ page, pageSize, signal }) {
     signal.throwIfAborted();
@@ -70,7 +70,7 @@ export const pageReaderExample: PageReader<
 
     return users.slice(startIndex, startIndex + pageSize);
   }
-});
+};
 
 export const readerExamples = {
   iterable: iterableReaderExample,

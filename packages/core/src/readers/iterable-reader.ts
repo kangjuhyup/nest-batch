@@ -3,6 +3,11 @@ import { createIterableSession, type Reader } from "./reader.js";
 
 export interface IterableReader<Item, TCheckpoint = unknown> extends Reader<Item, TCheckpoint> {}
 
+export interface IterableReaderDefinition<Item, TCheckpoint = unknown> {
+  readonly kind: "iterable";
+  readonly source: IterableReaderSource<Item, TCheckpoint>;
+}
+
 export type IterableReaderSource<Item, TCheckpoint = unknown> =
   | AsyncIterable<Item>
   | Iterable<Item>

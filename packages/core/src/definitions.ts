@@ -7,6 +7,7 @@ import type {
   JobParameters,
   TaskletStepDefinition
 } from "./types/index.js";
+import { normalizeReader } from "./readers/definition-reader.js";
 
 const assertName = (kind: "Job" | "Step", name: string): void => {
   if (name.trim().length === 0) {
@@ -48,7 +49,8 @@ export function defineChunkStep<Input = unknown, Output = Input, TCheckpoint = u
   return Object.freeze({
     ...definition,
     kind: "chunk" as const,
-    name: definition.name.trim()
+    name: definition.name.trim(),
+    reader: normalizeReader(definition.reader)
   }) as ChunkStepDefinition<Input, Output, TCheckpoint>;
 }
 

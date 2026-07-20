@@ -27,6 +27,14 @@ export interface CursorReader<
   TCheckpoint extends CursorReaderCheckpoint<Cursor> = CursorReaderCheckpoint<Cursor>
 > extends Reader<Item, TCheckpoint> {}
 
+export interface CursorReaderDefinition<
+  Item,
+  Cursor,
+  TCheckpoint extends CursorReaderCheckpoint<Cursor> = CursorReaderCheckpoint<Cursor>
+> extends CursorReaderOptions<Item, Cursor, TCheckpoint> {
+  readonly kind: "cursor";
+}
+
 export const createCursorReader = <
   Item,
   Cursor,

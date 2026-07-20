@@ -98,6 +98,23 @@ describe("reader contract / reader contract를 검증한다", () => {
     expect(items).toEqual([1, 2, 3]);
   });
 
+  it("opens reader definitions without calling factory helpers / factory helper 직접 호출 없이 reader 정의를 연다", async () => {
+    const opened = await openReader(
+      {
+        kind: "iterable",
+        source: ["a", "b"]
+      },
+      createContext()
+    );
+
+    const items: string[] = [];
+    for await (const item of opened) {
+      items.push(item);
+    }
+
+    expect(items).toEqual(["a", "b"]);
+  });
+
   it("creates reader sessions from read functions / read function으로 reader session을 만든다", async () => {
     const reader = createFunctionReader(async function* (
       context: ChunkStepExecutionContext<{ readonly cursor?: string }>
@@ -132,6 +149,34 @@ describe("reader contract / reader contract를 검증한다", () => {
     });
 
     const opened = await openReader(reader, createContext());
+
+    const names: string[] = [];
+    for await (const item of opened) {
+      names.push(item.name);
+    }
+
+    await expect(getReaderCheckpoint(opened)).resolves.toEqual({ cursor: 2 });
+    expect(names).toEqual(["first", "second"]);
+  });
+
+  it("opens cursor reader definitions with checkpoint support / checkpoint를 지원하는 cursor reader 정의를 연다", async () => {
+    const opened = await openReader(
+      {
+        kind: "cursor",
+        fetch({ cursor }: { readonly cursor?: number }) {
+          return cursor === undefined
+            ? [
+                { id: 1, name: "first" },
+                { id: 2, name: "second" }
+              ]
+            : [];
+        },
+        getCursor(item: { readonly id: number }) {
+          return item.id;
+        }
+      },
+      createContext()
+    );
 
     const names: string[] = [];
     for await (const item of opened) {

@@ -12,16 +12,22 @@ import type {
   CheckpointStore,
   ChunkWrittenBatchEvent,
   CursorReader,
+  CursorReaderDefinition,
   FunctionReader,
+  FunctionReaderDefinition,
   IterableReader,
+  IterableReaderDefinition,
   ItemSkippedBatchEvent,
   JobBatchEvent,
   JobExecution,
   JobRepository,
   LockManager,
   PageReader,
+  PageReaderDefinition,
   PagingReader,
+  PagingReaderDefinition,
   Reader,
+  ReaderDefinition,
   RetryBatchEvent,
   StepBatchEvent,
   StepExecution,
@@ -79,6 +85,46 @@ describe("core type module exports / core type module export", () => {
       }
     };
     const pagingReader: PagingReader<string> = pageReader;
+    const iterableReaderDefinition: IterableReaderDefinition<string> = {
+      kind: "iterable",
+      source: ["iterable-user"]
+    };
+    const functionReaderDefinition: FunctionReaderDefinition<string> = {
+      kind: "function",
+      read() {
+        return ["function-user"];
+      }
+    };
+    const cursorReaderDefinition: CursorReaderDefinition<string, string> = {
+      kind: "cursor",
+      fetch({ cursor }) {
+        return cursor ? [] : ["cursor-definition-user"];
+      },
+      getCursor(item) {
+        return item;
+      }
+    };
+    const pageReaderDefinition: PageReaderDefinition<string> = {
+      kind: "page",
+      pageSize: 1,
+      fetch({ page }) {
+        return page === 0 ? ["page-definition-user"] : [];
+      }
+    };
+    const pagingReaderDefinition: PagingReaderDefinition<string> = {
+      kind: "paging",
+      pageSize: 1,
+      fetch({ page }) {
+        return page === 0 ? ["paging-definition-user"] : [];
+      }
+    };
+    const readerDefinitions: readonly ReaderDefinition<string>[] = [
+      iterableReaderDefinition,
+      functionReaderDefinition,
+      cursorReaderDefinition,
+      pageReaderDefinition,
+      pagingReaderDefinition
+    ];
 
     expect(storage.repository).toBe(repository);
     const items: string[] = [];
@@ -90,6 +136,13 @@ describe("core type module exports / core type module export", () => {
     expect(functionReader).toBe(reader);
     expect(await collectReader(cursorReader)).toEqual(["cursor-user"]);
     expect(await collectReader(pagingReader)).toEqual(["page-user"]);
+    expect(readerDefinitions.map((definition) => definition.kind)).toEqual([
+      "iterable",
+      "function",
+      "cursor",
+      "page",
+      "paging"
+    ]);
     expect(writer.write(["user-1"], { attempt: 1, chunkIndex: 0, signal: new AbortController().signal })).toBeUndefined();
   });
 

@@ -92,6 +92,32 @@ describe("core definitions / core 정의", () => {
     expect(written).toEqual([[{ id: "user-1" }, { id: "user-2" }]]);
   });
 
+  it("normalizes reader definitions in chunk steps / chunk step의 reader 정의를 변환한다", async () => {
+    const step = defineChunkStep<string>({
+      name: "reader-definition-users",
+      chunkSize: 2,
+      reader: {
+        kind: "iterable",
+        source: ["user-1", "user-2"]
+      },
+      writer: {
+        write() {
+          return undefined;
+        }
+      }
+    });
+    const session = await openReader(step.reader, {
+      signal: new AbortController().signal
+    });
+    const items: string[] = [];
+
+    for await (const item of session) {
+      items.push(item);
+    }
+
+    expect(items).toEqual(["user-1", "user-2"]);
+  });
+
   it("defines a chunk step with a processor and explicit skip / processor와 명시적 skip이 있는 chunk step을 정의한다", async () => {
     class FilterUsersReader implements Reader<{ id: string; active: boolean }> {
       open() {

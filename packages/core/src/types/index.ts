@@ -10,12 +10,18 @@ export { DatabaseBatchStorage } from "./storage.js";
 export type {
   ChunkReader,
   CursorReader,
+  CursorReaderDefinition,
   FunctionReader,
+  FunctionReaderDefinition,
   IterableReader,
+  IterableReaderDefinition,
   LegacyReader,
   PageReader,
+  PageReaderDefinition,
   PagingReader,
+  PagingReaderDefinition,
   Reader,
+  ReaderDefinition,
   ReaderSession
 } from "../readers/index.js";
 export type { SkipItem } from "../skip-item.js";

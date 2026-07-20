@@ -3,6 +3,11 @@ import { createIterableSession, type Reader, type ReaderSession } from "./reader
 
 export interface FunctionReader<Item, TCheckpoint = unknown> extends Reader<Item, TCheckpoint> {}
 
+export interface FunctionReaderDefinition<Item, TCheckpoint = unknown> {
+  readonly kind: "function";
+  readonly read: ReaderFunction<Item, TCheckpoint>;
+}
+
 export type ReaderFunction<Item, TCheckpoint = unknown> = (
   context: ChunkStepExecutionContext<TCheckpoint>
 ) =>
