@@ -38,6 +38,8 @@ import type {
   ReaderDefinition,
   RetryBatchEvent,
   SqlReader,
+  SqlCursorReader,
+  SqlCursorReaderOptions,
   SqlReaderDefinition,
   StepBatchEvent,
   StepExecution,
@@ -96,6 +98,7 @@ describe("core type module exports / core type module export", () => {
     };
     const pagingReader: PagingReader<string> = pageReader;
     const sqlReader: SqlReader<string> = pageReader;
+    const sqlCursorReader: SqlCursorReader<string, string> = cursorReader;
     const httpReader: HttpReader<string, number> = reader;
     const fileReader: FileReader<string> = reader;
     const iterableReaderDefinition: IterableReaderDefinition<string> = {
@@ -175,6 +178,15 @@ describe("core type module exports / core type module export", () => {
         return (body as { readonly data: readonly { readonly id: string }[] }).data;
       }
     };
+    const sqlCursorReaderOptions: SqlCursorReaderOptions<string, string> = {
+      pageSize: 1,
+      query({ cursor }) {
+        return cursor ? [] : ["sql-cursor-user"];
+      },
+      getCursor(item) {
+        return item;
+      }
+    };
     const readerDefinitions: readonly ReaderDefinition<string>[] = [
       iterableReaderDefinition,
       functionReaderDefinition,
@@ -197,11 +209,13 @@ describe("core type module exports / core type module export", () => {
     expect(await collectReader(cursorReader)).toEqual(["cursor-user"]);
     expect(await collectReader(pagingReader)).toEqual(["page-user"]);
     expect(await collectReader(sqlReader)).toEqual(["page-user"]);
+    expect(await collectReader(sqlCursorReader)).toEqual(["cursor-user"]);
     expect(await collectReader(httpReader)).toEqual(["user-1"]);
     expect(await collectReader(fileReader)).toEqual(["user-1"]);
     expect(lineFileReaderOptions.lines).toEqual(["line-1"]);
     expect(jsonlFileReaderOptions.lines).toEqual(['{"id":"user-1"}']);
     expect(jsonHttpReaderOptions.pageSize).toBe(1);
+    expect(sqlCursorReaderOptions.pageSize).toBe(1);
     expect(readerDefinitions.map((definition) => definition.kind)).toEqual([
       "iterable",
       "function",

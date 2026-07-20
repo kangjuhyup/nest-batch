@@ -13,6 +13,7 @@ import {
   jsonlFileReaderExample,
   lineFileReaderExample,
   pageReaderExample,
+  sqlCursorReaderExample,
   sqlReaderExample,
   writtenUsers,
   type ReaderExampleUser
@@ -67,6 +68,10 @@ describe("basic example e2e / basic example e2e를 검증한다", () => {
     await expect(readUserIds(sqlReaderExample)).resolves.toEqual({
       ids: ["user-1", "user-2", "user-3", "user-4"],
       checkpoint: { page: 2, offset: 0 }
+    });
+    await expect(readUserIds(sqlCursorReaderExample)).resolves.toEqual({
+      ids: ["user-1", "user-2", "user-3", "user-4"],
+      checkpoint: { cursor: "user-4" }
     });
     await expect(readUserIds(httpReaderExample)).resolves.toEqual({
       ids: ["user-1", "user-2", "user-3", "user-4"],

@@ -238,6 +238,30 @@ const reader: SqlReaderDefinition<UserRow> = {
 checkpoint는 page reader와 같은 `{ page, offset }`입니다. 실행 중 source ordering이
 바뀌는 테이블에는 offset 기반 SQL reader보다 cursor 기반 reader를 우선 사용합니다.
 
+cursor 기반 SQL 조회는 `createSqlCursorReader()`를 사용합니다. core는 SQL 문자열이나
+driver type을 만들지 않고, query 함수만 호출합니다.
+
+```ts
+import { createSqlCursorReader } from "@nest-batch/core";
+
+const reader = createSqlCursorReader<UserRow, string>({
+  pageSize: 100,
+  async query({ cursor, pageSize, signal }) {
+    signal.throwIfAborted();
+
+    const result = await pool.query<UserRow>(
+      "select id, email from users where id > $1 order by id limit $2",
+      [cursor ?? "", pageSize]
+    );
+
+    return result.rows;
+  },
+  getCursor(row) {
+    return row.id;
+  }
+});
+```
+
 ## HTTP Reader
 
 HTTP API가 page token 또는 next URL을 반환할 때 사용합니다. `request()`는 item 배열과

@@ -1,5 +1,10 @@
 import type { ChunkStepExecutionContext } from "../types/step.js";
 import {
+  createCursorReader,
+  type CursorReaderCheckpoint,
+  type CursorReaderOptions
+} from "./cursor-reader.js";
+import {
   createPagingReader,
   type PagingReaderCheckpoint,
   type PagingReaderOptions
@@ -38,6 +43,34 @@ export interface SqlReaderDefinition<
   readonly kind: "sql";
 }
 
+export interface SqlCursorReaderCheckpoint<Cursor> extends CursorReaderCheckpoint<Cursor> {}
+
+export interface SqlCursorReaderQueryContext<
+  Cursor,
+  TCheckpoint extends SqlCursorReaderCheckpoint<Cursor>
+> extends ChunkStepExecutionContext<TCheckpoint> {
+  readonly cursor?: Cursor;
+  readonly pageSize: number;
+}
+
+export interface SqlCursorReaderOptions<
+  Item,
+  Cursor,
+  TCheckpoint extends SqlCursorReaderCheckpoint<Cursor> = SqlCursorReaderCheckpoint<Cursor>
+> {
+  readonly pageSize: number;
+  readonly query: (
+    context: SqlCursorReaderQueryContext<Cursor, TCheckpoint>
+  ) => readonly Item[] | Promise<readonly Item[]>;
+  readonly getCursor: (item: Item) => Cursor;
+}
+
+export interface SqlCursorReader<
+  Item,
+  Cursor,
+  TCheckpoint extends SqlCursorReaderCheckpoint<Cursor> = SqlCursorReaderCheckpoint<Cursor>
+> extends Reader<Item, TCheckpoint> {}
+
 export const createSqlReader = <
   Item,
   TCheckpoint extends SqlReaderCheckpoint = SqlReaderCheckpoint
@@ -56,4 +89,33 @@ export const createSqlReader = <
   };
 
   return createPagingReader(pagingOptions);
+};
+
+export const createSqlCursorReader = <
+  Item,
+  Cursor,
+  TCheckpoint extends SqlCursorReaderCheckpoint<Cursor> = SqlCursorReaderCheckpoint<Cursor>
+>(
+  options: SqlCursorReaderOptions<Item, Cursor, TCheckpoint>
+): SqlCursorReader<Item, Cursor, TCheckpoint> => {
+  validatePositiveInteger(options.pageSize, "pageSize");
+  const cursorOptions: CursorReaderOptions<Item, Cursor, TCheckpoint> = {
+    fetch({ cursor, signal, checkpoint }) {
+      return options.query({
+        signal,
+        checkpoint,
+        cursor,
+        pageSize: options.pageSize
+      });
+    },
+    getCursor: options.getCursor
+  };
+
+  return createCursorReader(cursorOptions);
+};
+
+const validatePositiveInteger = (value: number, name: string): void => {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new TypeError(`SQL cursor reader ${name} must be a positive safe integer.`);
+  }
 };

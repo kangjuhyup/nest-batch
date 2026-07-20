@@ -12,6 +12,7 @@ export {
   createJsonHttpReader,
   createLineFileReader,
   createPagingReader,
+  createSqlCursorReader,
   createSqlReader,
   getReaderCheckpoint,
   openReader
@@ -135,6 +136,10 @@ export type {
   ReaderSession,
   SqlReader,
   SqlReaderCheckpoint,
+  SqlCursorReader,
+  SqlCursorReaderCheckpoint,
+  SqlCursorReaderOptions,
+  SqlCursorReaderQueryContext,
   SqlReaderDefinition,
   SqlReaderOptions,
   SqlReaderQueryContext

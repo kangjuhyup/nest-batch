@@ -18,6 +18,7 @@ export {
   lineFileReaderExample,
   pageReaderExample,
   readerExamples,
+  sqlCursorReaderExample,
   sqlReaderExample
 } from "./jobs/reader-examples/reader-examples.js";
 export type {

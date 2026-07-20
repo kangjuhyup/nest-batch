@@ -11,6 +11,7 @@ import {
   createJsonHttpReader,
   createLineFileReader,
   createPagingReader,
+  createSqlCursorReader,
   getReaderCheckpoint,
   openReader,
   type ChunkStepExecutionContext,
@@ -259,6 +260,53 @@ describe("reader contract / reader contract를 검증한다", () => {
     await expect(getReaderCheckpoint(opened)).resolves.toEqual({ page: 2, offset: 0 });
     expect(items).toEqual(rows);
     expect(queriedOffsets).toEqual([0, 2, 4]);
+  });
+
+  it("creates SQL cursor readers with cursor checkpoints / cursor checkpoint를 지원하는 SQL cursor reader를 만든다", async () => {
+    const rows = [
+      { id: "user-1" },
+      { id: "user-2" },
+      { id: "user-3" }
+    ];
+    const seenCursors: Array<string | undefined> = [];
+    const reader = createSqlCursorReader<{ readonly id: string }, string>({
+      pageSize: 2,
+      query({ cursor, pageSize }) {
+        seenCursors.push(cursor);
+        const startIndex = cursor
+          ? rows.findIndex((row) => row.id === cursor) + 1
+          : 0;
+
+        return rows.slice(startIndex, startIndex + pageSize);
+      },
+      getCursor(row) {
+        return row.id;
+      }
+    });
+    const opened = await openReader(reader, createContext({ cursor: "user-1" }));
+    const ids: string[] = [];
+
+    for await (const row of opened) {
+      ids.push(row.id);
+    }
+
+    await expect(getReaderCheckpoint(opened)).resolves.toEqual({ cursor: "user-3" });
+    expect(ids).toEqual(["user-2", "user-3"]);
+    expect(seenCursors).toEqual(["user-1", "user-3"]);
+  });
+
+  it("rejects invalid SQL cursor reader options / 유효하지 않은 SQL cursor reader 설정을 거부한다", () => {
+    expect(() =>
+      createSqlCursorReader({
+        pageSize: 0,
+        query() {
+          return [];
+        },
+        getCursor() {
+          return "cursor";
+        }
+      })
+    ).toThrow("SQL cursor reader pageSize must be a positive safe integer.");
   });
 
   it("opens HTTP reader definitions with next page checkpoints / 다음 page checkpoint를 지원하는 HTTP reader 정의를 연다", async () => {

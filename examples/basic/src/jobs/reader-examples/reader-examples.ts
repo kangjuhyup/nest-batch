@@ -1,4 +1,9 @@
-import { createJsonlFileReader, createJsonHttpReader, createLineFileReader } from "@nest-batch/core";
+import {
+  createJsonlFileReader,
+  createJsonHttpReader,
+  createLineFileReader,
+  createSqlCursorReader
+} from "@nest-batch/core";
 import type {
   CursorReaderDefinition,
   FileReaderDefinition,
@@ -98,6 +103,23 @@ export const sqlReaderExample: SqlReaderDefinition<
   }
 };
 
+export const sqlCursorReaderExample = createSqlCursorReader<
+  ReaderExampleUser,
+  string,
+  ReaderExampleCursorCheckpoint
+>({
+  pageSize: 2,
+  query({ cursor, pageSize, signal }) {
+    signal.throwIfAborted();
+    const startIndex = cursor ? users.findIndex((user) => user.id === cursor) + 1 : 0;
+
+    return users.slice(startIndex, startIndex + pageSize);
+  },
+  getCursor(user) {
+    return user.id;
+  }
+});
+
 export const httpReaderExample: HttpReaderDefinition<
   ReaderExampleUser,
   number,
@@ -180,6 +202,7 @@ export const readerExamples = {
   cursor: cursorReaderExample,
   page: pageReaderExample,
   sql: sqlReaderExample,
+  sqlCursor: sqlCursorReaderExample,
   http: httpReaderExample,
   file: fileReaderExample,
   lineFile: lineFileReaderExample,

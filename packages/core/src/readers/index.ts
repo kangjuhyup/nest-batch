@@ -71,9 +71,14 @@ export {
   type ReaderSession
 } from "./reader.js";
 export {
+  createSqlCursorReader,
   createSqlReader,
   type SqlReader,
   type SqlReaderCheckpoint,
+  type SqlCursorReader,
+  type SqlCursorReaderCheckpoint,
+  type SqlCursorReaderOptions,
+  type SqlCursorReaderQueryContext,
   type SqlReaderDefinition,
   type SqlReaderOptions,
   type SqlReaderQueryContext

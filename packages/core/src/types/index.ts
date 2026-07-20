@@ -31,6 +31,8 @@ export type {
   ReaderDefinition,
   ReaderSession,
   SqlReader,
+  SqlCursorReader,
+  SqlCursorReaderOptions,
   SqlReaderDefinition
 } from "../readers/index.js";
 export type { SkipItem } from "../skip-item.js";
