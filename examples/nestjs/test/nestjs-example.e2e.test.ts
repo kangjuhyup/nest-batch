@@ -39,7 +39,7 @@ describe("nestjs example e2e / nestjs example e2e를 검증한다", () => {
         jobName: "daily-billing",
         status: "completed"
       });
-      expect(writtenCharges).toEqual([{ accountId: "account-1", amount: 1200 }]);
+      expect(writtenCharges).toEqual([{ tenant: "acme", accountId: "acme-account-1", amount: 1200 }]);
     } finally {
       await app.close();
     }

@@ -80,12 +80,26 @@ describe("NestBatchRegistry / NestBatchRegistry", () => {
   it("runs a discovered job by name / 발견한 job을 이름으로 실행한다", async () => {
     const storage = new InMemoryBatchStorage();
     const executed: string[] = [];
+    const receivedContexts: Array<{
+      readonly jobName: string;
+      readonly jobExecutionId: string;
+      readonly stepName: string;
+      readonly parameters: { readonly tenant: string };
+      readonly restart: boolean;
+    }> = [];
 
     class BillingJob {
       chargeAccounts() {
-        return defineStep({
+        return defineStep<unknown, string, { readonly tenant: string }>({
           name: "charge-accounts",
-          execute() {
+          execute(context) {
+            receivedContexts.push({
+              jobName: context.jobName,
+              jobExecutionId: context.jobExecutionId,
+              stepName: context.stepName,
+              parameters: context.parameters,
+              restart: context.restart
+            });
             executed.push("charge-accounts");
             return "charged";
           }
@@ -134,6 +148,15 @@ describe("NestBatchRegistry / NestBatchRegistry", () => {
         status: "completed"
       });
       expect(executed).toEqual(["charge-accounts"]);
+      expect(receivedContexts).toEqual([
+        {
+          jobName: "daily-billing",
+          jobExecutionId: "nestjs-discovered-execution",
+          stepName: "charge-accounts",
+          parameters: { tenant: "acme" },
+          restart: false
+        }
+      ]);
     } finally {
       await app.close();
     }

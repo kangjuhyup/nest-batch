@@ -158,10 +158,10 @@ context는 두 종류로 나눈다.
 
 **Produces:** Nest 사용자가 job parameters와 execution metadata를 자연스럽게 참조할 수 있는 경로.
 
-- [ ] decorator 기반 step method에 core context가 그대로 전달되는지 확인한다.
-- [ ] 필요하면 `BatchContext` injection helper를 `packages/nest`에만 추가한다.
-- [ ] request-scoped provider처럼 보이는 API를 만들지 않고 batch execution scoped 값임을 문서화한다.
-- [ ] Nest example에서 `context.parameters`를 사용하는 예제를 추가한다.
+- [x] decorator 기반 step method에 core context가 그대로 전달되는지 확인한다.
+- [x] `BatchContext` injection helper는 추가하지 않고 core callback context를 그대로 사용하기로 결정한다.
+- [x] request-scoped provider처럼 보이는 API를 만들지 않고 batch execution scoped 값으로 다루기로 결정한다.
+- [x] Nest example에서 `context.parameters`를 사용하는 예제를 추가한다.
 
 ## Task 9: 문서와 예제 갱신
 
