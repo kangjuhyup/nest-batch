@@ -8,8 +8,12 @@ import {
 } from "../src/types/index.js";
 import type {
   BatchEvent,
+  BatchEventByType,
+  BatchEventListener,
+  BatchEventListenerRegistration,
   BatchEventType,
   CheckpointStore,
+  ChainableJobDefinition,
   ChunkFailurePhase,
   ChunkWrittenBatchEvent,
   CursorReader,
@@ -72,6 +76,14 @@ describe("core type module exports / core type module export", () => {
     const checkpointStore = {} as CheckpointStore;
     const lockManager = {} as LockManager;
     const storage = new FakeDatabaseBatchStorage(repository, checkpointStore, lockManager);
+    const listener: BatchEventListener<BatchEventByType<"job.completed">> = (event) => {
+      expect(event.type).toBe("job.completed");
+    };
+    const listenerRegistration: BatchEventListenerRegistration<BatchEventByType<"job.completed">> = {
+      type: "job.completed",
+      listener
+    };
+    const chainableJob = {} as ChainableJobDefinition;
     const executionEngine = {} as ExecutionEngine;
     const partitionStatus: PartitionExecutionStatus = "created";
     const partition: PartitionExecution = {
@@ -257,6 +269,8 @@ describe("core type module exports / core type module export", () => {
     ];
 
     expect(storage.repository).toBe(repository);
+    expect(listenerRegistration.type).toBe("job.completed");
+    expect(chainableJob).toBeDefined();
     expect(executionEngine).toBeDefined();
     expect(partition.status).toBe("created");
     expect(claimOptions.stepExecutionId).toBe("step-execution-1");

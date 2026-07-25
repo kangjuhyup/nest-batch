@@ -54,7 +54,7 @@ export const runStepExecution = async (
       startedAt: options.now()
     };
     await storage.repository.updateStepExecution(execution);
-    await emitBatchEvent(context.observer, { type: "step.started", execution });
+    await emitBatchEvent(context.observer, { type: "step.started", execution }, context.eventListeners);
 
     const result =
       step.kind === "chunk"
@@ -74,7 +74,7 @@ export const runStepExecution = async (
       endedAt: options.now()
     };
     await storage.repository.updateStepExecution(execution);
-    await emitBatchEvent(context.observer, { type: "step.completed", execution });
+    await emitBatchEvent(context.observer, { type: "step.completed", execution }, context.eventListeners);
 
     return result;
   } catch (error) {
@@ -88,7 +88,7 @@ export const runStepExecution = async (
     await emitBatchEvent(context.observer, {
       type: execution.status === "cancelled" ? "step.cancelled" : "step.failed",
       execution
-    });
+    }, context.eventListeners);
 
     throw error;
   }
@@ -118,7 +118,7 @@ export const recordCompletedRestartStepExecution = async (
   };
 
   await options.storage.repository.createStepExecution(execution);
-  await emitBatchEvent(context.observer, { type: "step.completed", execution });
+  await emitBatchEvent(context.observer, { type: "step.completed", execution }, context.eventListeners);
 
   return {
     readCount: execution.readCount,

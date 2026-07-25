@@ -55,7 +55,7 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
             item,
             error: processed.cause,
             reason: processed.reason
-          });
+          }, context.eventListeners);
           return { skipped: true };
         }
 
@@ -82,7 +82,7 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
             phase: "process",
             attempt,
             error
-          });
+          }, context.eventListeners);
           await backoff(step.retryPolicy, retryContext, signal);
           attempt += 1;
           continue;
@@ -105,7 +105,7 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
             stepName: step.name,
             item,
             error
-          });
+          }, context.eventListeners);
           return { skipped: true };
         }
 
@@ -151,7 +151,7 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
           phase: "write",
           attempt,
           error
-        });
+        }, context.eventListeners);
         await backoff(step.retryPolicy, retryContext, signal);
         attempt += 1;
       }
@@ -180,7 +180,7 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
       readCount,
       writeCount,
       skipCount
-    });
+    }, context.eventListeners);
 
     const nextCheckpoint = step.checkpoint
       ? await step.checkpoint({

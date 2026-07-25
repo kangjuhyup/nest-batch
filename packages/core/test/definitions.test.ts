@@ -53,6 +53,38 @@ describe("core definitions / core 정의", () => {
     expect(job.steps[0]).toBe(step);
   });
 
+  it("chains job event listeners / job event listener를 체이닝한다", () => {
+    const step = defineStep({
+      name: "load-users",
+      execute() {
+        return "loaded";
+      }
+    });
+    const onFailure = () => undefined;
+    const onSuccess = () => undefined;
+    const job = defineJob({
+      name: "listener-job",
+      steps: [step]
+    })
+      .onFailure(onFailure)
+      .onSuccess(onSuccess)
+      .onStepFailure(() => undefined)
+      .onEvent("retry", () => undefined);
+
+    expect(Object.isFrozen(job)).toBe(true);
+    expect(job.listeners?.map((listener) => listener.type)).toEqual([
+      "job.failed",
+      "job.completed",
+      "step.failed",
+      "retry"
+    ]);
+    expect(job.onFailure(() => undefined)).toBe(job);
+    expect(job.listeners).toHaveLength(5);
+    expect(() => {
+      (job.listeners as Array<unknown>).push({ type: "job.started", listener: () => undefined });
+    }).toThrow();
+  });
+
   it("defines a chunk step without a processor / processor 없이 chunk step을 정의한다", async () => {
     const written: Array<readonly { id: string }[]> = [];
     class CopyUsersReader implements Reader<{ id: string }> {

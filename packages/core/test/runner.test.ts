@@ -432,6 +432,73 @@ describe("default batch runner / 기본 batch runner", () => {
     expect(events).toEqual(["job.started", "step.started", "step.completed", "job.completed"]);
   });
 
+  it("runs chained listeners on successful jobs / 성공한 job에서 chained listener를 실행한다", async () => {
+    const storage = new RecordingStorage();
+    const events: string[] = [];
+    const runner = new DefaultBatchRunner(storage, {
+      generateExecutionId: () => "listener-success-execution",
+      generateStepExecutionId: ({ stepName }) => `listener-success-execution:${stepName}`,
+      generateOwnerId: () => "worker-1"
+    });
+    const job = defineJob({
+      name: "listener-success-job",
+      steps: [
+        defineStep({
+          name: "load-users",
+          execute() {
+            return "loaded";
+          }
+        })
+      ]
+    })
+      .onEvent("step.completed", (event) => {
+        events.push(`${event.type}:${event.execution.stepName}`);
+      })
+      .onSuccess((event) => {
+        events.push(`${event.type}:${event.execution.status}`);
+      });
+
+    const execution = await runner.run(job, {});
+
+    expect(execution.status).toBe("completed");
+    expect(events).toEqual(["step.completed:load-users", "job.completed:completed"]);
+  });
+
+  it("runs chained listeners on failed jobs / 실패한 job에서 chained listener를 실행한다", async () => {
+    const storage = new RecordingStorage();
+    const events: string[] = [];
+    const runner = new DefaultBatchRunner(storage, {
+      generateExecutionId: () => "listener-failure-execution",
+      generateStepExecutionId: ({ stepName }) => `listener-failure-execution:${stepName}`,
+      generateOwnerId: () => "worker-1"
+    });
+    const job = defineJob({
+      name: "listener-failure-job",
+      steps: [
+        defineStep({
+          name: "fail-step",
+          execute() {
+            throw new Error("writer unavailable");
+          }
+        })
+      ]
+    })
+      .onStepFailure((event) => {
+        events.push(`${event.type}:${event.execution.stepName}`);
+      })
+      .onFailure((event) => {
+        events.push(`${event.type}:${event.execution.status}`);
+      })
+      .onFailure(() => {
+        throw new Error("listener unavailable");
+      });
+
+    const execution = await runner.run(job, {});
+
+    expect(execution.status).toBe("failed");
+    expect(events).toEqual(["step.failed:fail-step", "job.failed:failed"]);
+  });
+
   it("ignores observer failures during job execution / observer 실패가 job 실행을 실패시키지 않는다", async () => {
     const storage = new RecordingStorage();
     const runner = new DefaultBatchRunner(storage, {

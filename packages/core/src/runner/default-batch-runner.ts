@@ -53,6 +53,7 @@ export class DefaultBatchRunner implements BatchRunner, ExecutionEngine {
     options: BatchRunOptions = {}
   ): Promise<JobExecution<Parameters>> {
     const observer = options.observer ?? this.options.observer;
+    const eventListeners = job.listeners ?? [];
     const executionId = options.executionId ?? this.generateExecutionId();
     const ownerId = options.ownerId ?? this.generateOwnerId();
     const parametersHash = hashJobParameters(parameters);
@@ -131,7 +132,7 @@ export class DefaultBatchRunner implements BatchRunner, ExecutionEngine {
         startedAt: this.now()
       };
       await this.storage.repository.update(execution);
-      await emitBatchEvent(observer, { type: "job.started", execution });
+      await emitBatchEvent(observer, { type: "job.started", execution }, eventListeners);
 
       let input: unknown;
       let reachedRestartStartStep = !restartExecution;
@@ -151,7 +152,8 @@ export class DefaultBatchRunner implements BatchRunner, ExecutionEngine {
               stepIndex,
               input,
               signal: options.signal,
-              observer
+              observer,
+              eventListeners
             },
             {
               storage: this.storage,
@@ -172,7 +174,8 @@ export class DefaultBatchRunner implements BatchRunner, ExecutionEngine {
             stepIndex,
             input,
             signal: options.signal,
-            observer
+            observer,
+            eventListeners
           },
           {
             storage: this.storage,
@@ -189,7 +192,7 @@ export class DefaultBatchRunner implements BatchRunner, ExecutionEngine {
         endedAt: this.now()
       };
       await this.storage.repository.update(execution);
-      await emitBatchEvent(observer, { type: "job.completed", execution });
+      await emitBatchEvent(observer, { type: "job.completed", execution }, eventListeners);
 
       return execution;
     } catch (error) {
@@ -207,7 +210,7 @@ export class DefaultBatchRunner implements BatchRunner, ExecutionEngine {
       await emitBatchEvent(observer, {
         type: execution.status === "cancelled" ? "job.cancelled" : "job.failed",
         execution
-      });
+      }, eventListeners);
 
       return execution;
     } finally {

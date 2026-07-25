@@ -3,6 +3,10 @@ import type {
   ChunkStepOptions,
   ChunkStepWithProcessorOptions,
   ChunkStepWithoutProcessorOptions,
+  BatchEventListener,
+  BatchEventListenerRegistration,
+  BatchEventType,
+  ChainableJobDefinition,
   JobDefinition,
   JobParameters,
   PartitionedStepDefinition,
@@ -77,16 +81,89 @@ export function defineChunkStep<Input = unknown, Output = Input, TCheckpoint = u
 
 export const defineJob = <Parameters extends JobParameters = JobParameters>(
   definition: JobDefinition<Parameters>
-): JobDefinition<Parameters> => {
+): ChainableJobDefinition<Parameters> => {
   assertName("Job", definition.name);
 
   if (definition.steps.length === 0) {
     throw new Error(`Job "${definition.name.trim()}" must include at least one step.`);
   }
 
-  return Object.freeze({
+  return createChainableJobDefinition({
     ...definition,
     name: definition.name.trim(),
     steps: Object.freeze([...definition.steps])
   });
+};
+
+const createChainableJobDefinition = <Parameters extends JobParameters>(
+  definition: JobDefinition<Parameters>
+): ChainableJobDefinition<Parameters> => {
+  const listeners: BatchEventListenerRegistration[] = [...(definition.listeners ?? [])];
+  const job = {
+    ...definition
+  } as ChainableJobDefinition<Parameters>;
+
+  Object.defineProperties(job, {
+    listeners: {
+      enumerable: false,
+      get() {
+        return Object.freeze([...listeners]);
+      }
+    },
+    onEvent: {
+      enumerable: false,
+      value(type: BatchEventType, listener: BatchEventListener) {
+        appendListener(listeners, { type, listener });
+        return job;
+      }
+    },
+    onStart: {
+      enumerable: false,
+      value(listener: BatchEventListener) {
+        appendListener(listeners, { type: "job.started", listener });
+        return job;
+      }
+    },
+    onSuccess: {
+      enumerable: false,
+      value(listener: BatchEventListener) {
+        appendListener(listeners, { type: "job.completed", listener });
+        return job;
+      }
+    },
+    onFailure: {
+      enumerable: false,
+      value(listener: BatchEventListener) {
+        appendListener(listeners, { type: "job.failed", listener });
+        return job;
+      }
+    },
+    onCancel: {
+      enumerable: false,
+      value(listener: BatchEventListener) {
+        appendListener(listeners, { type: "job.cancelled", listener });
+        return job;
+      }
+    },
+    onStepFailure: {
+      enumerable: false,
+      value(listener: BatchEventListener) {
+        appendListener(listeners, { type: "step.failed", listener });
+        return job;
+      }
+    }
+  });
+
+  return Object.freeze(job);
+};
+
+const appendListener = (
+  listeners: BatchEventListenerRegistration[],
+  registration: BatchEventListenerRegistration
+): void => {
+  if (typeof registration.listener !== "function") {
+    throw new TypeError("Batch event listener must be a function.");
+  }
+
+  listeners.push(registration);
 };

@@ -1,4 +1,8 @@
-import type { BatchExecutionId, BatchObserver } from "../types/index.js";
+import type {
+  BatchEventListenerRegistration,
+  BatchExecutionId,
+  BatchObserver
+} from "../types/index.js";
 
 export interface StepRunContext {
   readonly jobExecutionId: BatchExecutionId;
@@ -7,6 +11,7 @@ export interface StepRunContext {
   readonly input: unknown;
   readonly signal?: AbortSignal;
   readonly observer?: BatchObserver;
+  readonly eventListeners?: readonly BatchEventListenerRegistration[];
 }
 
 export interface StepRunResult {

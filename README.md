@@ -272,6 +272,29 @@ const runner = new DefaultBatchRunner(storage, {
 `step.started`, `step.completed`, `step.failed`, `step.cancelled`,
 `chunk.written`, `retry`, `item.skipped`입니다.
 
+Job definition에 listener를 체이닝해서 특정 event만 처리할 수도 있습니다.
+listener는 `BatchObserver`와 같은 event payload를 받고, listener 내부 오류는 batch
+실행 상태를 바꾸지 않습니다.
+
+```ts
+const job = defineJob({
+  name: "daily-user-import",
+  steps: [importUsers]
+})
+  .onSuccess(({ execution }) => {
+    console.log(`${execution.jobName} completed`);
+  })
+  .onFailure(({ execution }) => {
+    console.error(`${execution.jobName} failed: ${execution.failureReason}`);
+  })
+  .onStepFailure(({ execution }) => {
+    console.error(`${execution.stepName} failed`);
+  })
+  .onEvent("retry", ({ stepName, attempt }) => {
+    console.warn(`${stepName} retry ${attempt}`);
+  });
+```
+
 ## Nest Integration
 
 `NestBatchModule.forRoot()` wires `DatabaseBatchStorage`, repository,
