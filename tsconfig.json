@@ -8,6 +8,7 @@
     { "path": "./packages/mysql" },
     { "path": "./packages/mariadb" },
     { "path": "./packages/worker-local" },
+    { "path": "./packages/worker-threads" },
     { "path": "./packages/cli" },
     { "path": "./examples/basic" },
     { "path": "./examples/nestjs" }

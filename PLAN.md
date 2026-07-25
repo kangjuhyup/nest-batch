@@ -465,7 +465,7 @@ git commit -m "feat : local worker pool package 추가" -m "- core WorkerPool co
 - Consumes: core `WorkerPool`.
 - Produces: `WorkerThreadPool` with default capacity from `os.availableParallelism()`.
 
-- [ ] **Step 1: Write failing CPU offload test**
+- [x] **Step 1: Write failing CPU offload test**
 
 ```ts
 it("runs CPU tasks in worker threads / CPU 작업을 worker thread에서 실행한다", async () => {
@@ -486,7 +486,7 @@ it("runs CPU tasks in worker threads / CPU 작업을 worker thread에서 실행�
 
 Expected: FAIL because package and implementation do not exist.
 
-- [ ] **Step 2: Implement worker thread pool**
+- [x] **Step 2: Implement worker thread pool**
 
 The package may import Node `worker_threads`; `@nest-batch/core` must not. Default capacity:
 
@@ -494,18 +494,18 @@ The package may import Node `worker_threads`; `@nest-batch/core` must not. Defau
 const defaultCapacity = Math.max(1, availableParallelism() - 1);
 ```
 
-- [ ] **Step 3: Add cancellation behavior**
+- [x] **Step 3: Add cancellation behavior**
 
 If `AbortSignal` aborts while queued, remove the task. If it aborts while running, terminate the worker and mark the task failed.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 ./node_modules/.bin/vitest run packages/worker-threads/test/worker-thread-pool.test.ts
 ./node_modules/.bin/tsc -b
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/worker-threads tsconfig.json

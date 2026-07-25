@@ -21,6 +21,7 @@
       "@nest-batch/mysql": ["packages/mysql/src/index.ts"],
       "@nest-batch/mariadb": ["packages/mariadb/src/index.ts"],
       "@nest-batch/worker-local": ["packages/worker-local/src/index.ts"],
+      "@nest-batch/worker-threads": ["packages/worker-threads/src/index.ts"],
       "@nest-batch/cli": ["packages/cli/src/index.ts"]
     }
   }
