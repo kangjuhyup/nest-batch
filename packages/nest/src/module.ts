@@ -3,7 +3,7 @@ import type { DynamicModule } from "@nestjs/common";
 import { DiscoveryModule } from "@nestjs/core";
 import { NEST_BATCH_OPTIONS } from "./constants.js";
 import type { NestBatchModuleAsyncOptions, NestBatchModuleOptions } from "./module-options.js";
-import { createRuntimeProviders, NEST_BATCH_RUNTIME_EXPORTS } from "./runtime.providers.js";
+import { createRuntimeExports, createRuntimeProviders } from "./runtime.providers.js";
 import {
   assertDatabaseBatchStorage,
   createAsyncStorageProviders,
@@ -26,9 +26,9 @@ export class NestBatchModule {
           useValue: options
         },
         ...storageProviders,
-        ...createRuntimeProviders()
+        ...createRuntimeProviders(options)
       ],
-      exports: [NEST_BATCH_OPTIONS, ...NEST_BATCH_STORAGE_EXPORTS, ...NEST_BATCH_RUNTIME_EXPORTS]
+      exports: [NEST_BATCH_OPTIONS, ...NEST_BATCH_STORAGE_EXPORTS, ...createRuntimeExports(options)]
     };
   }
 
@@ -45,7 +45,7 @@ export class NestBatchModule {
         ...createAsyncStorageProviders(),
         ...createRuntimeProviders()
       ],
-      exports: [NEST_BATCH_OPTIONS, ...NEST_BATCH_STORAGE_EXPORTS, ...NEST_BATCH_RUNTIME_EXPORTS]
+      exports: [NEST_BATCH_OPTIONS, ...NEST_BATCH_STORAGE_EXPORTS, ...createRuntimeExports()]
     };
   }
 }

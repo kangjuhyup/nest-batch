@@ -3,10 +3,8 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../core" }, { "path": "../queue-core" }]
+  "references": [{ "path": "../queue-core" }]
 }

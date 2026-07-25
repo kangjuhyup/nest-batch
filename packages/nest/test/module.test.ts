@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { DatabaseBatchStorage, DefaultBatchRunner } from "@nest-batch/core";
+import type { ExecutionEngine, WorkerPool } from "@nest-batch/core";
+import type { WorkQueue } from "@nest-batch/queue-core";
 import { DiscoveryModule } from "@nestjs/core";
 import {
   BATCH_CHECKPOINT_STORE,
+  BATCH_EXECUTION_ENGINE,
   BATCH_JOB_REPOSITORY,
   BATCH_LOCK_MANAGER,
   BATCH_RUNNER,
+  BATCH_WORKER_POOL,
+  BATCH_WORK_QUEUE,
   NestBatchRegistry,
   NestBatchModule,
   NestBatchRunner,
@@ -81,6 +86,32 @@ describe("NestBatchModule / NestBatchModule", () => {
     const runnerProvider = findFactoryProvider(dynamicModule.providers ?? [], BATCH_RUNNER);
 
     expect(runnerProvider.useFactory(storage, { storage, batchRunner })).toBe(batchRunner);
+  });
+
+  it("accepts runtime extension providers / runtime 확장 provider를 설정한다", () => {
+    const storage = new FakeDatabaseBatchStorage();
+    const executionEngine = { runJob: async () => ({ status: "completed" }) } as ExecutionEngine;
+    const workerPool = { capacity: 1, run: async () => "done" } as WorkerPool;
+    const workQueue = {
+      enqueue: async () => undefined,
+      claim: async () => undefined,
+      complete: async () => undefined,
+      fail: async () => undefined
+    } as WorkQueue;
+    const dynamicModule = NestBatchModule.forRoot({
+      storage,
+      executionEngine,
+      workerPool,
+      workQueue
+    });
+    const providers = dynamicModule.providers ?? [];
+
+    expect(findValueProvider(providers, BATCH_EXECUTION_ENGINE).useValue).toBe(executionEngine);
+    expect(findValueProvider(providers, BATCH_WORKER_POOL).useValue).toBe(workerPool);
+    expect(findValueProvider(providers, BATCH_WORK_QUEUE).useValue).toBe(workQueue);
+    expect(dynamicModule.exports).toEqual(
+      expect.arrayContaining([BATCH_EXECUTION_ENGINE, BATCH_WORKER_POOL, BATCH_WORK_QUEUE])
+    );
   });
 
   it("creates async module providers from storage options / storage option으로 async module provider를 생성한다", () => {

@@ -1,27 +1,31 @@
 {
-  "name": "@nest-batch/cli",
+  "name": "@nest-batch/queue-bullmq",
   "version": "0.0.1",
-  "description": "Operational CLI boundary for nest-batch.",
+  "description": "BullMQ-backed WorkQueue adapter for nest-batch distributed workers.",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": {
-    "nest-batch": "./dist/bin.js"
-  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run --root ../.. --config vitest.config.ts packages/cli/test/run-cli.test.ts"
+    "test": "vitest run --root ../.. --config vitest.config.ts packages/queue-bullmq/test"
   },
   "dependencies": {
-    "@nest-batch/core": "workspace:*",
     "@nest-batch/queue-core": "workspace:*"
+  },
+  "peerDependencies": {
+    "bullmq": ">=5"
+  },
+  "devDependencies": {
+    "bullmq": "^5"
   }
 }

@@ -1,13 +1,40 @@
 import { describe, expect, it } from "vitest";
 import { defineJob, defineStep } from "@nest-batch/core";
 import { InMemoryBatchStorage } from "@nest-batch/inmemory";
+import type { WorkClaimOptions, WorkQueue, WorkUnit } from "@nest-batch/queue-core";
 import { runCli } from "../src/index.js";
+
+class InMemoryWorkQueue implements WorkQueue {
+  readonly completed: string[] = [];
+  readonly failed: string[] = [];
+  private readonly pending: WorkUnit[];
+
+  constructor(work: readonly WorkUnit[]) {
+    this.pending = [...work];
+  }
+
+  async enqueue(work: WorkUnit): Promise<void> {
+    this.pending.push(work);
+  }
+
+  async claim(_options: WorkClaimOptions): Promise<WorkUnit | undefined> {
+    return this.pending.shift();
+  }
+
+  async complete(work: WorkUnit): Promise<void> {
+    this.completed.push(work.id);
+  }
+
+  async fail(work: WorkUnit): Promise<void> {
+    this.failed.push(work.id);
+  }
+}
 
 describe("runCli / runCli 동작을 검증한다", () => {
   it("prints help for empty args / 빈 인자에 대해 help를 출력한다", async () => {
     await expect(runCli([])).resolves.toEqual({
       exitCode: 0,
-      output: "nest-batch commands: run, status, retry, list"
+      output: "nest-batch commands: run, status, retry, list, worker"
     });
   });
 
@@ -178,6 +205,51 @@ describe("runCli / runCli 동작을 검증한다", () => {
         id: "retry-execution",
         status: "completed"
       }
+    });
+  });
+
+  it("runs worker loop once from CLI / CLI에서 worker loop를 한 번 실행한다", async () => {
+    const storage = new InMemoryBatchStorage();
+    const queue = new InMemoryWorkQueue([
+      {
+        id: "work-1",
+        payload: {
+          jobName: "queued-import",
+          parameters: { tenant: "acme" },
+          executionId: "queued-execution-1",
+          ownerId: "worker-1"
+        }
+      }
+    ]);
+    const job = defineJob({
+      name: "queued-import",
+      steps: [
+        defineStep({
+          name: "load-users",
+          execute() {
+            return "loaded";
+          }
+        })
+      ]
+    });
+
+    const result = await runCli(["worker", "--once", "--worker-id", "worker-1"], {
+      storage,
+      jobs: [job],
+      queue
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.output)).toEqual({
+      command: "worker",
+      workerId: "worker-1",
+      handled: true
+    });
+    expect(queue.completed).toEqual(["work-1"]);
+    expect(queue.failed).toEqual([]);
+    await expect(storage.repository.findById("queued-execution-1")).resolves.toMatchObject({
+      id: "queued-execution-1",
+      status: "completed"
     });
   });
 });

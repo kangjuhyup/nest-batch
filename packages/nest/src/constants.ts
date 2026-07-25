@@ -8,3 +8,6 @@ export const BATCH_JOB_REPOSITORY = Symbol("nest-batch:job-repository");
 export const BATCH_CHECKPOINT_STORE = Symbol("nest-batch:checkpoint-store");
 export const BATCH_LOCK_MANAGER = Symbol("nest-batch:lock-manager");
 export const BATCH_RUNNER = Symbol("nest-batch:runner");
+export const BATCH_EXECUTION_ENGINE = Symbol("nest-batch:execution-engine");
+export const BATCH_WORKER_POOL = Symbol("nest-batch:worker-pool");
+export const BATCH_WORK_QUEUE = Symbol("nest-batch:work-queue");

@@ -5,6 +5,5 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
-  "include": ["src/**/*.ts"],
-  "references": [{ "path": "../core" }, { "path": "../queue-core" }]
+  "include": ["src/**/*.ts"]
 }

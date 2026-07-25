@@ -15,8 +15,9 @@ processor skip policy, `BatchObserver` lifecycle event를 지원합니다. CLI�
 application이 storage와 job registry를 주입할 때 job 실행, 재시도, 상태 확인,
 목록 출력을 처리할 수 있습니다. `@nest-batch/nest`는 decorator가 붙은 job과
 batch component provider를 발견하고, `BATCH_RUNNER` provider와
-`NestBatchRunner`를 통해 발견한 job을 실행할 수 있습니다. distributed worker와
-production scheduling은 아직 구현되지 않았습니다.
+`NestBatchRunner`를 통해 발견한 job을 실행할 수 있습니다. distributed worker
+contract와 queue adapter 경계는 진행 중이며, production scheduling은 아직
+구현되지 않았습니다.
 
 ## Packages
 
@@ -26,7 +27,21 @@ production scheduling은 아직 구현되지 않았습니다.
 - `@nest-batch/postgres`: Postgres driver-backed repository, lock, checkpoint storage.
 - `@nest-batch/mysql`: MySQL driver-backed repository, lock, checkpoint storage.
 - `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, checkpoint storage.
+- `@nest-batch/queue-core`: queue-neutral `WorkQueue` contract와 worker loop.
+- `@nest-batch/queue-bullmq`: BullMQ-compatible `WorkQueue` adapter 경계.
 - `@nest-batch/cli`: 운영 CLI 경계.
+
+## Distributed Workers
+
+`@nest-batch/queue-core`는 pull 기반 `WorkQueue` contract와 `WorkerLoop`를
+정의합니다. queue adapter는 work 전달만 담당하고, job/step/checkpoint/partition
+상태의 source of truth는 repository입니다. distributed execution은
+at-least-once를 전제로 하므로 writer와 외부 side effect는 idempotent해야 합니다.
+
+`@nest-batch/queue-bullmq`는 `WorkUnit.id`를 BullMQ job id로 매핑하고,
+batch runtime이 retry policy를 소유하도록 BullMQ retry를 기본 비활성화합니다
+(`attempts: 1`). application은 실제 BullMQ `Queue`/worker instance를 감싼 뒤
+`BullMqWorkQueue`에 주입할 수 있습니다.
 
 ## Development
 
@@ -37,14 +52,15 @@ pnpm test
 pnpm build
 ```
 
-## Test Databases
+## Test Services
 
-이 저장소는 local database integration test를 위해 Docker Compose를 사용합니다.
-루트의 `compose.yaml` 하나로 Postgres, MySQL, MariaDB를 함께 실행할 수 있고,
-각 database는 같은 machine에서 동시에 떠 있도록 별도 host port를 사용합니다.
+이 저장소는 local database와 queue integration test를 위해 Docker Compose를
+사용합니다. 루트의 `compose.yaml` 하나로 Postgres, MySQL, MariaDB, Redis를
+함께 실행할 수 있고, 각 service는 같은 machine에서 동시에 떠 있도록 별도 host
+port를 사용합니다.
 
 ```bash
-docker compose up -d postgres mysql mariadb
+docker compose up -d postgres mysql mariadb redis
 docker compose ps
 docker compose down
 ```
@@ -58,11 +74,12 @@ NEST_BATCH_MYSQL_URL=mysql://nest_batch:nest_batch@localhost:13306/nest_batch
 NEST_BATCH_MYSQL_DATABASE=nest_batch
 NEST_BATCH_MARIADB_URL=mariadb://nest_batch:nest_batch@localhost:13307/nest_batch
 NEST_BATCH_MARIADB_DATABASE=nest_batch
+NEST_BATCH_E2E_REDIS_URL=redis://127.0.0.1:16379
 ```
 
 다른 Compose service에서 접속할 때는 위 localhost port 대신 `postgres:5432`,
-`mysql:3306`, `mariadb:3306`을 사용합니다. 테스트 환경은 공식 database
-image만 사용하므로 custom `Dockerfile`은 필요하지 않습니다.
+`mysql:3306`, `mariadb:3306`, `redis:6379`를 사용합니다. 테스트 환경은 공식
+service image만 사용하므로 custom `Dockerfile`은 필요하지 않습니다.
 
 모든 database state를 초기화해야 할 때는 다음 명령을 사용합니다.
 
@@ -72,16 +89,17 @@ docker compose down -v
 
 ### E2E Tests
 
-E2E test는 기본 `pnpm test` 명령에서 제외됩니다. 필요한 database를 먼저
-실행한 뒤 e2e script를 명시적으로 실행합니다.
+E2E test는 기본 `pnpm test` 명령에서 제외됩니다. 필요한 database 또는 queue
+service를 먼저 실행한 뒤 e2e script를 명시적으로 실행합니다.
 
 ```bash
-docker compose up -d postgres mysql mariadb
+docker compose up -d postgres mysql mariadb redis
 pnpm test:e2e
 pnpm test:e2e:adapters
 pnpm test:e2e:system
 pnpm test:e2e:examples
 pnpm test:e2e:postgres
+pnpm test:e2e:redis
 ```
 
 E2E test는 책임 경계별로 나눕니다.

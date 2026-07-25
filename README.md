@@ -14,8 +14,8 @@ processor skip policy, and `BatchObserver` lifecycle events. The CLI can run,
 retry, inspect, and list jobs when an application supplies storage and a job
 registry. `@nest-batch/nest` can discover decorated job and batch component
 providers, expose a `BATCH_RUNNER` provider, and run discovered jobs through
-`NestBatchRunner`. Distributed workers and production scheduling are not
-implemented yet.
+`NestBatchRunner`. Distributed worker contracts and queue adapter boundaries are
+in progress; production scheduling is not implemented yet.
 
 ## Packages
 
@@ -25,7 +25,21 @@ implemented yet.
 - `@nest-batch/postgres`: Postgres driver-backed repository, lock, and checkpoint storage.
 - `@nest-batch/mysql`: MySQL driver-backed repository, lock, and checkpoint storage.
 - `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, and checkpoint storage.
+- `@nest-batch/queue-core`: queue-neutral `WorkQueue` contract and worker loop.
+- `@nest-batch/queue-bullmq`: BullMQ-compatible `WorkQueue` adapter boundary.
 - `@nest-batch/cli`: operational CLI boundary.
+
+## Distributed Workers
+
+`@nest-batch/queue-core` defines a pull-based `WorkQueue` contract and
+`WorkerLoop`. Queue adapters deliver work; repository state remains the source
+of truth for job, step, checkpoint, and partition status. Distributed execution
+is at-least-once, so writers and external side effects should be idempotent.
+
+`@nest-batch/queue-bullmq` maps `WorkUnit.id` to the BullMQ job id and disables
+BullMQ retry by default (`attempts: 1`) so retry policy stays owned by the batch
+runtime. Applications can wrap real BullMQ `Queue`/worker instances and pass
+them into `BullMqWorkQueue`.
 
 ## Development
 
@@ -36,14 +50,14 @@ pnpm test
 pnpm build
 ```
 
-## Test Databases
+## Test Services
 
-The repository uses Docker Compose for local database integration tests. A
-single `compose.yaml` starts Postgres, MySQL, and MariaDB with separate host
-ports so they can run together on one machine.
+The repository uses Docker Compose for local database and queue integration
+tests. A single `compose.yaml` starts Postgres, MySQL, MariaDB, and Redis with
+separate host ports so they can run together on one machine.
 
 ```bash
-docker compose up -d postgres mysql mariadb
+docker compose up -d postgres mysql mariadb redis
 docker compose ps
 docker compose down
 ```
@@ -57,11 +71,12 @@ NEST_BATCH_MYSQL_URL=mysql://nest_batch:nest_batch@localhost:13306/nest_batch
 NEST_BATCH_MYSQL_DATABASE=nest_batch
 NEST_BATCH_MARIADB_URL=mariadb://nest_batch:nest_batch@localhost:13307/nest_batch
 NEST_BATCH_MARIADB_DATABASE=nest_batch
+NEST_BATCH_E2E_REDIS_URL=redis://127.0.0.1:16379
 ```
 
 From another Compose service, use `postgres:5432`, `mysql:3306`, and
-`mariadb:3306` instead of the localhost ports above. A custom `Dockerfile` is
-not needed because the test environment only depends on official database
+`mariadb:3306`, and `redis:6379` instead of the localhost ports above. A custom `Dockerfile` is
+not needed because the test environment only depends on official service
 images.
 
 Use `docker compose down -v` when you need to reset all database state.
@@ -69,15 +84,16 @@ Use `docker compose down -v` when you need to reset all database state.
 ### E2E Tests
 
 E2E tests are excluded from the default `pnpm test` command. Start the needed
-database first, then run the e2e script explicitly.
+database or queue service first, then run the e2e script explicitly.
 
 ```bash
-docker compose up -d postgres mysql mariadb
+docker compose up -d postgres mysql mariadb redis
 pnpm test:e2e
 pnpm test:e2e:adapters
 pnpm test:e2e:system
 pnpm test:e2e:examples
 pnpm test:e2e:postgres
+pnpm test:e2e:redis
 ```
 
 E2E tests are organized by ownership boundary:

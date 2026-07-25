@@ -16,6 +16,7 @@ export default defineConfig({
     }
   },
   test: {
+    reporters: ["verbose"],
     include: ["packages/**/*.perf.test.ts"],
     hookTimeout: 60_000,
     testTimeout: 180_000

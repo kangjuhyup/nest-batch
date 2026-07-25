@@ -7,6 +7,8 @@ import type {
   JobParameters,
   StepExecution
 } from "@nest-batch/core";
+import { WorkerLoop } from "@nest-batch/queue-core";
+import type { WorkHandler, WorkQueue, WorkUnit } from "@nest-batch/queue-core";
 
 export interface CliResult {
   readonly exitCode: number;
@@ -17,9 +19,13 @@ export interface CliContext {
   readonly storage?: DatabaseBatchStorage;
   readonly jobs?: readonly JobDefinition[];
   readonly runner?: BatchRunner;
+  readonly queue?: WorkQueue;
+  readonly workerHandler?: WorkHandler;
+  readonly workerLoop?: WorkerLoop;
+  readonly signal?: AbortSignal;
 }
 
-const commands = new Set(["run", "status", "retry", "list"]);
+const commands = new Set(["run", "status", "retry", "list", "worker"]);
 
 export const runCli = async (
   args: readonly string[],
@@ -30,7 +36,7 @@ export const runCli = async (
   if (command === undefined || command === "--help" || command === "-h") {
     return {
       exitCode: 0,
-      output: "nest-batch commands: run, status, retry, list"
+      output: "nest-batch commands: run, status, retry, list, worker"
     };
   }
 
@@ -52,6 +58,10 @@ export const runCli = async (
       return await printStatus(options, context);
     }
 
+    if (command === "worker") {
+      return await runWorker(options, context);
+    }
+
     return await runJob(command, options, context);
   } catch (error) {
     return {
@@ -59,6 +69,35 @@ export const runCli = async (
       output: error instanceof Error ? error.message : String(error)
     };
   }
+};
+
+const runWorker = async (options: ParsedFlags, context: CliContext): Promise<CliResult> => {
+  const once = getBooleanFlag(options, "once");
+  const workerId = getStringOption(options, "worker-id") ?? "nest-batch-cli-worker";
+  const loop =
+    context.workerLoop ??
+    new WorkerLoop({
+      queue: requireQueue(context),
+      workerId,
+      pollIntervalMs: getNumberOption(options, "poll-interval-ms") ?? 1_000,
+      handler: context.workerHandler ?? createDefaultWorkerHandler(context)
+    });
+
+  if (once) {
+    const handled = await loop.runOnce({ signal: context.signal });
+
+    return {
+      exitCode: 0,
+      output: stringifyWorkerResult(workerId, handled)
+    };
+  }
+
+  await loop.runUntilStopped({ signal: context.signal });
+
+  return {
+    exitCode: 0,
+    output: stringifyWorkerResult(workerId, false)
+  };
 };
 
 interface ParsedFlags {
@@ -172,6 +211,35 @@ const requireStorage = (context: CliContext): DatabaseBatchStorage => {
   return context.storage;
 };
 
+const requireQueue = (context: CliContext): WorkQueue => {
+  if (!context.queue) {
+    throw new Error("WorkQueue is required for the worker command.");
+  }
+
+  return context.queue;
+};
+
+const createDefaultWorkerHandler = (context: CliContext): WorkHandler => {
+  const storage = requireStorage(context);
+
+  return async (work) => {
+    const payload = parseWorkerJobPayload(work);
+    const job = toJobRegistry(context.jobs).get(payload.jobName);
+
+    if (!job) {
+      throw new Error(`Job "${payload.jobName}" is not registered.`);
+    }
+
+    const runner = context.runner ?? new DefaultBatchRunner(storage);
+    await runner.run(job, payload.parameters, {
+      executionId: payload.executionId,
+      ownerId: payload.ownerId,
+      lockTtlMs: payload.lockTtlMs,
+      restart: payload.restart
+    });
+  };
+};
+
 const toJobRegistry = (
   jobs: readonly JobDefinition[] | undefined
 ): ReadonlyMap<string, JobDefinition> => {
@@ -220,6 +288,20 @@ const getNumberOption = (options: ParsedFlags, name: string): number | undefined
   return number;
 };
 
+const getBooleanFlag = (options: ParsedFlags, name: string): boolean => {
+  const value = options.values.get(name);
+
+  if (value === undefined) {
+    return false;
+  }
+
+  if (value === true) {
+    return true;
+  }
+
+  throw new Error(`--${name} does not take a value.`);
+};
+
 const parseJobParameters = (
   job: JobDefinition,
   rawParameters: string | undefined
@@ -253,6 +335,98 @@ const stringifyExecution = (
       command,
       execution: serializeJobExecution(execution),
       steps: steps.map(serializeStepExecution)
+    },
+    null,
+    2
+  );
+};
+
+interface WorkerJobPayload {
+  readonly jobName: string;
+  readonly parameters: JobParameters;
+  readonly executionId?: string;
+  readonly ownerId?: string;
+  readonly lockTtlMs?: number;
+  readonly restart?: boolean;
+}
+
+const parseWorkerJobPayload = (work: WorkUnit): WorkerJobPayload => {
+  const payload = work.payload;
+
+  if (!isRecord(payload)) {
+    throw new Error(`Worker work "${work.id}" payload must be a JSON object.`);
+  }
+
+  const jobName = payload.jobName;
+
+  if (typeof jobName !== "string" || jobName.length === 0) {
+    throw new Error(`Worker work "${work.id}" payload requires jobName.`);
+  }
+
+  return {
+    jobName,
+    parameters: parseOptionalWorkerParameters(payload.parameters),
+    executionId: parseOptionalWorkerString(payload.executionId, "executionId"),
+    ownerId: parseOptionalWorkerString(payload.ownerId, "ownerId"),
+    lockTtlMs: parseOptionalWorkerNumber(payload.lockTtlMs, "lockTtlMs"),
+    restart: parseOptionalWorkerBoolean(payload.restart, "restart")
+  };
+};
+
+const parseOptionalWorkerParameters = (value: unknown): JobParameters => {
+  if (value === undefined) {
+    return {};
+  }
+
+  if (!isRecord(value)) {
+    throw new Error("Worker work payload parameters must be a JSON object.");
+  }
+
+  return value;
+};
+
+const parseOptionalWorkerString = (value: unknown, fieldName: string): string | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "string") {
+    throw new Error(`Worker work payload ${fieldName} must be a string.`);
+  }
+
+  return value;
+};
+
+const parseOptionalWorkerNumber = (value: unknown, fieldName: string): number | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`Worker work payload ${fieldName} must be a finite number.`);
+  }
+
+  return value;
+};
+
+const parseOptionalWorkerBoolean = (value: unknown, fieldName: string): boolean | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "boolean") {
+    throw new Error(`Worker work payload ${fieldName} must be a boolean.`);
+  }
+
+  return value;
+};
+
+const stringifyWorkerResult = (workerId: string, handled: boolean): string => {
+  return JSON.stringify(
+    {
+      command: "worker",
+      workerId,
+      handled
     },
     null,
     2
