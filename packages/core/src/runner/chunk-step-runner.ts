@@ -11,11 +11,15 @@ import type {
 import { emitBatchEvent } from "./events.js";
 import { errorToFailureReason, isAbortError } from "./errors.js";
 import { delay, requireSignal } from "./signals.js";
-import type { StepRunContext, StepRunResult } from "./step-run-context.js";
+import {
+  createStepRuntimeContext,
+  type ActiveStepRunContext,
+  type StepRunResult
+} from "./step-run-context.js";
 
 export const runChunkStep = async <Input, Output, TCheckpoint>(
   step: ChunkStepDefinition<Input, Output, TCheckpoint>,
-  context: StepRunContext,
+  context: ActiveStepRunContext,
   checkpointStore: CheckpointStore
 ): Promise<StepRunResult> => {
   let checkpoint = await checkpointStore.read<TCheckpoint>(context.checkpointExecutionId, step.name);
@@ -26,7 +30,8 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
   let chunkIndex = 0;
   let chunk: Output[] = [];
   const signal = requireSignal(context.signal);
-  const readerContext = { signal, checkpoint };
+  const createRuntimeContext = () => createStepRuntimeContext(context, signal, checkpoint);
+  const readerContext = createRuntimeContext();
 
   type ProcessItemResult = { readonly skipped: true } | { readonly skipped: false; readonly output: Output };
 
@@ -40,10 +45,9 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
     while (true) {
       try {
         const processed = await step.processor.process(item, {
+          ...createRuntimeContext(),
           item,
-          index: readCount - 1,
-          signal,
-          checkpoint
+          index: readCount - 1
         });
 
         if (isSkipItem(processed)) {
@@ -62,15 +66,14 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
         return { skipped: false, output: processed as Output };
       } catch (error) {
         const retryContext: ChunkRetryContext<Input, Output, TCheckpoint> = {
+          ...createRuntimeContext(),
           phase: "process",
           error,
           attempt,
           item,
           readCount,
           writeCount,
-          skipCount,
-          signal,
-          checkpoint
+          skipCount
         };
 
         if (await shouldRetry(step.retryPolicy, retryContext)) {
@@ -89,14 +92,13 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
         }
 
         if (await shouldSkip(step.skipPolicy, {
+          ...createRuntimeContext(),
           phase: "process",
           error,
           item,
           readCount,
           writeCount,
-          skipCount,
-          signal,
-          checkpoint
+          skipCount
         })) {
           skipCount += 1;
           await emitBatchEvent(context.observer, {
@@ -120,23 +122,21 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
     while (true) {
       try {
         await step.writer.write(items, {
+          ...createRuntimeContext(),
           attempt,
-          chunkIndex,
-          signal,
-          checkpoint
+          chunkIndex
         });
         return;
       } catch (error) {
         const retryContext: ChunkRetryContext<Input, Output, TCheckpoint> = {
+          ...createRuntimeContext(),
           phase: "write",
           error,
           attempt,
           items,
           readCount,
           writeCount,
-          skipCount,
-          signal,
-          checkpoint
+          skipCount
         };
 
         if (!(await shouldRetry(step.retryPolicy, retryContext))) {
@@ -184,14 +184,13 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
 
     const nextCheckpoint = step.checkpoint
       ? await step.checkpoint({
+        ...createRuntimeContext(),
         executionId: context.jobExecutionId,
         stepName: step.name,
         chunkIndex,
         readCount,
         writeCount,
-        skipCount,
-        signal,
-        checkpoint
+        skipCount
       })
       : await getReaderCheckpoint(readerSession);
 

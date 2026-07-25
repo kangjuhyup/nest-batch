@@ -48,6 +48,11 @@ export const runStepExecution = async (
 
   try {
     context.signal?.throwIfAborted();
+    const activeContext = {
+      ...context,
+      stepName: step.name,
+      stepExecutionId: execution.id
+    };
     execution = {
       ...execution,
       status: "running",
@@ -58,14 +63,14 @@ export const runStepExecution = async (
 
     const result =
       step.kind === "chunk"
-        ? await runChunkStep(step, context, storage.checkpointStore)
+        ? await runChunkStep(step, activeContext, storage.checkpointStore)
         : step.kind === "partitioned"
-          ? await runPartitionedStep(step, context, {
+          ? await runPartitionedStep(step, activeContext, {
               repository: storage.repository,
               stepExecutionId: execution.id,
               now: options.now
             })
-          : await runTaskletStep(step, context, storage.checkpointStore);
+          : await runTaskletStep(step, activeContext, storage.checkpointStore);
 
     execution = {
       ...execution,

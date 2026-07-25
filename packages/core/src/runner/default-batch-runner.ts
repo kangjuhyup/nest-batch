@@ -147,10 +147,14 @@ export class DefaultBatchRunner implements BatchRunner, ExecutionEngine {
           await recordCompletedRestartStepExecution(
             restartStepExecution,
             {
+              jobName: job.name,
               jobExecutionId: executionId,
               checkpointExecutionId,
               stepIndex,
               input,
+              parameters,
+              restart: true,
+              restartFromExecutionId: restartExecution!.id,
               signal: options.signal,
               observer,
               eventListeners
@@ -169,10 +173,14 @@ export class DefaultBatchRunner implements BatchRunner, ExecutionEngine {
         const result = await runStepExecution(
           step,
           {
+            jobName: job.name,
             jobExecutionId: executionId,
             checkpointExecutionId,
             stepIndex,
             input,
+            parameters,
+            restart: Boolean(restartExecution),
+            restartFromExecutionId: restartExecution?.id,
             signal: options.signal,
             observer,
             eventListeners

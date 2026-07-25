@@ -611,23 +611,59 @@ describe("default batch runner / 기본 batch runner", () => {
 
     expect(execution.status).toBe("completed");
     expect(contexts.tasklet).toEqual([
-      {
+      expect.objectContaining({
         input: undefined,
         signal: controller.signal,
-        checkpoint: { tasklet: true }
-      }
+        checkpoint: { tasklet: true },
+        jobName: "context-job",
+        jobExecutionId: "context-execution",
+        stepName: "load-context",
+        stepExecutionId: "context-execution:load-context",
+        parameters: { tenant: "acme" },
+        restart: false
+      })
     ]);
     expect(contexts.reader).toEqual([
-      {
+      expect.objectContaining({
         signal: controller.signal,
-        checkpoint: { cursor: 1 }
-      }
+        checkpoint: { cursor: 1 },
+        jobName: "context-job",
+        jobExecutionId: "context-execution",
+        stepName: "copy-context",
+        stepExecutionId: "context-execution:copy-context",
+        parameters: { tenant: "acme" },
+        restart: false
+      })
     ]);
     expect(contexts.processor).toEqual([
-      expect.objectContaining({ item: "retry", index: 0, signal: controller.signal, checkpoint: { cursor: 1 } }),
-      expect.objectContaining({ item: "retry", index: 0, signal: controller.signal, checkpoint: { cursor: 1 } }),
-      expect.objectContaining({ item: "skip", index: 1, signal: controller.signal, checkpoint: { cursor: 1 } }),
-      expect.objectContaining({ item: "ok", index: 2, signal: controller.signal, checkpoint: { cursor: 1 } })
+      expect.objectContaining({
+        item: "retry",
+        index: 0,
+        signal: controller.signal,
+        checkpoint: { cursor: 1 },
+        parameters: { tenant: "acme" }
+      }),
+      expect.objectContaining({
+        item: "retry",
+        index: 0,
+        signal: controller.signal,
+        checkpoint: { cursor: 1 },
+        parameters: { tenant: "acme" }
+      }),
+      expect.objectContaining({
+        item: "skip",
+        index: 1,
+        signal: controller.signal,
+        checkpoint: { cursor: 1 },
+        parameters: { tenant: "acme" }
+      }),
+      expect.objectContaining({
+        item: "ok",
+        index: 2,
+        signal: controller.signal,
+        checkpoint: { cursor: 1 },
+        parameters: { tenant: "acme" }
+      })
     ]);
     expect(contexts.retry).toEqual([
       expect.objectContaining({
@@ -663,12 +699,13 @@ describe("default batch runner / 기본 batch runner", () => {
       })
     ]);
     expect(contexts.writer).toEqual([
-      {
+      expect.objectContaining({
         attempt: 1,
         chunkIndex: 0,
         signal: controller.signal,
-        checkpoint: { cursor: 1 }
-      }
+        checkpoint: { cursor: 1 },
+        parameters: { tenant: "acme" }
+      })
     ]);
     expect(contexts.checkpoint).toEqual([
       expect.objectContaining({
@@ -683,18 +720,26 @@ describe("default batch runner / 기본 batch runner", () => {
       })
     ]);
     expect(contexts.partition).toEqual([
-      {
+      expect.objectContaining({
+        jobName: "context-job",
         jobExecutionId: "context-execution",
         stepExecutionId: "context-execution:partition-context",
         partitionExecutionId: "context-execution:partition-context:partition:000000",
         stepName: "partition-context",
         partition: { shard: 0 },
-        signal: controller.signal
-      }
+        signal: controller.signal,
+        parameters: { tenant: "acme" },
+        restart: false
+      })
     ]);
 
     for (const context of Object.values(contexts).flat()) {
-      expect(context).not.toHaveProperty("parameters");
+      expect(context).toMatchObject({
+        jobName: "context-job",
+        jobExecutionId: "context-execution",
+        parameters: { tenant: "acme" },
+        restart: false
+      });
     }
   });
 
@@ -875,6 +920,7 @@ describe("default batch runner / 기본 batch runner", () => {
     storage.checkpointStore.set("failed-execution", "copy-users", { cursor: 2 });
     const written: number[][] = [];
     const seenCheckpoints: unknown[] = [];
+    const seenRestartContexts: unknown[] = [];
     const runner = new DefaultBatchRunner(storage, {
       generateExecutionId: () => "restart-execution",
       generateStepExecutionId: ({ stepName }) => `restart-execution:${stepName}`,
@@ -884,8 +930,10 @@ describe("default batch runner / 기본 batch runner", () => {
       name: "copy-users",
       chunkSize: 2,
       reader: {
-        *read({ checkpoint }) {
+        *read(context) {
+          const { checkpoint } = context;
           seenCheckpoints.push(checkpoint);
+          seenRestartContexts.push(context);
           const start = checkpoint?.cursor ?? 0;
           for (let index = start; index < 4; index += 1) {
             yield index + 1;
@@ -914,6 +962,18 @@ describe("default batch runner / 기본 batch runner", () => {
       status: "completed"
     });
     expect(seenCheckpoints).toEqual([{ cursor: 2 }]);
+    expect(seenRestartContexts).toEqual([
+      expect.objectContaining({
+        jobName: "restartable-copy-job",
+        jobExecutionId: "restart-execution",
+        stepName: "copy-users",
+        stepExecutionId: "restart-execution:copy-users",
+        parameters,
+        restart: true,
+        restartFromExecutionId: "failed-execution",
+        checkpoint: { cursor: 2 }
+      })
+    ]);
     expect(written).toEqual([[3, 4]]);
     expect(storage.checkpointStore.writes).toEqual([
       {

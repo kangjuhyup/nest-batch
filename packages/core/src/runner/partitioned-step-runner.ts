@@ -6,7 +6,11 @@ import type {
 } from "../types/index.js";
 import { errorToFailureReason, isAbortError } from "./errors.js";
 import { requireSignal } from "./signals.js";
-import type { StepRunContext, StepRunResult } from "./step-run-context.js";
+import {
+  createStepRuntimeContext,
+  type ActiveStepRunContext,
+  type StepRunResult
+} from "./step-run-context.js";
 
 export interface PartitionedStepRunnerOptions {
   readonly repository: JobRepository;
@@ -16,7 +20,7 @@ export interface PartitionedStepRunnerOptions {
 
 export const runPartitionedStep = async <TPartition>(
   step: PartitionedStepDefinition<TPartition>,
-  context: StepRunContext,
+  context: ActiveStepRunContext,
   options: PartitionedStepRunnerOptions
 ): Promise<StepRunResult> => {
   const signal = requireSignal(context.signal);
@@ -59,7 +63,7 @@ export const runPartitionedStep = async <TPartition>(
 
 const runPartitionWorker = async <TPartition>(
   step: PartitionedStepDefinition<TPartition>,
-  context: StepRunContext,
+  context: ActiveStepRunContext,
   options: PartitionedStepRunnerOptions,
   workerIndex: number,
   signal: AbortSignal,
@@ -89,7 +93,7 @@ const runPartitionWorker = async <TPartition>(
 
 const executeClaimedPartition = async <TPartition>(
   step: PartitionedStepDefinition<TPartition>,
-  context: StepRunContext,
+  context: ActiveStepRunContext,
   options: PartitionedStepRunnerOptions,
   claimed: PartitionExecution,
   signal: AbortSignal
@@ -97,6 +101,7 @@ const executeClaimedPartition = async <TPartition>(
   try {
     signal.throwIfAborted();
     const result = await step.execute(claimed.partition as TPartition, {
+      ...createStepRuntimeContext(context, signal, undefined),
       jobExecutionId: context.jobExecutionId,
       stepExecutionId: options.stepExecutionId,
       partitionExecutionId: claimed.id,

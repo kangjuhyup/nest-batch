@@ -74,12 +74,12 @@ context는 두 종류로 나눈다.
 
 **Produces:** 모든 step callback에 같은 job/step metadata와 parameters가 전달된다.
 
-- [ ] `DefaultBatchRunner`가 parsed job parameters를 `StepRunContext`에 넣도록 변경한다.
-- [ ] tasklet `execute()`에서 `context.parameters`, `context.jobExecutionId`, `context.stepName`을 읽을 수 있게 한다.
-- [ ] chunk reader open/read context에 `parameters`와 execution metadata를 전달한다.
-- [ ] processor, writer, retry, skip, checkpoint callback이 같은 runtime context를 공유하게 한다.
-- [ ] partition handler context에도 `parameters`, `jobExecutionId`, `stepExecutionId`, `partitionExecutionId`를 전달한다.
-- [ ] restart 실행에서 `restart: true`와 `checkpoint`가 함께 전달되는지 검증한다.
+- [x] `DefaultBatchRunner`가 parsed job parameters를 `StepRunContext`에 넣도록 변경한다.
+- [x] tasklet `execute()`에서 `context.parameters`, `context.jobExecutionId`, `context.stepName`을 읽을 수 있게 한다.
+- [x] chunk reader open/read context에 `parameters`와 execution metadata를 전달한다.
+- [x] processor, writer, retry, skip, checkpoint callback이 같은 runtime context를 공유하게 한다.
+- [x] partition handler context에도 `parameters`, `jobExecutionId`, `stepExecutionId`, `partitionExecutionId`를 전달한다.
+- [x] restart 실행에서 `restart: true`와 `checkpoint`가 함께 전달되는지 검증한다.
 
 ## Task 4: 타입 호환성과 Generic 개선
 
