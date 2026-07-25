@@ -16,6 +16,7 @@ export interface MySqlTables {
   readonly stepExecutions: string;
   readonly partitionExecutions: string;
   readonly checkpoints: string;
+  readonly executionContexts: string;
   readonly locks: string;
 }
 
@@ -85,6 +86,7 @@ export const createMySqlTables = (options: Pick<MySqlBatchOptions, "database" | 
     stepExecutions: qualify("step_executions"),
     partitionExecutions: qualify("partition_executions"),
     checkpoints: qualify("checkpoints"),
+    executionContexts: qualify("execution_contexts"),
     locks: qualify("locks")
   };
 };

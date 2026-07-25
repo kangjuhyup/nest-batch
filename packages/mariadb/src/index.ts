@@ -1,5 +1,6 @@
 export { MariaDbCheckpointStore } from "./checkpoint-store.js";
 export { createMariaDbScaffoldError } from "./errors.js";
+export { MariaDbExecutionContextStore } from "./execution-context-store.js";
 export { MariaDbLockManager } from "./lock/lock-manager.js";
 export type { MariaDbBatchOptions, MariaDbPoolLike, MariaDbPoolOptions } from "./options.js";
 export { createMariaDbCursorReader } from "./reader.js";

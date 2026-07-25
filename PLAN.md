@@ -143,11 +143,11 @@ context는 두 종류로 나눈다.
 
 **Produces:** database-backed restart-safe execution context.
 
-- [ ] `nest_batch_execution_contexts` 테이블 스키마를 확정한다.
-- [ ] Postgres는 `JSONB`, MySQL/MariaDB는 `JSON`으로 저장한다.
-- [ ] upsert와 delete 동작을 adapter별로 구현한다.
-- [ ] restart 시 context 복원 동작을 DB adapter matrix로 검증한다.
-- [ ] `DATABASE.md` ERD와 테이블 설명을 갱신한다.
+- [x] `nest_batch_execution_contexts` 테이블 스키마를 확정한다.
+- [x] Postgres는 `JSONB`, MySQL/MariaDB는 `JSON`으로 저장한다.
+- [x] upsert와 delete 동작을 adapter별로 구현한다.
+- [x] restart 시 context 복원 동작을 DB adapter matrix로 검증한다.
+- [x] `DATABASE.md` ERD와 테이블 설명을 갱신한다.
 
 ## Task 8: Nest Decorator/Provider Context 연동
 

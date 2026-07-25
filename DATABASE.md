@@ -15,6 +15,7 @@
 - `nest_batch_step_executions`
 - `nest_batch_partition_executions`
 - `nest_batch_checkpoints`
+- `nest_batch_execution_contexts`
 - `nest_batch_locks`
 
 Postgres는 `schema` option으로 schema를 지정할 수 있고, MySQL/MariaDB는 `database` option으로 database를 지정할 수 있다. `tablePrefix`를 바꾸면 모든 테이블 prefix가 함께 바뀐다.
@@ -86,6 +87,14 @@ erDiagram
     datetime updated_at
   }
 
+  NEST_BATCH_EXECUTION_CONTEXTS {
+    string execution_id PK
+    string scope PK
+    string name PK
+    json context
+    datetime updated_at
+  }
+
   NEST_BATCH_LOCKS {
     string resource PK
     string owner_id
@@ -97,6 +106,7 @@ erDiagram
   NEST_BATCH_JOB_EXECUTIONS ||--o{ NEST_BATCH_STEP_EXECUTIONS : "id = job_execution_id"
   NEST_BATCH_STEP_EXECUTIONS ||--o{ NEST_BATCH_PARTITION_EXECUTIONS : "id = step_execution_id"
   NEST_BATCH_JOB_EXECUTIONS ||--o{ NEST_BATCH_CHECKPOINTS : "id = execution_id"
+  NEST_BATCH_JOB_EXECUTIONS ||--o{ NEST_BATCH_EXECUTION_CONTEXTS : "id = execution_id"
 ```
 
 ## 테이블 설명
@@ -209,6 +219,24 @@ chunk/tasklet step의 checkpoint를 저장한다. checkpoint는 성공적으로 
 
 restart 시에는 최신 실패 execution의 checkpoint를 읽고, 새 execution이 진행되면서 새 `execution_id`로 checkpoint를 다시 쓴다.
 
+### `nest_batch_execution_contexts`
+
+job 또는 step 실행 범위의 durable execution context를 저장한다. checkpoint가 reader cursor와 chunk 안전 경계를 표현한다면, execution context는 step 간 공유하거나 restart 이후 복원해야 하는 JSON metadata를 저장한다.
+
+| 컬럼 | 설명 |
+| --- | --- |
+| `execution_id` | context를 소유한 job execution id. |
+| `scope` | context 범위. 현재 값은 `job` 또는 `step`. |
+| `name` | context 이름. step scope에서는 보통 step 이름을 사용한다. |
+| `context` | JSON-serializable context payload. |
+| `updated_at` | context 마지막 갱신 시각. |
+
+주요 제약과 index:
+
+- Primary key: `(execution_id, scope, name)`
+
+restart 시에는 이전 failed execution의 context를 읽고, 새 execution에서 필요한 값을 다시 저장하는 방식으로 이어간다. checkpoint와 execution context는 별도 테이블이므로 cursor 저장과 사용자 metadata 저장을 섞지 않는다.
+
 ### `nest_batch_locks`
 
 분산 lock을 저장한다. 같은 `resource`에 하나의 owner만 lock을 가질 수 있다. TTL이 있는 lock은 만료 후 새 owner가 획득할 수 있고, 같은 owner는 lock을 갱신할 수 있다.
@@ -243,5 +271,5 @@ MySQL/MariaDB에서 `partition` 컬럼은 reserved word 충돌을 피하기 위�
 
 - 현재 schema bootstrap은 `CREATE TABLE IF NOT EXISTS` 기반이다. 운영에서 schema 변경이 필요한 버전 upgrade는 별도 migration 절차로 고정하는 편이 안전하다.
 - DDL은 물리 `FOREIGN KEY`를 생성하지 않는다. batch runtime은 repository contract와 transaction 경계로 관계 정합성을 유지한다.
-- `parameters`, `partition`, `checkpoint`는 JSON-serializable 값이어야 한다.
+- `parameters`, `partition`, `checkpoint`, `context`는 JSON-serializable 값이어야 한다.
 - partition claim과 distributed lock은 crash 이후 재처리를 허용하는 방향이다. writer는 중복 실행 가능성을 고려해 idempotent하게 작성해야 한다.

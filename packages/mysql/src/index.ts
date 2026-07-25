@@ -1,5 +1,6 @@
 export { MySqlCheckpointStore } from "./checkpoint-store.js";
 export { createMySqlScaffoldError } from "./errors.js";
+export { MySqlExecutionContextStore } from "./execution-context-store.js";
 export { MySqlLockManager } from "./lock/lock-manager.js";
 export type { MySqlBatchOptions, MySqlPoolLike, MySqlPoolOptions } from "./options.js";
 export { createMySqlCursorReader } from "./reader.js";

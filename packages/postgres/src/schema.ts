@@ -110,6 +110,17 @@ export const ensurePostgresSchema = async (options: PostgresBatchOptions): Promi
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS ${tables.executionContexts} (
+      execution_id TEXT NOT NULL,
+      scope TEXT NOT NULL,
+      name TEXT NOT NULL,
+      context JSONB NOT NULL,
+      updated_at TIMESTAMPTZ(3) NOT NULL,
+      PRIMARY KEY (execution_id, scope, name)
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS ${tables.locks} (
       resource TEXT NOT NULL,
       owner_id TEXT NOT NULL,

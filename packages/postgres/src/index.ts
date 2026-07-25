@@ -1,5 +1,6 @@
 export { PostgresCheckpointStore } from "./checkpoint-store.js";
 export { createPostgresScaffoldError } from "./errors.js";
+export { PostgresExecutionContextStore } from "./execution-context-store.js";
 export { PostgresLockManager } from "./lock/lock-manager.js";
 export type {
   PostgresBatchOptions,

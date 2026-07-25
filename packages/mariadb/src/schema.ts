@@ -86,6 +86,17 @@ export const ensureMariaDbSchema = async (options: MariaDbBatchOptions): Promise
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS ${tables.executionContexts} (
+      execution_id VARCHAR(191) NOT NULL,
+      scope VARCHAR(32) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      context JSON NOT NULL,
+      updated_at DATETIME(3) NOT NULL,
+      PRIMARY KEY (execution_id, scope, name)
+    ) ENGINE=InnoDB
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS ${tables.locks} (
       resource VARCHAR(255) NOT NULL,
       owner_id VARCHAR(255) NOT NULL,

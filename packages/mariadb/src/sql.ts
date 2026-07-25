@@ -16,6 +16,7 @@ export interface MariaDbTables {
   readonly stepExecutions: string;
   readonly partitionExecutions: string;
   readonly checkpoints: string;
+  readonly executionContexts: string;
   readonly locks: string;
 }
 
@@ -87,6 +88,7 @@ export const createMariaDbTables = (
     stepExecutions: qualify("step_executions"),
     partitionExecutions: qualify("partition_executions"),
     checkpoints: qualify("checkpoints"),
+    executionContexts: qualify("execution_contexts"),
     locks: qualify("locks")
   };
 };

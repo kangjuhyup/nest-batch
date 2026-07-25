@@ -16,6 +16,7 @@ export interface PostgresTables {
   readonly stepExecutions: string;
   readonly partitionExecutions: string;
   readonly checkpoints: string;
+  readonly executionContexts: string;
   readonly locks: string;
   readonly jobInstanceParametersIndex: string;
   readonly jobStatusIndex: string;
@@ -94,6 +95,7 @@ export const createPostgresTables = (
     stepExecutions: qualify("step_executions"),
     partitionExecutions: qualify("partition_executions"),
     checkpoints: qualify("checkpoints"),
+    executionContexts: qualify("execution_contexts"),
     locks: qualify("locks"),
     jobInstanceParametersIndex: quotePostgresIdentifier(`idx_${tablePrefix}_job_instances_job_parameters`),
     jobStatusIndex: quotePostgresIdentifier(`idx_${tablePrefix}_job_executions_job_status`),
