@@ -1,4 +1,4 @@
-export { defineChunkStep, defineJob, defineStep } from "./definitions.js";
+export { defineChunkStep, defineJob, definePartitionedStep, defineStep } from "./definitions.js";
 export { createJobInstanceId, hashJobParameters } from "./parameters.js";
 export {
   closeReader,
@@ -51,6 +51,7 @@ export type {
   ChunkWrittenBatchEvent,
   ChunkWriter,
   ChunkWriteContext,
+  ExecutionEngine,
   ItemBatchEventType,
   ItemSkippedBatchEvent,
   JobBatchEvent,
@@ -71,6 +72,14 @@ export type {
   LockAcquireOptions,
   LockHandle,
   LockManager,
+  PartitionClaimOptions,
+  PartitionExecution,
+  PartitionExecutionContext,
+  PartitionExecutionId,
+  PartitionExecutionResult,
+  PartitionExecutionStatus,
+  PartitionedStepDefinition,
+  PartitionedStepOptions,
   Processor,
   RetryBatchEvent,
   RetryBatchEventType,
@@ -88,6 +97,8 @@ export type {
   StepStartedBatchEvent,
   StepExecutionStatus,
   TaskletStepDefinition,
+  WorkerPool,
+  WorkerTask,
   Writer
 } from "./types/index.js";
 export type {

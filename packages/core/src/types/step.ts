@@ -1,6 +1,7 @@
 import type { SkipItem } from "../skip-item.js";
 import type { ChunkReader } from "../readers/reader.js";
 import type { BatchExecutionId } from "./common.js";
+import type { PartitionedStepDefinition } from "./partitioned-step.js";
 
 export type ChunkFailurePhase = "read" | "process" | "write";
 
@@ -126,6 +127,7 @@ export type ChunkStepOptions<Input = unknown, Output = Input, TCheckpoint = unkn
 
 export type StepDefinition<Input = unknown, Output = unknown> =
   | TaskletStepDefinition<Input, Output>
-  | ChunkStepDefinition<Input, Output>;
+  | ChunkStepDefinition<Input, Output>
+  | PartitionedStepDefinition;
 
 export type AnyStepDefinition = StepDefinition<any, any>;

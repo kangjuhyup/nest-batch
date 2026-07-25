@@ -1,12 +1,15 @@
-import type { JobExecution, JobInstance, StepExecution } from "@nest-batch/core";
+import type { JobExecution, JobInstance, PartitionExecution, StepExecution } from "@nest-batch/core";
 import {
+  parseMariaDbJson,
   parseMariaDbJobParameters,
   parseMariaDbJobStatus,
   parseMariaDbOptionalDate,
+  parseMariaDbPartitionStatus,
   parseMariaDbRequiredDate,
   parseMariaDbStepStatus,
   type MariaDbJobExecutionRow,
   type MariaDbJobInstanceRow,
+  type MariaDbPartitionExecutionRow,
   type MariaDbStepExecutionRow
 } from "../sql.js";
 
@@ -35,6 +38,23 @@ export const toStepExecution = (row: MariaDbStepExecutionRow): StepExecution => 
   jobExecutionId: row.job_execution_id,
   stepName: row.step_name,
   status: parseMariaDbStepStatus(row.status),
+  readCount: parseMariaDbCount(row.read_count, "read_count"),
+  writeCount: parseMariaDbCount(row.write_count, "write_count"),
+  skipCount: parseMariaDbCount(row.skip_count, "skip_count"),
+  retryCount: parseMariaDbCount(row.retry_count, "retry_count"),
+  createdAt: parseMariaDbRequiredDate(row.created_at, "created_at"),
+  startedAt: parseMariaDbOptionalDate(row.started_at),
+  endedAt: parseMariaDbOptionalDate(row.ended_at),
+  failureReason: typeof row.failure_reason === "string" ? row.failure_reason : undefined
+});
+
+export const toPartitionExecution = (row: MariaDbPartitionExecutionRow): PartitionExecution => ({
+  id: row.id,
+  stepExecutionId: row.step_execution_id,
+  stepName: row.step_name,
+  status: parseMariaDbPartitionStatus(row.status),
+  partition: parseMariaDbJson(row.partition),
+  ownerId: typeof row.owner_id === "string" ? row.owner_id : undefined,
   readCount: parseMariaDbCount(row.read_count, "read_count"),
   writeCount: parseMariaDbCount(row.write_count, "write_count"),
   skipCount: parseMariaDbCount(row.skip_count, "skip_count"),

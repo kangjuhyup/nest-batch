@@ -1,12 +1,15 @@
-import type { JobExecution, JobInstance, StepExecution } from "@nest-batch/core";
+import type { JobExecution, JobInstance, PartitionExecution, StepExecution } from "@nest-batch/core";
 import {
   parsePostgresJobParameters,
   parsePostgresJobStatus,
   parsePostgresOptionalDate,
+  parsePostgresPartitionStatus,
+  parsePostgresJson,
   parsePostgresRequiredDate,
   parsePostgresStepStatus,
   type PostgresJobExecutionRow,
   type PostgresJobInstanceRow,
+  type PostgresPartitionExecutionRow,
   type PostgresStepExecutionRow
 } from "../sql.js";
 
@@ -35,6 +38,23 @@ export const toStepExecution = (row: PostgresStepExecutionRow): StepExecution =>
   jobExecutionId: row.job_execution_id,
   stepName: row.step_name,
   status: parsePostgresStepStatus(row.status),
+  readCount: parsePostgresCount(row.read_count, "read_count"),
+  writeCount: parsePostgresCount(row.write_count, "write_count"),
+  skipCount: parsePostgresCount(row.skip_count, "skip_count"),
+  retryCount: parsePostgresCount(row.retry_count, "retry_count"),
+  createdAt: parsePostgresRequiredDate(row.created_at, "created_at"),
+  startedAt: parsePostgresOptionalDate(row.started_at),
+  endedAt: parsePostgresOptionalDate(row.ended_at),
+  failureReason: typeof row.failure_reason === "string" ? row.failure_reason : undefined
+});
+
+export const toPartitionExecution = (row: PostgresPartitionExecutionRow): PartitionExecution => ({
+  id: row.id,
+  stepExecutionId: row.step_execution_id,
+  stepName: row.step_name,
+  status: parsePostgresPartitionStatus(row.status),
+  partition: parsePostgresJson(row.partition),
+  ownerId: typeof row.owner_id === "string" ? row.owner_id : undefined,
   readCount: parsePostgresCount(row.read_count, "read_count"),
   writeCount: parsePostgresCount(row.write_count, "write_count"),
   skipCount: parsePostgresCount(row.skip_count, "skip_count"),

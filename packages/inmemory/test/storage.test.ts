@@ -1,5 +1,5 @@
 import { DatabaseBatchStorage } from "@nest-batch/core";
-import type { JobExecution, JobInstance, StepExecution } from "@nest-batch/core";
+import type { JobExecution, JobInstance, PartitionExecution, StepExecution } from "@nest-batch/core";
 import { describe, expect, it } from "vitest";
 import {
   InMemoryBatchStorage,
@@ -32,6 +32,22 @@ const createStepExecution = (overrides: Partial<StepExecution> = {}): StepExecut
   jobExecutionId: "execution-1",
   stepName: "load-users",
   status: "created",
+  readCount: 0,
+  writeCount: 0,
+  skipCount: 0,
+  retryCount: 0,
+  createdAt: new Date("2026-07-19T00:00:00.000Z"),
+  ...overrides
+});
+
+const createPartitionExecution = (
+  overrides: Partial<PartitionExecution<{ readonly shard: number }>> = {}
+): PartitionExecution<{ readonly shard: number }> => ({
+  id: "partition-1",
+  stepExecutionId: "step-execution-1",
+  stepName: "load-users",
+  status: "created",
+  partition: { shard: 0 },
   readCount: 0,
   writeCount: 0,
   skipCount: 0,
@@ -113,6 +129,39 @@ describe("inmemory batch storage / inmemory batch storage를 검증한다", () =
         endedAt
       })
     ]);
+
+    await repository.createPartitionExecution(createPartitionExecution());
+    await repository.createPartitionExecution(
+      createPartitionExecution({
+        id: "partition-2",
+        partition: { shard: 1 },
+        createdAt: new Date("2026-07-19T00:01:00.000Z")
+      })
+    );
+
+    await expect(repository.findPartitionExecutions("step-execution-1")).resolves.toEqual([
+      createPartitionExecution(),
+      createPartitionExecution({
+        id: "partition-2",
+        partition: { shard: 1 },
+        createdAt: new Date("2026-07-19T00:01:00.000Z")
+      })
+    ]);
+
+    const claimedAt = new Date("2026-07-19T00:06:00.000Z");
+    await expect(
+      repository.claimPartitionExecution({
+        stepExecutionId: "step-execution-1",
+        ownerId: "worker-1",
+        now: claimedAt
+      })
+    ).resolves.toEqual(
+      createPartitionExecution({
+        status: "running",
+        ownerId: "worker-1",
+        startedAt: claimedAt
+      })
+    );
   });
 
   it("stores reads and deletes checkpoints / checkpoint를 저장 조회 삭제한다", async () => {

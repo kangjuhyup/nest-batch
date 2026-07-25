@@ -20,6 +20,7 @@
       "@nest-batch/postgres": ["packages/postgres/src/index.ts"],
       "@nest-batch/mysql": ["packages/mysql/src/index.ts"],
       "@nest-batch/mariadb": ["packages/mariadb/src/index.ts"],
+      "@nest-batch/worker-local": ["packages/worker-local/src/index.ts"],
       "@nest-batch/cli": ["packages/cli/src/index.ts"]
     }
   }

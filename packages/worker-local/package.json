@@ -1,0 +1,23 @@
+{
+  "name": "@nest-batch/worker-local",
+  "version": "0.0.1",
+  "description": "Local bounded async worker pool for nest-batch.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --root ../.. --config vitest.config.ts packages/worker-local/test"
+  },
+  "dependencies": {
+    "@nest-batch/core": "workspace:*"
+  }
+}

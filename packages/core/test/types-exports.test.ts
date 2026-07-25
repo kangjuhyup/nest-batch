@@ -14,6 +14,7 @@ import type {
   ChunkWrittenBatchEvent,
   CursorReader,
   CursorReaderDefinition,
+  ExecutionEngine,
   FileReader,
   FileReaderDefinition,
   FunctionReader,
@@ -32,6 +33,13 @@ import type {
   LineFileReaderOptions,
   PageReader,
   PageReaderDefinition,
+  PartitionClaimOptions,
+  PartitionExecution,
+  PartitionExecutionContext,
+  PartitionExecutionResult,
+  PartitionExecutionStatus,
+  PartitionedStepDefinition,
+  PartitionedStepOptions,
   PagingReader,
   PagingReaderDefinition,
   Reader,
@@ -43,6 +51,8 @@ import type {
   SqlReaderDefinition,
   StepBatchEvent,
   StepExecution,
+  WorkerPool,
+  WorkerTask,
   Writer
 } from "../src/types/index.js";
 
@@ -62,6 +72,54 @@ describe("core type module exports / core type module export", () => {
     const checkpointStore = {} as CheckpointStore;
     const lockManager = {} as LockManager;
     const storage = new FakeDatabaseBatchStorage(repository, checkpointStore, lockManager);
+    const executionEngine = {} as ExecutionEngine;
+    const partitionStatus: PartitionExecutionStatus = "created";
+    const partition: PartitionExecution = {
+      id: "partition-1",
+      stepExecutionId: "step-execution-1",
+      stepName: "load-users",
+      status: partitionStatus,
+      partition: { shard: 0 },
+      readCount: 0,
+      writeCount: 0,
+      skipCount: 0,
+      retryCount: 0,
+      createdAt: new Date("2026-07-25T00:00:00.000Z")
+    };
+    const claimOptions: PartitionClaimOptions = {
+      stepExecutionId: partition.stepExecutionId,
+      ownerId: "worker-1",
+      now: new Date("2026-07-25T00:01:00.000Z")
+    };
+    const partitionContext: PartitionExecutionContext<{ readonly shard: number }> = {
+      jobExecutionId: "job-execution-1",
+      stepExecutionId: "step-execution-1",
+      partitionExecutionId: "partition-1",
+      stepName: "load-users",
+      partition: { shard: 0 },
+      signal: new AbortController().signal
+    };
+    const partitionResult: PartitionExecutionResult = {
+      readCount: 1,
+      writeCount: 1
+    };
+    const partitionedStepOptions: PartitionedStepOptions<{ readonly shard: number }> = {
+      name: "partition-users",
+      partitions: () => [{ shard: 0 }],
+      execute() {
+        return partitionResult;
+      }
+    };
+    const partitionedStep: PartitionedStepDefinition<{ readonly shard: number }> = {
+      ...partitionedStepOptions,
+      kind: "partitioned"
+    };
+    const workerTask: WorkerTask<string> = {
+      run() {
+        return "done";
+      }
+    };
+    const workerPool = {} as WorkerPool;
     const reader: Reader<string> = {
       open() {
         return {
@@ -199,6 +257,13 @@ describe("core type module exports / core type module export", () => {
     ];
 
     expect(storage.repository).toBe(repository);
+    expect(executionEngine).toBeDefined();
+    expect(partition.status).toBe("created");
+    expect(claimOptions.stepExecutionId).toBe("step-execution-1");
+    expect(partitionContext.partition.shard).toBe(0);
+    expect(partitionedStep.kind).toBe("partitioned");
+    expect(workerTask.run(new AbortController().signal)).toBe("done");
+    expect(workerPool).toBeDefined();
     const items: string[] = [];
     for await (const item of await reader.open({ signal: new AbortController().signal })) {
       items.push(item);

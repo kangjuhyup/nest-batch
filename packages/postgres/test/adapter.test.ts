@@ -1,4 +1,4 @@
-import type { JobExecution, JobInstance, StepExecution } from "@nest-batch/core";
+import type { JobExecution, JobInstance, PartitionExecution, StepExecution } from "@nest-batch/core";
 import { describe, expect, it } from "vitest";
 import {
   PostgresCheckpointStore,
@@ -74,6 +74,22 @@ const createStepExecution = (overrides: Partial<StepExecution> = {}): StepExecut
   jobExecutionId: "execution-1",
   stepName: "load-users",
   status: "created",
+  readCount: 0,
+  writeCount: 0,
+  skipCount: 0,
+  retryCount: 0,
+  createdAt: new Date("2026-07-19T00:00:00.000Z"),
+  ...overrides
+});
+
+const createPartitionExecution = (
+  overrides: Partial<PartitionExecution<{ readonly shard: number }>> = {}
+): PartitionExecution<{ readonly shard: number }> => ({
+  id: "partition-1",
+  stepExecutionId: "step-execution-1",
+  stepName: "load-users",
+  status: "created",
+  partition: { shard: 0 },
   readCount: 0,
   writeCount: 0,
   skipCount: 0,
@@ -370,6 +386,155 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
     expect(pool.releasedConnections).toBe(1);
   });
 
+  it("persists partition executions through the postgres driver / postgres driver로 partition execution을 저장한다", async () => {
+    const pool = new FakePostgresPool();
+    const repository = new PostgresJobRepository({ pool, schema: "batch", tablePrefix: "nb" });
+    const createdAt = new Date("2026-07-19T00:00:00.000Z");
+    const startedAt = new Date("2026-07-19T00:01:00.000Z");
+    const endedAt = new Date("2026-07-19T00:02:00.000Z");
+
+    pool.queueResult(1);
+    await repository.createPartitionExecution(createPartitionExecution({ createdAt }));
+
+    expect(pool.calls[0]?.sql).toContain('INSERT INTO "batch"."nb_partition_executions"');
+    expect(pool.calls[0]?.values).toEqual([
+      "partition-1",
+      "step-execution-1",
+      "load-users",
+      "created",
+      JSON.stringify({ shard: 0 }),
+      null,
+      0,
+      0,
+      0,
+      0,
+      createdAt,
+      null,
+      null,
+      null
+    ]);
+
+    pool.queueResult(1);
+    await repository.updatePartitionExecution(
+      createPartitionExecution({
+        status: "completed",
+        ownerId: "worker-1",
+        readCount: 10,
+        writeCount: 9,
+        skipCount: 1,
+        retryCount: 2,
+        createdAt,
+        startedAt,
+        endedAt
+      })
+    );
+
+    expect(pool.calls[1]?.sql).toContain('UPDATE "batch"."nb_partition_executions"');
+    expect(pool.calls[1]?.values).toEqual([
+      "step-execution-1",
+      "load-users",
+      "completed",
+      JSON.stringify({ shard: 0 }),
+      "worker-1",
+      10,
+      9,
+      1,
+      2,
+      createdAt,
+      startedAt,
+      endedAt,
+      null,
+      "partition-1"
+    ]);
+
+    pool.queueRows([
+      {
+        id: "partition-1",
+        step_execution_id: "step-execution-1",
+        step_name: "load-users",
+        status: "completed",
+        partition: { shard: 0 },
+        owner_id: "worker-1",
+        read_count: 10,
+        write_count: 9,
+        skip_count: 1,
+        retry_count: 2,
+        created_at: createdAt,
+        started_at: startedAt,
+        ended_at: endedAt,
+        failure_reason: null
+      }
+    ]);
+
+    await expect(repository.findPartitionExecutions("step-execution-1")).resolves.toEqual([
+      createPartitionExecution({
+        status: "completed",
+        ownerId: "worker-1",
+        readCount: 10,
+        writeCount: 9,
+        skipCount: 1,
+        retryCount: 2,
+        createdAt,
+        startedAt,
+        endedAt
+      })
+    ]);
+  });
+
+  it("claims partition executions with postgres row locking / postgres row lock으로 partition execution을 claim한다", async () => {
+    const pool = new FakePostgresPool();
+    const repository = new PostgresJobRepository({ pool, schema: "batch", tablePrefix: "nb" });
+    const createdAt = new Date("2026-07-19T00:00:00.000Z");
+    const claimedAt = new Date("2026-07-19T00:01:00.000Z");
+
+    pool.queueResult(1);
+    pool.queueRows([
+      {
+        id: "partition-1",
+        step_execution_id: "step-execution-1",
+        step_name: "load-users",
+        status: "created",
+        partition: { shard: 0 },
+        owner_id: null,
+        read_count: 0,
+        write_count: 0,
+        skip_count: 0,
+        retry_count: 0,
+        created_at: createdAt,
+        started_at: null,
+        ended_at: null,
+        failure_reason: null
+      }
+    ]);
+    pool.queueResult(1);
+    pool.queueResult(1);
+
+    await expect(
+      repository.claimPartitionExecution({
+        stepExecutionId: "step-execution-1",
+        ownerId: "worker-1",
+        now: claimedAt
+      })
+    ).resolves.toEqual(
+      createPartitionExecution({
+        status: "running",
+        ownerId: "worker-1",
+        createdAt,
+        startedAt: claimedAt
+      })
+    );
+
+    expect(pool.calls.map((call) => call.sql.trim().split(/\s+/)[0])).toEqual([
+      "BEGIN",
+      "SELECT",
+      "UPDATE",
+      "COMMIT"
+    ]);
+    expect(pool.calls[1]?.sql).toContain("FOR UPDATE SKIP LOCKED");
+    expect(pool.calls[2]?.values).toContain("worker-1");
+    expect(pool.releasedConnections).toBe(1);
+  });
+
   it("stores and removes checkpoints through postgres upsert SQL / postgres upsert SQL로 checkpoint를 저장하고 삭제한다", async () => {
     const pool = new FakePostgresPool();
     const store = new PostgresCheckpointStore({ pool, tablePrefix: "nb" });
@@ -425,7 +590,7 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
   it("creates schema tables with qualified postgres identifiers / 정규화한 postgres identifier로 schema table을 생성한다", async () => {
     const pool = new FakePostgresPool();
 
-    for (let index = 0; index < 11; index += 1) {
+    for (let index = 0; index < 13; index += 1) {
       pool.queueResult(1);
     }
     await ensurePostgresSchema({ pool, schema: "batch", tablePrefix: "nb" });
@@ -439,6 +604,8 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
       expect.stringContaining('CREATE INDEX IF NOT EXISTS "idx_nb_job_executions_instance_status"'),
       expect.stringContaining('CREATE TABLE IF NOT EXISTS "batch"."nb_step_executions"'),
       expect.stringContaining('CREATE INDEX IF NOT EXISTS "idx_nb_step_executions_job_step_status"'),
+      expect.stringContaining('CREATE TABLE IF NOT EXISTS "batch"."nb_partition_executions"'),
+      expect.stringContaining('CREATE INDEX IF NOT EXISTS "idx_nb_partition_executions_step_status"'),
       expect.stringContaining('CREATE TABLE IF NOT EXISTS "batch"."nb_checkpoints"'),
       expect.stringContaining('CREATE TABLE IF NOT EXISTS "batch"."nb_locks"'),
       expect.stringContaining('CREATE INDEX IF NOT EXISTS "idx_nb_locks_expires_at"')

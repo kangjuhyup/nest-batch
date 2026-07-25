@@ -7,6 +7,7 @@ import type {
   BatchRunner,
   BatchStepExecutionId,
   DatabaseBatchStorage,
+  ExecutionEngine,
   JobDefinition,
   JobExecution,
   JobInstance,
@@ -32,11 +33,19 @@ export interface DefaultBatchRunnerOptions {
   readonly observer?: BatchObserver;
 }
 
-export class DefaultBatchRunner implements BatchRunner {
+export class DefaultBatchRunner implements BatchRunner, ExecutionEngine {
   constructor(
     private readonly storage: DatabaseBatchStorage,
     private readonly options: DefaultBatchRunnerOptions = {}
   ) {}
+
+  async runJob<Parameters extends JobParameters = JobParameters>(
+    job: JobDefinition<Parameters>,
+    parameters: Parameters,
+    options: BatchRunOptions = {}
+  ): Promise<JobExecution<Parameters>> {
+    return this.run(job, parameters, options);
+  }
 
   async run<Parameters extends JobParameters = JobParameters>(
     job: JobDefinition<Parameters>,

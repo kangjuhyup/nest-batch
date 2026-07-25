@@ -5,6 +5,8 @@ import type {
   ChunkStepWithoutProcessorOptions,
   JobDefinition,
   JobParameters,
+  PartitionedStepDefinition,
+  PartitionedStepOptions,
   TaskletStepDefinition
 } from "./types/index.js";
 import { normalizeReader } from "./readers/definition-reader.js";
@@ -21,6 +23,12 @@ const assertChunkSize = (chunkSize: number): void => {
   }
 };
 
+const assertMaxConcurrency = (maxConcurrency: number | undefined): void => {
+  if (maxConcurrency !== undefined && (!Number.isSafeInteger(maxConcurrency) || maxConcurrency <= 0)) {
+    throw new Error("Max concurrency must be a positive safe integer.");
+  }
+};
+
 export const defineStep = <Input = unknown, Output = unknown>(
   definition: TaskletStepDefinition<Input, Output>
 ): TaskletStepDefinition<Input, Output> => {
@@ -28,6 +36,19 @@ export const defineStep = <Input = unknown, Output = unknown>(
 
   return Object.freeze({
     ...definition,
+    name: definition.name.trim()
+  });
+};
+
+export const definePartitionedStep = <TPartition = unknown>(
+  definition: PartitionedStepOptions<TPartition>
+): PartitionedStepDefinition<TPartition> => {
+  assertName("Step", definition.name);
+  assertMaxConcurrency(definition.maxConcurrency);
+
+  return Object.freeze({
+    ...definition,
+    kind: "partitioned" as const,
     name: definition.name.trim()
   });
 };

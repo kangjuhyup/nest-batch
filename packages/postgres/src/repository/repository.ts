@@ -1,15 +1,18 @@
 import type {
   BatchExecutionId,
+  BatchStepExecutionId,
   JobExecution,
   JobExecutionAttempt,
   JobInstance,
   JobInstanceId,
   JobParametersHash,
   JobRepository,
+  PartitionClaimOptions,
+  PartitionExecution,
   StepExecution
 } from "@nest-batch/core";
 import { resolvePostgresPool } from "../driver.js";
-import { toJobExecution, toJobInstance, toStepExecution } from "./mapper.js";
+import { toJobExecution, toJobInstance, toPartitionExecution, toStepExecution } from "./mapper.js";
 import type { PostgresBatchOptions } from "../options.js";
 import type { PostgresClientLike, PostgresPoolLike } from "../options.js";
 import {
@@ -18,6 +21,7 @@ import {
   stringifyPostgresJson,
   type PostgresJobExecutionRow,
   type PostgresJobInstanceRow,
+  type PostgresPartitionExecutionRow,
   type PostgresStepExecutionRow,
   type PostgresTables
 } from "../sql.js";
@@ -364,6 +368,129 @@ export class PostgresJobRepository implements JobRepository {
     return rowsFromPostgresResult<PostgresStepExecutionRow>(result).map(toStepExecution);
   }
 
+  async createPartitionExecution(execution: PartitionExecution): Promise<void> {
+    await this.pool.query(
+      `
+        INSERT INTO ${this.tables.partitionExecutions} (
+          id,
+          step_execution_id,
+          step_name,
+          status,
+          partition,
+          owner_id,
+          read_count,
+          write_count,
+          skip_count,
+          retry_count,
+          created_at,
+          started_at,
+          ended_at,
+          failure_reason
+        )
+        VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      `,
+      [
+        execution.id,
+        execution.stepExecutionId,
+        execution.stepName,
+        execution.status,
+        stringifyPostgresJson(execution.partition),
+        execution.ownerId ?? null,
+        execution.readCount,
+        execution.writeCount,
+        execution.skipCount,
+        execution.retryCount,
+        execution.createdAt,
+        execution.startedAt ?? null,
+        execution.endedAt ?? null,
+        execution.failureReason ?? null
+      ]
+    );
+  }
+
+  async updatePartitionExecution(execution: PartitionExecution): Promise<void> {
+    await this.updatePartitionExecutionWithClient(this.pool, execution);
+  }
+
+  async findPartitionExecutions(
+    stepExecutionId: BatchStepExecutionId
+  ): Promise<readonly PartitionExecution[]> {
+    const result = await this.pool.query<PostgresPartitionExecutionRow>(
+      `
+        SELECT
+          id,
+          step_execution_id,
+          step_name,
+          status,
+          partition,
+          owner_id,
+          read_count,
+          write_count,
+          skip_count,
+          retry_count,
+          created_at,
+          started_at,
+          ended_at,
+          failure_reason
+        FROM ${this.tables.partitionExecutions}
+        WHERE step_execution_id = $1
+        ORDER BY created_at ASC, id ASC
+      `,
+      [stepExecutionId]
+    );
+
+    return rowsFromPostgresResult<PostgresPartitionExecutionRow>(result).map(toPartitionExecution);
+  }
+
+  async claimPartitionExecution(
+    options: PartitionClaimOptions
+  ): Promise<PartitionExecution | undefined> {
+    return this.withTransaction(async (client) => {
+      const result = await client.query<PostgresPartitionExecutionRow>(
+        `
+          SELECT
+            id,
+            step_execution_id,
+            step_name,
+            status,
+            partition,
+            owner_id,
+            read_count,
+            write_count,
+            skip_count,
+            retry_count,
+            created_at,
+            started_at,
+            ended_at,
+            failure_reason
+          FROM ${this.tables.partitionExecutions}
+          WHERE step_execution_id = $1
+            AND status = 'created'
+          ORDER BY created_at ASC, id ASC
+          LIMIT 1
+          FOR UPDATE SKIP LOCKED
+        `,
+        [options.stepExecutionId]
+      );
+      const [row] = rowsFromPostgresResult<PostgresPartitionExecutionRow>(result);
+
+      if (!row) {
+        return undefined;
+      }
+
+      const claimed: PartitionExecution = {
+        ...toPartitionExecution(row),
+        status: "running",
+        ownerId: options.ownerId,
+        startedAt: options.now
+      };
+
+      await this.updatePartitionExecutionWithClient(client, claimed);
+
+      return claimed;
+    });
+  }
+
   private async withTransaction<T>(
     operation: (client: PostgresClientLike) => Promise<T>
   ): Promise<T> {
@@ -469,6 +596,48 @@ export class PostgresJobRepository implements JobRepository {
         execution.startedAt ?? null,
         execution.endedAt ?? null,
         execution.failureReason ?? null
+      ]
+    );
+  }
+
+  private async updatePartitionExecutionWithClient(
+    client: PostgresClientLike,
+    execution: PartitionExecution
+  ): Promise<void> {
+    await client.query(
+      `
+        UPDATE ${this.tables.partitionExecutions}
+        SET
+          step_execution_id = $1,
+          step_name = $2,
+          status = $3,
+          partition = $4::jsonb,
+          owner_id = $5,
+          read_count = $6,
+          write_count = $7,
+          skip_count = $8,
+          retry_count = $9,
+          created_at = $10,
+          started_at = $11,
+          ended_at = $12,
+          failure_reason = $13
+        WHERE id = $14
+      `,
+      [
+        execution.stepExecutionId,
+        execution.stepName,
+        execution.status,
+        stringifyPostgresJson(execution.partition),
+        execution.ownerId ?? null,
+        execution.readCount,
+        execution.writeCount,
+        execution.skipCount,
+        execution.retryCount,
+        execution.createdAt,
+        execution.startedAt ?? null,
+        execution.endedAt ?? null,
+        execution.failureReason ?? null,
+        execution.id
       ]
     );
   }

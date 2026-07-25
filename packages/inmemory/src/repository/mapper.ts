@@ -1,4 +1,4 @@
-import type { JobExecution, JobInstance, StepExecution } from "@nest-batch/core";
+import type { JobExecution, JobInstance, PartitionExecution, StepExecution } from "@nest-batch/core";
 
 export const cloneJobInstance = (instance: JobInstance): JobInstance => ({
   ...instance,
@@ -19,6 +19,24 @@ export const cloneStepExecution = (execution: StepExecution): StepExecution => (
   endedAt: cloneOptionalDate(execution.endedAt)
 });
 
+export const clonePartitionExecution = <TPartition>(
+  execution: PartitionExecution<TPartition>
+): PartitionExecution<TPartition> => ({
+  ...execution,
+  partition: cloneJsonLike(execution.partition),
+  createdAt: new Date(execution.createdAt.getTime()),
+  startedAt: cloneOptionalDate(execution.startedAt),
+  endedAt: cloneOptionalDate(execution.endedAt)
+});
+
 const cloneOptionalDate = (date?: Date): Date | undefined => {
   return date ? new Date(date.getTime()) : undefined;
+};
+
+const cloneJsonLike = <TValue>(value: TValue): TValue => {
+  if (value === undefined || value === null) {
+    return value;
+  }
+
+  return JSON.parse(JSON.stringify(value)) as TValue;
 };

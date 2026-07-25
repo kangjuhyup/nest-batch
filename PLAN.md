@@ -131,7 +131,7 @@ Expected: PASS and prints baseline table. This test should not fail on slow mach
 
 Add a short README section explaining `NEST_BATCH_PERF_ITEMS`, `NEST_BATCH_PERF_CHUNK_SIZE`, why perf tests are excluded from normal unit tests, and where completed run results are recorded.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add PLAN.md packages/core/test/performance-baseline.perf.test.ts docs/performance.md README.md README-kr.md
@@ -151,7 +151,7 @@ git commit -m "test : runtime 성능 기준 테스트 추가" -m "- chunk 처리
 - Consumes: `BatchRunner`, `JobDefinition`, `BatchRunOptions`, `JobExecution`.
 - Produces: `ExecutionEngine` contract and a compatibility path where `DefaultBatchRunner` implements it.
 
-- [ ] **Step 1: Write failing contract test**
+- [x] **Step 1: Write failing contract test**
 
 ```ts
 it("uses DefaultBatchRunner as an execution engine / DefaultBatchRunner를 execution engine으로 사용한다", async () => {
@@ -172,7 +172,7 @@ Run: `./node_modules/.bin/vitest run packages/core/test/execution-engine.test.ts
 
 Expected: FAIL because `ExecutionEngine` does not exist.
 
-- [ ] **Step 2: Add `ExecutionEngine` type**
+- [x] **Step 2: Add `ExecutionEngine` type**
 
 ```ts
 export interface ExecutionEngine {
@@ -184,7 +184,7 @@ export interface ExecutionEngine {
 }
 ```
 
-- [ ] **Step 3: Implement compatibility method**
+- [x] **Step 3: Implement compatibility method**
 
 Add `runJob()` to `DefaultBatchRunner` and delegate to `run()` so existing code keeps working.
 
@@ -198,7 +198,7 @@ async runJob<Parameters extends JobParameters = JobParameters>(
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 
@@ -207,7 +207,7 @@ Run:
 ./node_modules/.bin/tsc -b
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/core
@@ -231,7 +231,7 @@ git commit -m "feat : execution engine contract 추가" -m "- core에 ExecutionE
 - Consumes: current `JobRepository`, `StepExecution`.
 - Produces: `PartitionExecution`, `PartitionExecutionStatus`, repository methods for create/update/find/claim.
 
-- [ ] **Step 1: Define failing repository contract test**
+- [x] **Step 1: Define failing repository contract test**
 
 ```ts
 it("claims one pending partition at a time / pending partition을 하나씩 claim한다", async () => {
@@ -254,7 +254,7 @@ it("claims one pending partition at a time / pending partition을 하나씩 clai
 
 Expected: FAIL because partition repository APIs do not exist.
 
-- [ ] **Step 2: Add core partition types**
+- [x] **Step 2: Add core partition types**
 
 ```ts
 export type PartitionExecutionStatus = "created" | "running" | "completed" | "failed" | "cancelled";
@@ -277,7 +277,7 @@ export interface PartitionExecution<TPartition = unknown> {
 }
 ```
 
-- [ ] **Step 3: Extend repository contract**
+- [x] **Step 3: Extend repository contract**
 
 ```ts
 createPartitionExecution(execution: PartitionExecution): Promise<void>;
@@ -286,7 +286,7 @@ findPartitionExecutions(stepExecutionId: BatchStepExecutionId): Promise<readonly
 claimPartitionExecution(options: PartitionClaimOptions): Promise<PartitionExecution | undefined>;
 ```
 
-- [ ] **Step 4: Implement in-memory and SQL adapters**
+- [x] **Step 4: Implement in-memory and SQL adapters**
 
 Add `partition_executions` tables to Postgres/MySQL/MariaDB schema. SQL `claimPartitionExecution` must use dialect-specific row locking:
 
@@ -294,14 +294,14 @@ Add `partition_executions` tables to Postgres/MySQL/MariaDB schema. SQL `claimPa
 - MySQL: `FOR UPDATE SKIP LOCKED`
 - MariaDB: verify supported syntax; if unsupported for target version, use transaction plus owner update condition.
 
-- [ ] **Step 5: Run matrix tests**
+- [x] **Step 5: Run matrix tests**
 
 ```bash
 ./node_modules/.bin/vitest run packages/core/test/partition-repository.test.ts packages/inmemory/test/storage.test.ts packages/postgres/test/adapter.test.ts packages/mysql/test/adapter.test.ts packages/mariadb/test/adapter.test.ts
 ./node_modules/.bin/tsc -b
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/core packages/inmemory packages/postgres packages/mysql packages/mariadb
@@ -321,7 +321,7 @@ git commit -m "feat : partition execution 상태 저장 추가" -m "- core repos
 - Consumes: `PartitionExecution`, repository claim/update methods.
 - Produces: `definePartitionedStep()` and local `maxConcurrency` partition execution.
 
-- [ ] **Step 1: Write failing concurrency test**
+- [x] **Step 1: Write failing concurrency test**
 
 ```ts
 it("runs partitions with max concurrency / max concurrency로 partition을 실행한다", async () => {
@@ -349,7 +349,7 @@ it("runs partitions with max concurrency / max concurrency로 partition을 실�
 
 Expected: FAIL because `definePartitionedStep` does not exist.
 
-- [ ] **Step 2: Add partitioned step type**
+- [x] **Step 2: Add partitioned step type**
 
 ```ts
 export interface PartitionedStepDefinition<TPartition = unknown> {
@@ -361,22 +361,22 @@ export interface PartitionedStepDefinition<TPartition = unknown> {
 }
 ```
 
-- [ ] **Step 3: Implement local scheduler**
+- [x] **Step 3: Implement local scheduler**
 
 Use a bounded async loop, not `Promise.all()` over all partitions. Respect `AbortSignal` before claiming each partition and before starting execution.
 
-- [ ] **Step 4: Aggregate counters**
+- [x] **Step 4: Aggregate counters**
 
 After partitions complete, aggregate `readCount`, `writeCount`, `skipCount`, and `retryCount` into the parent `StepExecution`.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 ```bash
 ./node_modules/.bin/vitest run packages/core/test/partitioned-step-runner.test.ts packages/core/test/runner.test.ts
 ./node_modules/.bin/tsc -b
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/core
@@ -398,7 +398,7 @@ git commit -m "feat : local partitioned step 실행 추가" -m "- partitioned st
 - Consumes: `WorkerPool`, `WorkerTask`, `AbortSignal`.
 - Produces: `LocalWorkerPool` with bounded async execution.
 
-- [ ] **Step 1: Write failing worker pool test**
+- [x] **Step 1: Write failing worker pool test**
 
 ```ts
 it("limits concurrent tasks / 동시에 실행되는 task 수를 제한한다", async () => {
@@ -419,7 +419,7 @@ it("limits concurrent tasks / 동시에 실행되는 task 수를 제한한다", 
 
 Expected: FAIL because package and class do not exist.
 
-- [ ] **Step 2: Add core worker contract**
+- [x] **Step 2: Add core worker contract**
 
 ```ts
 export interface WorkerTask<T = unknown> {
@@ -433,18 +433,18 @@ export interface WorkerPool {
 }
 ```
 
-- [ ] **Step 3: Implement `LocalWorkerPool`**
+- [x] **Step 3: Implement `LocalWorkerPool`**
 
 Use an internal FIFO queue and start at most `capacity` active tasks. If `signal` aborts before start, reject with abort error.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 ./node_modules/.bin/vitest run packages/worker-local/test/local-worker-pool.test.ts
 ./node_modules/.bin/tsc -b
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/core packages/worker-local tsconfig.json vitest.config.ts

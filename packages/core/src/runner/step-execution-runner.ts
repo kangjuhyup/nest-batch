@@ -1,6 +1,7 @@
 import { errorToFailureReason, isAbortError } from "./errors.js";
 import { runChunkStep } from "./chunk-step-runner.js";
 import { emitBatchEvent } from "./events.js";
+import { runPartitionedStep } from "./partitioned-step-runner.js";
 import { runTaskletStep } from "./tasklet-step-runner.js";
 import type {
   AnyStepDefinition,
@@ -58,7 +59,13 @@ export const runStepExecution = async (
     const result =
       step.kind === "chunk"
         ? await runChunkStep(step, context, storage.checkpointStore)
-        : await runTaskletStep(step, context, storage.checkpointStore);
+        : step.kind === "partitioned"
+          ? await runPartitionedStep(step, context, {
+              repository: storage.repository,
+              stepExecutionId: execution.id,
+              now: options.now
+            })
+          : await runTaskletStep(step, context, storage.checkpointStore);
 
     execution = {
       ...execution,

@@ -1,4 +1,9 @@
-import type { JobExecutionStatus, JobParameters, StepExecutionStatus } from "@nest-batch/core";
+import type {
+  JobExecutionStatus,
+  JobParameters,
+  PartitionExecutionStatus,
+  StepExecutionStatus
+} from "@nest-batch/core";
 import type { PostgresBatchOptions } from "./options.js";
 
 const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -9,12 +14,14 @@ export interface PostgresTables {
   readonly jobInstances: string;
   readonly jobExecutions: string;
   readonly stepExecutions: string;
+  readonly partitionExecutions: string;
   readonly checkpoints: string;
   readonly locks: string;
   readonly jobInstanceParametersIndex: string;
   readonly jobStatusIndex: string;
   readonly jobExecutionInstanceStatusIndex: string;
   readonly stepStatusIndex: string;
+  readonly partitionStatusIndex: string;
   readonly locksExpiresAtIndex: string;
 }
 
@@ -53,6 +60,23 @@ export interface PostgresStepExecutionRow {
   readonly failure_reason: unknown;
 }
 
+export interface PostgresPartitionExecutionRow {
+  readonly id: string;
+  readonly step_execution_id: string;
+  readonly step_name: string;
+  readonly status: string;
+  readonly partition: unknown;
+  readonly owner_id: unknown;
+  readonly read_count: unknown;
+  readonly write_count: unknown;
+  readonly skip_count: unknown;
+  readonly retry_count: unknown;
+  readonly created_at: unknown;
+  readonly started_at: unknown;
+  readonly ended_at: unknown;
+  readonly failure_reason: unknown;
+}
+
 export const createPostgresTables = (
   options: Pick<PostgresBatchOptions, "schema" | "tablePrefix">
 ): PostgresTables => {
@@ -68,12 +92,14 @@ export const createPostgresTables = (
     jobInstances: qualify("job_instances"),
     jobExecutions: qualify("job_executions"),
     stepExecutions: qualify("step_executions"),
+    partitionExecutions: qualify("partition_executions"),
     checkpoints: qualify("checkpoints"),
     locks: qualify("locks"),
     jobInstanceParametersIndex: quotePostgresIdentifier(`idx_${tablePrefix}_job_instances_job_parameters`),
     jobStatusIndex: quotePostgresIdentifier(`idx_${tablePrefix}_job_executions_job_status`),
     jobExecutionInstanceStatusIndex: quotePostgresIdentifier(`idx_${tablePrefix}_job_executions_instance_status`),
     stepStatusIndex: quotePostgresIdentifier(`idx_${tablePrefix}_step_executions_job_step_status`),
+    partitionStatusIndex: quotePostgresIdentifier(`idx_${tablePrefix}_partition_executions_step_status`),
     locksExpiresAtIndex: quotePostgresIdentifier(`idx_${tablePrefix}_locks_expires_at`)
   };
 };
@@ -145,6 +171,10 @@ export const parsePostgresJobStatus = (value: unknown): JobExecutionStatus => {
 };
 
 export const parsePostgresStepStatus = (value: unknown): StepExecutionStatus => {
+  return parsePostgresJobStatus(value);
+};
+
+export const parsePostgresPartitionStatus = (value: unknown): PartitionExecutionStatus => {
   return parsePostgresJobStatus(value);
 };
 

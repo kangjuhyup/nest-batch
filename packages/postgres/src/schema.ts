@@ -75,6 +75,31 @@ export const ensurePostgresSchema = async (options: PostgresBatchOptions): Promi
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS ${tables.partitionExecutions} (
+      id TEXT NOT NULL,
+      step_execution_id TEXT NOT NULL,
+      step_name TEXT NOT NULL,
+      status TEXT NOT NULL,
+      partition JSONB NOT NULL,
+      owner_id TEXT NULL,
+      read_count INTEGER NOT NULL,
+      write_count INTEGER NOT NULL,
+      skip_count INTEGER NOT NULL,
+      retry_count INTEGER NOT NULL,
+      created_at TIMESTAMPTZ(3) NOT NULL,
+      started_at TIMESTAMPTZ(3) NULL,
+      ended_at TIMESTAMPTZ(3) NULL,
+      failure_reason TEXT NULL,
+      PRIMARY KEY (id)
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS ${tables.partitionStatusIndex}
+    ON ${tables.partitionExecutions} (step_execution_id, status, created_at)
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS ${tables.checkpoints} (
       execution_id TEXT NOT NULL,
       step_name TEXT NOT NULL,

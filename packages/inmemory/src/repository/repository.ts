@@ -1,19 +1,28 @@
 import type {
   BatchExecutionId,
+  BatchStepExecutionId,
   JobExecution,
   JobExecutionAttempt,
   JobInstance,
   JobInstanceId,
   JobParametersHash,
   JobRepository,
+  PartitionClaimOptions,
+  PartitionExecution,
   StepExecution
 } from "@nest-batch/core";
-import { cloneJobExecution, cloneJobInstance, cloneStepExecution } from "./mapper.js";
+import {
+  cloneJobExecution,
+  cloneJobInstance,
+  clonePartitionExecution,
+  cloneStepExecution
+} from "./mapper.js";
 
 export class InMemoryJobRepository implements JobRepository {
   private readonly executions = new Map<BatchExecutionId, JobExecution>();
   private readonly instances = new Map<string, JobInstance>();
   private readonly stepExecutions = new Map<BatchExecutionId, StepExecution[]>();
+  private readonly partitionExecutions = new Map<BatchStepExecutionId, PartitionExecution[]>();
 
   async createJobInstance(instance: JobInstance): Promise<JobInstance> {
     const stored = cloneJobInstance(instance);
@@ -109,6 +118,55 @@ export class InMemoryJobRepository implements JobRepository {
       .map(cloneStepExecution);
   }
 
+  async createPartitionExecution(execution: PartitionExecution): Promise<void> {
+    this.partitionExecutions.set(execution.stepExecutionId, [
+      ...(this.partitionExecutions.get(execution.stepExecutionId) ?? []),
+      clonePartitionExecution(execution)
+    ]);
+  }
+
+  async updatePartitionExecution(execution: PartitionExecution): Promise<void> {
+    const executions = this.partitionExecutions.get(execution.stepExecutionId) ?? [];
+    this.partitionExecutions.set(
+      execution.stepExecutionId,
+      executions.map((candidate) =>
+        candidate.id === execution.id ? clonePartitionExecution(execution) : candidate
+      )
+    );
+  }
+
+  async findPartitionExecutions(
+    stepExecutionId: BatchStepExecutionId
+  ): Promise<readonly PartitionExecution[]> {
+    return [...(this.partitionExecutions.get(stepExecutionId) ?? [])]
+      .sort(comparePartitionExecutionByCreatedAtAsc)
+      .map(clonePartitionExecution);
+  }
+
+  async claimPartitionExecution(
+    options: PartitionClaimOptions
+  ): Promise<PartitionExecution | undefined> {
+    const executions = this.partitionExecutions.get(options.stepExecutionId) ?? [];
+    const partition = [...executions]
+      .filter((candidate) => candidate.status === "created")
+      .sort(comparePartitionExecutionByCreatedAtAsc)[0];
+
+    if (!partition) {
+      return undefined;
+    }
+
+    const claimed: PartitionExecution = {
+      ...partition,
+      status: "running",
+      ownerId: options.ownerId,
+      startedAt: options.now
+    };
+
+    await this.updatePartitionExecution(claimed);
+
+    return clonePartitionExecution(claimed);
+  }
+
   private instanceKey(jobName: string, parametersHash: JobParametersHash): string {
     return `${jobName}:${parametersHash}`;
   }
@@ -125,6 +183,14 @@ const compareJobExecutionByCreatedAtDesc = (left: JobExecution, right: JobExecut
 };
 
 const compareStepExecutionByCreatedAtAsc = (left: StepExecution, right: StepExecution): number => {
+  const diff = left.createdAt.getTime() - right.createdAt.getTime();
+  return diff === 0 ? left.id.localeCompare(right.id) : diff;
+};
+
+const comparePartitionExecutionByCreatedAtAsc = (
+  left: PartitionExecution,
+  right: PartitionExecution
+): number => {
   const diff = left.createdAt.getTime() - right.createdAt.getTime();
   return diff === 0 ? left.id.localeCompare(right.id) : diff;
 };

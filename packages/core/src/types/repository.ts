@@ -1,5 +1,6 @@
-import type { BatchExecutionId, JobInstanceId, JobParametersHash } from "./common.js";
+import type { BatchExecutionId, BatchStepExecutionId, JobInstanceId, JobParametersHash } from "./common.js";
 import type { JobExecution, JobInstance, StepExecution } from "./execution.js";
+import type { PartitionClaimOptions, PartitionExecution } from "./partition.js";
 
 export interface JobExecutionAttempt {
   readonly instance: JobInstance;
@@ -21,6 +22,10 @@ export interface JobRepository {
   createStepExecution(execution: StepExecution): Promise<void>;
   updateStepExecution(execution: StepExecution): Promise<void>;
   findStepExecutions(jobExecutionId: BatchExecutionId): Promise<readonly StepExecution[]>;
+  createPartitionExecution(execution: PartitionExecution): Promise<void>;
+  updatePartitionExecution(execution: PartitionExecution): Promise<void>;
+  findPartitionExecutions(stepExecutionId: BatchStepExecutionId): Promise<readonly PartitionExecution[]>;
+  claimPartitionExecution(options: PartitionClaimOptions): Promise<PartitionExecution | undefined>;
 }
 
 export interface CheckpointStore {

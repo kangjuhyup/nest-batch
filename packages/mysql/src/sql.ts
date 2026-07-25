@@ -1,5 +1,10 @@
 import { Buffer } from "node:buffer";
-import type { JobExecutionStatus, JobParameters, StepExecutionStatus } from "@nest-batch/core";
+import type {
+  JobExecutionStatus,
+  JobParameters,
+  PartitionExecutionStatus,
+  StepExecutionStatus
+} from "@nest-batch/core";
 import type { MySqlBatchOptions } from "./options.js";
 
 const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -9,6 +14,7 @@ export interface MySqlTables {
   readonly jobInstances: string;
   readonly jobExecutions: string;
   readonly stepExecutions: string;
+  readonly partitionExecutions: string;
   readonly checkpoints: string;
   readonly locks: string;
 }
@@ -48,6 +54,23 @@ export interface MySqlStepExecutionRow {
   readonly failure_reason: unknown;
 }
 
+export interface MySqlPartitionExecutionRow {
+  readonly id: string;
+  readonly step_execution_id: string;
+  readonly step_name: string;
+  readonly status: string;
+  readonly partition: unknown;
+  readonly owner_id: unknown;
+  readonly read_count: unknown;
+  readonly write_count: unknown;
+  readonly skip_count: unknown;
+  readonly retry_count: unknown;
+  readonly created_at: unknown;
+  readonly started_at: unknown;
+  readonly ended_at: unknown;
+  readonly failure_reason: unknown;
+}
+
 export const createMySqlTables = (options: Pick<MySqlBatchOptions, "database" | "tablePrefix">): MySqlTables => {
   const tablePrefix = validateMySqlIdentifier(options.tablePrefix ?? DEFAULT_TABLE_PREFIX, "tablePrefix");
   const database = options.database ? validateMySqlIdentifier(options.database, "database") : undefined;
@@ -60,6 +83,7 @@ export const createMySqlTables = (options: Pick<MySqlBatchOptions, "database" | 
     jobInstances: qualify("job_instances"),
     jobExecutions: qualify("job_executions"),
     stepExecutions: qualify("step_executions"),
+    partitionExecutions: qualify("partition_executions"),
     checkpoints: qualify("checkpoints"),
     locks: qualify("locks")
   };
@@ -136,6 +160,10 @@ export const parseMySqlJobStatus = (value: unknown): JobExecutionStatus => {
 };
 
 export const parseMySqlStepStatus = (value: unknown): StepExecutionStatus => {
+  return parseMySqlJobStatus(value);
+};
+
+export const parseMySqlPartitionStatus = (value: unknown): PartitionExecutionStatus => {
   return parseMySqlJobStatus(value);
 };
 
