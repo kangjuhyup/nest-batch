@@ -106,11 +106,11 @@ context는 두 종류로 나눈다.
 
 **Produces:** checkpoint와 분리된 durable context 저장 contract 초안.
 
-- [ ] `ExecutionContextStore`를 별도 contract로 둘지, `JobRepository`에 포함할지 결정한다.
-- [ ] 저장 key를 `jobExecutionId + scope + name` 형태로 둘지, `stepExecutionId` 중심으로 둘지 결정한다.
-- [ ] `read`, `write`, `delete`, `merge` 중 필요한 최소 API를 정한다.
-- [ ] JSON-serializable 값만 허용하고 `undefined` 처리 규칙을 정한다.
-- [ ] checkpoint와 durable context의 책임 차이를 README 또는 docs에 설명할 기준을 정한다.
+- [x] `ExecutionContextStore`를 별도 contract로 둘지, `JobRepository`에 포함할지 결정한다.
+- [x] 저장 key를 `jobExecutionId + scope + name` 형태로 둘지, `stepExecutionId` 중심으로 둘지 결정한다.
+- [x] `read`, `write`, `delete`, `merge` 중 필요한 최소 API를 정한다.
+- [x] JSON-serializable 값만 허용하고 `undefined` 처리 규칙을 정한다.
+- [x] checkpoint와 durable context의 책임 차이를 README 또는 docs에 설명할 기준을 정한다.
 
 ## Task 6: In-memory Execution Context Store 구현
 
