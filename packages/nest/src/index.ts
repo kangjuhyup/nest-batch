@@ -5,6 +5,7 @@ export {
   BATCH_LOCK_MANAGER,
   BATCH_PROCESSOR_METADATA,
   BATCH_READER_METADATA,
+  BATCH_RUNNER,
   BATCH_STEP_METADATA,
   BATCH_WRITER_METADATA,
   NEST_BATCH_OPTIONS
@@ -19,3 +20,6 @@ export type {
 } from "./decorators.js";
 export { NestBatchModule } from "./module.js";
 export type { NestBatchModuleAsyncOptions, NestBatchModuleOptions } from "./module-options.js";
+export { NestBatchRegistry } from "./registry.js";
+export type { NestBatchComponent, NestBatchDiscoveredJob } from "./registry.js";
+export { NestBatchRunner } from "./runner.service.js";

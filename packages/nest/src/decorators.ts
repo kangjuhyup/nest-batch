@@ -38,7 +38,7 @@ const normalizeOptions = <TOptions extends { readonly name?: string }>(
 };
 
 export const BatchJob = (nameOrOptions?: string | BatchJobOptions): ClassDecorator =>
-  SetMetadata(BATCH_JOB_METADATA, normalizeOptions<BatchJobOptions>(nameOrOptions));
+  createBatchComponentDecorator<BatchJobOptions>(BATCH_JOB_METADATA, nameOrOptions);
 
 export const BatchStep = (nameOrOptions?: string | BatchStepOptions): MethodDecorator =>
   SetMetadata(BATCH_STEP_METADATA, normalizeOptions<BatchStepOptions>(nameOrOptions));

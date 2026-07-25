@@ -7,3 +7,4 @@ export const BATCH_WRITER_METADATA = Symbol("nest-batch:writer");
 export const BATCH_JOB_REPOSITORY = Symbol("nest-batch:job-repository");
 export const BATCH_CHECKPOINT_STORE = Symbol("nest-batch:checkpoint-store");
 export const BATCH_LOCK_MANAGER = Symbol("nest-batch:lock-manager");
+export const BATCH_RUNNER = Symbol("nest-batch:runner");

@@ -12,7 +12,10 @@ the same `JobInstance`, skip steps that already completed, and resume the failed
 step from its checkpoint. Chunk steps support processor/writer retry policy,
 processor skip policy, and `BatchObserver` lifecycle events. The CLI can run,
 retry, inspect, and list jobs when an application supplies storage and a job
-registry. Distributed workers and production scheduling are not implemented yet.
+registry. `@nest-batch/nest` can discover decorated job and batch component
+providers, expose a `BATCH_RUNNER` provider, and run discovered jobs through
+`NestBatchRunner`. Distributed workers and production scheduling are not
+implemented yet.
 
 ## Packages
 
@@ -268,6 +271,45 @@ const runner = new DefaultBatchRunner(storage, {
 현재 값은 `job.started`, `job.completed`, `job.failed`, `job.cancelled`,
 `step.started`, `step.completed`, `step.failed`, `step.cancelled`,
 `chunk.written`, `retry`, `item.skipped`입니다.
+
+## Nest Integration
+
+`NestBatchModule.forRoot()` wires `DatabaseBatchStorage`, repository,
+checkpoint, lock, the default `BATCH_RUNNER`, `NestBatchRegistry`, and
+`NestBatchRunner`. On application bootstrap, `NestBatchRegistry` discovers
+providers decorated with `@BatchJob`, `@BatchStep`, `@BatchReader`,
+`@BatchProcessor`, and `@BatchWriter`.
+
+```ts
+import { Module } from "@nestjs/common";
+import { NestBatchModule, BatchJob, BatchStep, NestBatchRunner } from "@nest-batch/nest";
+import { defineStep } from "@nest-batch/core";
+
+@BatchJob("daily-billing")
+class BillingJob {
+  @BatchStep("charge-accounts")
+  chargeAccounts() {
+    return defineStep({
+      name: "charge-accounts",
+      execute() {
+        return "charged";
+      }
+    });
+  }
+}
+
+@Module({
+  imports: [NestBatchModule.forRoot({ storage })],
+  providers: [BillingJob]
+})
+class AppModule {}
+
+await app.get(NestBatchRunner).run("daily-billing", { tenant: "acme" });
+```
+
+If you need a custom runner, pass `batchRunner` to `forRoot()` or
+`forRootAsync()`. `NestBatchRunner` uses the discovered job registry and applies
+module-level default run options from `runner` before per-call options.
 
 ## Operational CLI
 

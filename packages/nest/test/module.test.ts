@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { DatabaseBatchStorage } from "@nest-batch/core";
+import { DatabaseBatchStorage, DefaultBatchRunner } from "@nest-batch/core";
+import { DiscoveryModule } from "@nestjs/core";
 import {
   BATCH_CHECKPOINT_STORE,
   BATCH_JOB_REPOSITORY,
   BATCH_LOCK_MANAGER,
+  BATCH_RUNNER,
+  NestBatchRegistry,
   NestBatchModule,
+  NestBatchRunner,
   type NestBatchModuleOptions,
   NEST_BATCH_OPTIONS
 } from "../src/index.js";
@@ -17,6 +21,7 @@ describe("NestBatchModule / NestBatchModule", () => {
     const providers = dynamicModule.providers ?? [];
 
     expect(dynamicModule.module).toBe(NestBatchModule);
+    expect(dynamicModule.imports).toEqual([DiscoveryModule]);
     expect(findValueProvider(providers, NEST_BATCH_OPTIONS).useValue).toEqual({
       defaultTimeoutMs: 5000,
       storage
@@ -28,7 +33,10 @@ describe("NestBatchModule / NestBatchModule", () => {
         DatabaseBatchStorage,
         BATCH_JOB_REPOSITORY,
         BATCH_CHECKPOINT_STORE,
-        BATCH_LOCK_MANAGER
+        BATCH_LOCK_MANAGER,
+        BATCH_RUNNER,
+        NestBatchRegistry,
+        NestBatchRunner
       ])
     );
   });
@@ -49,9 +57,30 @@ describe("NestBatchModule / NestBatchModule", () => {
         expect.objectContaining({ provide: DatabaseBatchStorage, useValue: storage }),
         expect.objectContaining({ provide: BATCH_JOB_REPOSITORY }),
         expect.objectContaining({ provide: BATCH_CHECKPOINT_STORE }),
-        expect.objectContaining({ provide: BATCH_LOCK_MANAGER })
+        expect.objectContaining({ provide: BATCH_LOCK_MANAGER }),
+        NestBatchRegistry,
+        expect.objectContaining({ provide: BATCH_RUNNER }),
+        NestBatchRunner
       ])
     );
+  });
+
+  it("creates a default runner provider / 기본 runner provider를 생성한다", () => {
+    const storage = new FakeDatabaseBatchStorage();
+    const dynamicModule = NestBatchModule.forRoot({ storage });
+    const runnerProvider = findFactoryProvider(dynamicModule.providers ?? [], BATCH_RUNNER);
+
+    expect(runnerProvider.inject).toEqual([DatabaseBatchStorage, NEST_BATCH_OPTIONS]);
+    expect(runnerProvider.useFactory(storage, { storage })).toBeInstanceOf(DefaultBatchRunner);
+  });
+
+  it("uses a custom batch runner from options / option으로 custom batch runner를 사용한다", () => {
+    const storage = new FakeDatabaseBatchStorage();
+    const batchRunner = { run: async () => ({ status: "completed" }) };
+    const dynamicModule = NestBatchModule.forRoot({ storage, batchRunner });
+    const runnerProvider = findFactoryProvider(dynamicModule.providers ?? [], BATCH_RUNNER);
+
+    expect(runnerProvider.useFactory(storage, { storage, batchRunner })).toBe(batchRunner);
   });
 
   it("creates async module providers from storage options / storage option으로 async module provider를 생성한다", () => {
@@ -77,7 +106,10 @@ describe("NestBatchModule / NestBatchModule", () => {
         DatabaseBatchStorage,
         BATCH_JOB_REPOSITORY,
         BATCH_CHECKPOINT_STORE,
-        BATCH_LOCK_MANAGER
+        BATCH_LOCK_MANAGER,
+        BATCH_RUNNER,
+        NestBatchRegistry,
+        NestBatchRunner
       ])
     );
   });
@@ -90,7 +122,7 @@ describe("NestBatchModule / NestBatchModule", () => {
     });
     const optionsProvider = findFactoryProvider(dynamicModule.providers ?? [], NEST_BATCH_OPTIONS);
 
-    expect(dynamicModule.imports).toEqual([importedModule]);
+    expect(dynamicModule.imports).toEqual([DiscoveryModule, importedModule]);
     expect(optionsProvider.inject).toEqual([]);
   });
 });

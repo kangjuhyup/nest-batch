@@ -1,7 +1,9 @@
 import { Module } from "@nestjs/common";
 import type { DynamicModule } from "@nestjs/common";
+import { DiscoveryModule } from "@nestjs/core";
 import { NEST_BATCH_OPTIONS } from "./constants.js";
 import type { NestBatchModuleAsyncOptions, NestBatchModuleOptions } from "./module-options.js";
+import { createRuntimeProviders, NEST_BATCH_RUNTIME_EXPORTS } from "./runtime.providers.js";
 import {
   assertDatabaseBatchStorage,
   createAsyncStorageProviders,
@@ -17,30 +19,33 @@ export class NestBatchModule {
 
     return {
       module: NestBatchModule,
+      imports: [DiscoveryModule],
       providers: [
         {
           provide: NEST_BATCH_OPTIONS,
           useValue: options
         },
-        ...storageProviders
+        ...storageProviders,
+        ...createRuntimeProviders()
       ],
-      exports: [NEST_BATCH_OPTIONS, ...NEST_BATCH_STORAGE_EXPORTS]
+      exports: [NEST_BATCH_OPTIONS, ...NEST_BATCH_STORAGE_EXPORTS, ...NEST_BATCH_RUNTIME_EXPORTS]
     };
   }
 
   static forRootAsync(options: NestBatchModuleAsyncOptions): DynamicModule {
     return {
       module: NestBatchModule,
-      imports: options.imports,
+      imports: [DiscoveryModule, ...(options.imports ?? [])],
       providers: [
         {
           provide: NEST_BATCH_OPTIONS,
           useFactory: options.useFactory,
           inject: options.inject ?? []
         },
-        ...createAsyncStorageProviders()
+        ...createAsyncStorageProviders(),
+        ...createRuntimeProviders()
       ],
-      exports: [NEST_BATCH_OPTIONS, ...NEST_BATCH_STORAGE_EXPORTS]
+      exports: [NEST_BATCH_OPTIONS, ...NEST_BATCH_STORAGE_EXPORTS, ...NEST_BATCH_RUNTIME_EXPORTS]
     };
   }
 }

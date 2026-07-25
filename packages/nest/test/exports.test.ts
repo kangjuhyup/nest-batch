@@ -6,6 +6,7 @@ import {
   BATCH_LOCK_MANAGER,
   BATCH_PROCESSOR_METADATA,
   BATCH_READER_METADATA,
+  BATCH_RUNNER,
   BATCH_STEP_METADATA,
   BATCH_WRITER_METADATA,
   BatchJob,
@@ -13,7 +14,9 @@ import {
   BatchReader,
   BatchStep,
   BatchWriter,
+  NestBatchRegistry,
   NestBatchModule,
+  NestBatchRunner,
   NEST_BATCH_OPTIONS
 } from "../src/index.js";
 
@@ -28,11 +31,14 @@ describe("nest package exports / nest package export를 검증한다", () => {
     expect(typeof BATCH_JOB_REPOSITORY).toBe("symbol");
     expect(typeof BATCH_CHECKPOINT_STORE).toBe("symbol");
     expect(typeof BATCH_LOCK_MANAGER).toBe("symbol");
+    expect(typeof BATCH_RUNNER).toBe("symbol");
     expect(typeof BatchJob).toBe("function");
     expect(typeof BatchStep).toBe("function");
     expect(typeof BatchReader).toBe("function");
     expect(typeof BatchProcessor).toBe("function");
     expect(typeof BatchWriter).toBe("function");
+    expect(typeof NestBatchRegistry).toBe("function");
+    expect(typeof NestBatchRunner).toBe("function");
     expect(typeof NestBatchModule.forRoot).toBe("function");
     expect(typeof NestBatchModule.forRootAsync).toBe("function");
   });
@@ -44,5 +50,7 @@ describe("nest package exports / nest package export를 검증한다", () => {
     expect(publicApi).not.toHaveProperty("createStaticStorageProviders");
     expect(publicApi).not.toHaveProperty("createAsyncStorageProviders");
     expect(publicApi).not.toHaveProperty("NEST_BATCH_STORAGE_EXPORTS");
+    expect(publicApi).not.toHaveProperty("createRuntimeProviders");
+    expect(publicApi).not.toHaveProperty("NEST_BATCH_RUNTIME_EXPORTS");
   });
 });

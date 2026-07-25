@@ -13,8 +13,10 @@ driver-backed repository, checkpoint, lock storage의 초기 구현을 제공합
 checkpoint부터 재개합니다. chunk step은 processor/writer retry policy,
 processor skip policy, `BatchObserver` lifecycle event를 지원합니다. CLI는
 application이 storage와 job registry를 주입할 때 job 실행, 재시도, 상태 확인,
-목록 출력을 처리할 수 있습니다. distributed worker와 production scheduling은
-아직 구현되지 않았습니다.
+목록 출력을 처리할 수 있습니다. `@nest-batch/nest`는 decorator가 붙은 job과
+batch component provider를 발견하고, `BATCH_RUNNER` provider와
+`NestBatchRunner`를 통해 발견한 job을 실행할 수 있습니다. distributed worker와
+production scheduling은 아직 구현되지 않았습니다.
 
 ## Packages
 
@@ -274,6 +276,45 @@ const runner = new DefaultBatchRunner(storage, {
 현재 값은 `job.started`, `job.completed`, `job.failed`, `job.cancelled`,
 `step.started`, `step.completed`, `step.failed`, `step.cancelled`,
 `chunk.written`, `retry`, `item.skipped`입니다.
+
+## Nest Integration
+
+`NestBatchModule.forRoot()`는 `DatabaseBatchStorage`, repository, checkpoint,
+lock, 기본 `BATCH_RUNNER`, `NestBatchRegistry`, `NestBatchRunner`를 연결합니다.
+application bootstrap 시점에 `NestBatchRegistry`는 `@BatchJob`,
+`@BatchStep`, `@BatchReader`, `@BatchProcessor`, `@BatchWriter`가 붙은 provider를
+발견합니다.
+
+```ts
+import { Module } from "@nestjs/common";
+import { NestBatchModule, BatchJob, BatchStep, NestBatchRunner } from "@nest-batch/nest";
+import { defineStep } from "@nest-batch/core";
+
+@BatchJob("daily-billing")
+class BillingJob {
+  @BatchStep("charge-accounts")
+  chargeAccounts() {
+    return defineStep({
+      name: "charge-accounts",
+      execute() {
+        return "charged";
+      }
+    });
+  }
+}
+
+@Module({
+  imports: [NestBatchModule.forRoot({ storage })],
+  providers: [BillingJob]
+})
+class AppModule {}
+
+await app.get(NestBatchRunner).run("daily-billing", { tenant: "acme" });
+```
+
+custom runner가 필요하면 `forRoot()` 또는 `forRootAsync()`에 `batchRunner`를
+넘깁니다. `NestBatchRunner`는 발견된 job registry를 사용하고, module option의
+`runner` 기본 실행 option을 per-call option보다 먼저 적용합니다.
 
 ## Operational CLI
 
