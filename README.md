@@ -255,6 +255,68 @@ await storage.close();
 await runner.run(job, { tenant: "acme" }, { restart: true });
 ```
 
+## Runtime Context and Durable Context
+
+Tasklet and chunk callbacks receive a read-only runtime context for the current
+execution. It includes `jobName`, `jobExecutionId`, `stepName`,
+`stepExecutionId`, `parameters`, `signal`, `checkpoint`, `restart`, and
+`restartFromExecutionId` when the run is a restart.
+
+```ts
+const loadUsers = defineStep({
+  name: "load-users",
+  execute({ parameters, jobExecutionId, stepName, restart }) {
+    return {
+      tenant: String(parameters.tenant),
+      jobExecutionId,
+      stepName,
+      restart
+    };
+  }
+});
+
+const importUsers = defineChunkStep({
+  name: "import-users",
+  chunkSize: 100,
+  reader: {
+    open({ parameters, signal, checkpoint }) {
+      const tenant = String(parameters.tenant);
+
+      return {
+        async *[Symbol.asyncIterator]() {
+          signal.throwIfAborted();
+          yield { id: `${tenant}-user-1`, checkpoint };
+        }
+      };
+    }
+  },
+  processor: {
+    process(user, { parameters }) {
+      return { ...user, tenant: String(parameters.tenant) };
+    }
+  },
+  writer: {
+    async write(users, { jobExecutionId, stepName }) {
+      await saveUsers(users, { jobExecutionId, stepName });
+    }
+  }
+});
+```
+
+Checkpoint and durable execution context are separate concepts. A checkpoint is
+the safe reader cursor or chunk boundary that `DefaultBatchRunner` reads
+automatically when `restart: true` is used. Durable execution context is JSON
+metadata stored through `storage.executionContextStore`, keyed by
+`executionId`, `scope`, and `name`; use it for metadata that should be shared or
+restored separately from the reader cursor.
+
+On restart, the runner reads the failed execution checkpoint, exposes
+`restart: true` and `restartFromExecutionId` in callback context, and writes new
+checkpoints under the new execution id. Execution context rows remain scoped to
+their execution id, so copy or merge them to the new execution only at safe
+boundaries. Neither checkpoint nor execution context makes external writes
+exactly-once; writers should use idempotency keys or natural unique constraints.
+
 Runner lifecycle과 chunk 처리 이벤트는 `BatchObserver`로 받을 수 있습니다.
 
 ```ts
@@ -314,8 +376,8 @@ class BillingJob {
   chargeAccounts() {
     return defineStep({
       name: "charge-accounts",
-      execute() {
-        return "charged";
+      execute({ parameters, jobExecutionId }) {
+        return `charged ${String(parameters.tenant)} in ${jobExecutionId}`;
       }
     });
   }
@@ -391,7 +453,9 @@ export const job = defineJob({
 있습니다. `null`과 `undefined`는 유효한 output이며, 명시적 skip은 `skipItem()`으로
 표현합니다. `retryPolicy`는 processor와 writer 실패에 적용되고, `skipPolicy`는
 processor 실패 item을 건너뛰는 데만 적용됩니다. writer 실패 skip은 데이터 손실
-의미가 커서 아직 지원하지 않습니다. Reader helper별 예제는
+의미가 커서 아직 지원하지 않습니다. `reader`, `processor`, `writer` callback은
+같은 runtime context를 받아 `parameters`, execution id, `checkpoint`,
+`AbortSignal`을 참조할 수 있습니다. Reader helper별 예제는
 `docs/readers-kr.md`를 참고하세요.
 
 ```ts

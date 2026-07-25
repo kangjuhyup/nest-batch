@@ -173,10 +173,10 @@ context는 두 종류로 나눈다.
 
 **Produces:** 사용자가 context와 checkpoint를 혼동하지 않도록 하는 public 문서.
 
-- [ ] tasklet에서 `context.parameters`를 사용하는 예제를 추가한다.
-- [ ] chunk reader/processor/writer에서 runtime context를 사용하는 예제를 추가한다.
-- [ ] checkpoint와 durable execution context의 차이를 설명한다.
-- [ ] restart 시 context가 복원되는 범위와 writer idempotency 주의점을 문서화한다.
+- [x] tasklet에서 `context.parameters`를 사용하는 예제를 추가한다.
+- [x] chunk reader/processor/writer에서 runtime context를 사용하는 예제를 추가한다.
+- [x] checkpoint와 durable execution context의 차이를 설명한다.
+- [x] restart 시 context가 복원되는 범위와 writer idempotency 주의점을 문서화한다.
 
 ## Verification Matrix
 

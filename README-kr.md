@@ -260,6 +260,68 @@ await storage.close();
 await runner.run(job, { tenant: "acme" }, { restart: true });
 ```
 
+## Runtime Context와 Durable Context
+
+tasklet과 chunk callback은 현재 실행에 대한 read-only runtime context를 받습니다.
+여기에는 `jobName`, `jobExecutionId`, `stepName`, `stepExecutionId`,
+`parameters`, `signal`, `checkpoint`, `restart`, restart 실행일 때의
+`restartFromExecutionId`가 포함됩니다.
+
+```ts
+const loadUsers = defineStep({
+  name: "load-users",
+  execute({ parameters, jobExecutionId, stepName, restart }) {
+    return {
+      tenant: String(parameters.tenant),
+      jobExecutionId,
+      stepName,
+      restart
+    };
+  }
+});
+
+const importUsers = defineChunkStep({
+  name: "import-users",
+  chunkSize: 100,
+  reader: {
+    open({ parameters, signal, checkpoint }) {
+      const tenant = String(parameters.tenant);
+
+      return {
+        async *[Symbol.asyncIterator]() {
+          signal.throwIfAborted();
+          yield { id: `${tenant}-user-1`, checkpoint };
+        }
+      };
+    }
+  },
+  processor: {
+    process(user, { parameters }) {
+      return { ...user, tenant: String(parameters.tenant) };
+    }
+  },
+  writer: {
+    async write(users, { jobExecutionId, stepName }) {
+      await saveUsers(users, { jobExecutionId, stepName });
+    }
+  }
+});
+```
+
+checkpoint와 durable execution context는 다른 책임을 가집니다. checkpoint는
+`DefaultBatchRunner`가 `restart: true` 실행에서 자동으로 읽는 reader cursor 또는
+chunk 안전 경계입니다. durable execution context는
+`storage.executionContextStore`를 통해 저장하는 JSON metadata이며
+`executionId`, `scope`, `name`으로 식별합니다. reader cursor가 아닌 step 간 공유
+metadata나 별도 복원 대상 값을 저장할 때 사용합니다.
+
+restart 시 runner는 failed execution의 checkpoint를 읽고 callback context에
+`restart: true`, `restartFromExecutionId`를 넣은 뒤, 새 execution id로 checkpoint를
+다시 저장합니다. execution context row는 execution id에 묶여 있으므로 필요한 값만
+안전 경계에서 새 execution으로 copy 또는 merge해야 합니다. checkpoint나 execution
+context는 외부 write를 exactly-once로 만들지 않으므로 writer는 idempotency key나
+자연 unique constraint를 기준으로 idempotent하게 작성해야 합니다.
+
 Runner lifecycle과 chunk 처리 이벤트는 `BatchObserver`로 받을 수 있습니다.
 
 ```ts
@@ -319,8 +381,8 @@ class BillingJob {
   chargeAccounts() {
     return defineStep({
       name: "charge-accounts",
-      execute() {
-        return "charged";
+      execute({ parameters, jobExecutionId }) {
+        return `charged ${String(parameters.tenant)} in ${jobExecutionId}`;
       }
     });
   }
@@ -396,7 +458,9 @@ export const job = defineJob({
 있습니다. `null`과 `undefined`는 유효한 output이며, 명시적 skip은 `skipItem()`으로
 표현합니다. `retryPolicy`는 processor와 writer 실패에 적용되고, `skipPolicy`는
 processor 실패 item을 건너뛰는 데만 적용됩니다. writer 실패 skip은 데이터 손실
-의미가 커서 아직 지원하지 않습니다. Reader helper별 예제는
+의미가 커서 아직 지원하지 않습니다. `reader`, `processor`, `writer` callback은
+같은 runtime context를 받아 `parameters`, execution id, `checkpoint`,
+`AbortSignal`을 참조할 수 있습니다. Reader helper별 예제는
 `docs/readers-kr.md`를 참고하세요.
 
 ```ts
