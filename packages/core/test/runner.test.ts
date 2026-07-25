@@ -5,6 +5,7 @@ import {
   createJobInstanceId,
   defineChunkStep,
   defineJob,
+  definePartitionedStep,
   defineStep,
   hashJobParameters,
   skipItem
@@ -18,6 +19,8 @@ import type {
   LockAcquireOptions,
   LockHandle,
   LockManager,
+  PartitionClaimOptions,
+  PartitionExecution,
   StepExecution
 } from "../src/index.js";
 
@@ -31,9 +34,12 @@ class RecordingJobRepository implements JobRepository {
   }> = [];
   readonly createdSteps: StepExecution[] = [];
   readonly updatedSteps: StepExecution[] = [];
+  readonly createdPartitions: PartitionExecution[] = [];
+  readonly updatedPartitions: PartitionExecution[] = [];
   private readonly jobs = new Map<BatchExecutionId, JobExecution>();
   private readonly instances = new Map<string, JobInstance>();
   private readonly steps = new Map<BatchExecutionId, StepExecution[]>();
+  private readonly partitions = new Map<string, PartitionExecution[]>();
 
   async createJobInstance(instance: JobInstance): Promise<JobInstance> {
     this.createdInstances.push(instance);
@@ -113,8 +119,88 @@ class RecordingJobRepository implements JobRepository {
     return this.steps.get(jobExecutionId) ?? [];
   }
 
+  async createPartitionExecution(execution: PartitionExecution): Promise<void> {
+    this.createdPartitions.push(execution);
+    this.partitions.set(execution.stepExecutionId, [
+      ...(this.partitions.get(execution.stepExecutionId) ?? []),
+      execution
+    ]);
+  }
+
+  async updatePartitionExecution(execution: PartitionExecution): Promise<void> {
+    this.updatedPartitions.push(execution);
+    this.partitions.set(
+      execution.stepExecutionId,
+      (this.partitions.get(execution.stepExecutionId) ?? []).map((candidate) =>
+        candidate.id === execution.id ? execution : candidate
+      )
+    );
+  }
+
+  async findPartitionExecutions(stepExecutionId: string): Promise<readonly PartitionExecution[]> {
+    return this.partitions.get(stepExecutionId) ?? [];
+  }
+
+  async claimPartitionExecution(options: PartitionClaimOptions): Promise<PartitionExecution | undefined> {
+    const executions = this.partitions.get(options.stepExecutionId) ?? [];
+    const index = executions.findIndex((execution) => execution.status === "created");
+
+    if (index < 0) {
+      return undefined;
+    }
+
+    const execution = executions[index]!;
+    const claimed: PartitionExecution = {
+      ...execution,
+      status: "running",
+      ownerId: options.ownerId,
+      heartbeatAt: options.now,
+      claimExpiresAt: options.staleAfterMs
+        ? new Date(options.now.getTime() + options.staleAfterMs)
+        : undefined,
+      startedAt: execution.startedAt ?? options.now
+    };
+    this.updatedPartitions.push(claimed);
+    this.partitions.set(execution.stepExecutionId, [
+      ...executions.slice(0, index),
+      claimed,
+      ...executions.slice(index + 1)
+    ]);
+
+    return claimed;
+  }
+
+  async heartbeatPartitionExecution(): Promise<boolean> {
+    return false;
+  }
+
+  async completePartitionExecution(execution: PartitionExecution, ownerId: string): Promise<boolean> {
+    return this.updateOwnedPartitionExecution(execution, ownerId);
+  }
+
+  async failPartitionExecution(execution: PartitionExecution, ownerId: string): Promise<boolean> {
+    return this.updateOwnedPartitionExecution(execution, ownerId);
+  }
+
   private instanceKey(jobName: string, parametersHash: string): string {
     return `${jobName}:${parametersHash}`;
+  }
+
+  private async updateOwnedPartitionExecution(
+    execution: PartitionExecution,
+    ownerId: string
+  ): Promise<boolean> {
+    const stored = (this.partitions.get(execution.stepExecutionId) ?? []).find(
+      (candidate) => candidate.id === execution.id
+    );
+
+    if (!stored || stored.ownerId !== ownerId) {
+      return false;
+    }
+
+    await this.updatePartitionExecution(execution);
+
+    return true;
   }
 }
 
@@ -430,6 +516,186 @@ describe("default batch runner / 기본 batch runner", () => {
     await runner.run(job, {});
 
     expect(events).toEqual(["job.started", "step.started", "step.completed", "job.completed"]);
+  });
+
+  it("forwards current step callback contexts / 현재 step callback context를 전달한다", async () => {
+    const storage = new RecordingStorage();
+    storage.checkpointStore.set("context-execution", "load-context", { tasklet: true });
+    storage.checkpointStore.set("context-execution", "copy-context", { cursor: 1 });
+    const controller = new AbortController();
+    const contexts: Record<string, unknown[]> = {
+      tasklet: [],
+      reader: [],
+      processor: [],
+      retry: [],
+      skip: [],
+      writer: [],
+      checkpoint: [],
+      partition: []
+    };
+    let retryAttempts = 0;
+    const runner = new DefaultBatchRunner(storage, {
+      generateExecutionId: () => "context-execution",
+      generateStepExecutionId: ({ stepName }) => `context-execution:${stepName}`,
+      generateOwnerId: () => "worker-1"
+    });
+    const job = defineJob({
+      name: "context-job",
+      steps: [
+        defineStep({
+          name: "load-context",
+          execute(context) {
+            contexts.tasklet.push(context);
+            return "tasklet-output";
+          }
+        }),
+        defineChunkStep<string, string, { readonly cursor: number }>({
+          name: "copy-context",
+          chunkSize: 2,
+          reader: {
+            read(context) {
+              contexts.reader.push(context);
+              return ["retry", "skip", "ok"];
+            }
+          },
+          processor: {
+            process(item, context) {
+              contexts.processor.push(context);
+
+              if (item === "retry" && retryAttempts === 0) {
+                retryAttempts += 1;
+                throw new Error("retry once");
+              }
+
+              if (item === "skip") {
+                throw new Error("skip once");
+              }
+
+              return item.toUpperCase();
+            }
+          },
+          retryPolicy: {
+            canRetry(context) {
+              contexts.retry.push(context);
+              return context.item === "retry" && context.attempt === 1;
+            }
+          },
+          skipPolicy: {
+            canSkip(context) {
+              contexts.skip.push(context);
+              return context.item === "skip";
+            }
+          },
+          writer: {
+            write(_items, context) {
+              contexts.writer.push(context);
+            }
+          },
+          checkpoint(context) {
+            contexts.checkpoint.push(context);
+            return { cursor: context.readCount };
+          }
+        }),
+        definePartitionedStep({
+          name: "partition-context",
+          partitions: () => [{ shard: 0 }],
+          execute(_partition, context) {
+            contexts.partition.push(context);
+            return { readCount: 1, writeCount: 1 };
+          }
+        })
+      ]
+    });
+
+    const execution = await runner.run(job, { tenant: "acme" }, { signal: controller.signal });
+
+    expect(execution.status).toBe("completed");
+    expect(contexts.tasklet).toEqual([
+      {
+        input: undefined,
+        signal: controller.signal,
+        checkpoint: { tasklet: true }
+      }
+    ]);
+    expect(contexts.reader).toEqual([
+      {
+        signal: controller.signal,
+        checkpoint: { cursor: 1 }
+      }
+    ]);
+    expect(contexts.processor).toEqual([
+      expect.objectContaining({ item: "retry", index: 0, signal: controller.signal, checkpoint: { cursor: 1 } }),
+      expect.objectContaining({ item: "retry", index: 0, signal: controller.signal, checkpoint: { cursor: 1 } }),
+      expect.objectContaining({ item: "skip", index: 1, signal: controller.signal, checkpoint: { cursor: 1 } }),
+      expect.objectContaining({ item: "ok", index: 2, signal: controller.signal, checkpoint: { cursor: 1 } })
+    ]);
+    expect(contexts.retry).toEqual([
+      expect.objectContaining({
+        phase: "process",
+        item: "retry",
+        attempt: 1,
+        readCount: 1,
+        writeCount: 0,
+        skipCount: 0,
+        signal: controller.signal,
+        checkpoint: { cursor: 1 }
+      }),
+      expect.objectContaining({
+        phase: "process",
+        item: "skip",
+        attempt: 1,
+        readCount: 2,
+        writeCount: 0,
+        skipCount: 0,
+        signal: controller.signal,
+        checkpoint: { cursor: 1 }
+      })
+    ]);
+    expect(contexts.skip).toEqual([
+      expect.objectContaining({
+        phase: "process",
+        item: "skip",
+        readCount: 2,
+        writeCount: 0,
+        skipCount: 0,
+        signal: controller.signal,
+        checkpoint: { cursor: 1 }
+      })
+    ]);
+    expect(contexts.writer).toEqual([
+      {
+        attempt: 1,
+        chunkIndex: 0,
+        signal: controller.signal,
+        checkpoint: { cursor: 1 }
+      }
+    ]);
+    expect(contexts.checkpoint).toEqual([
+      expect.objectContaining({
+        executionId: "context-execution",
+        stepName: "copy-context",
+        chunkIndex: 0,
+        readCount: 3,
+        writeCount: 2,
+        skipCount: 1,
+        signal: controller.signal,
+        checkpoint: { cursor: 1 }
+      })
+    ]);
+    expect(contexts.partition).toEqual([
+      {
+        jobExecutionId: "context-execution",
+        stepExecutionId: "context-execution:partition-context",
+        partitionExecutionId: "context-execution:partition-context:partition:000000",
+        stepName: "partition-context",
+        partition: { shard: 0 },
+        signal: controller.signal
+      }
+    ]);
+
+    for (const context of Object.values(contexts).flat()) {
+      expect(context).not.toHaveProperty("parameters");
+    }
   });
 
   it("runs chained listeners on successful jobs / 성공한 job에서 chained listener를 실행한다", async () => {
