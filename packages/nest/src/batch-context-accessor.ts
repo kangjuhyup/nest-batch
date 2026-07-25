@@ -55,6 +55,10 @@ export class BatchContextAccessor {
     return parameters;
   }
 
+  getCheckpoint<TCheckpoint = unknown>(): TCheckpoint | undefined {
+    return this.getContext()?.checkpoint as TCheckpoint | undefined;
+  }
+
   getSignal(): AbortSignal | undefined {
     return this.getContext()?.signal;
   }

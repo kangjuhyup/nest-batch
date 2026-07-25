@@ -96,6 +96,7 @@ describe("NestBatchRegistry / NestBatchRegistry", () => {
       readonly jobExecutionId: string;
       readonly stepName: string;
       readonly parameters: BillingParameters;
+      readonly checkpoint: unknown;
       readonly signalAborted: boolean;
     }> = [];
 
@@ -119,6 +120,7 @@ describe("NestBatchRegistry / NestBatchRegistry", () => {
               jobExecutionId: accessorContext.jobExecutionId,
               stepName: accessorContext.stepName,
               parameters,
+              checkpoint: batchContext.getCheckpoint(),
               signalAborted: signal.aborted
             });
             receivedContexts.push({
@@ -167,6 +169,7 @@ describe("NestBatchRegistry / NestBatchRegistry", () => {
       const batchContext = app.get(BatchContextAccessor);
 
       expect(batchContext.getContext()).toBeUndefined();
+      expect(batchContext.getCheckpoint()).toBeUndefined();
       const execution = await runner.run(
         "daily-billing",
         { tenant: "acme" },
@@ -194,10 +197,12 @@ describe("NestBatchRegistry / NestBatchRegistry", () => {
           jobExecutionId: "nestjs-discovered-execution",
           stepName: "charge-accounts",
           parameters: { tenant: "acme" },
+          checkpoint: undefined,
           signalAborted: false
         }
       ]);
       expect(batchContext.getContext()).toBeUndefined();
+      expect(batchContext.getCheckpoint()).toBeUndefined();
     } finally {
       await app.close();
     }

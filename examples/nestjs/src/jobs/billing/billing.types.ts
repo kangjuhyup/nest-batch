@@ -13,6 +13,10 @@ export interface BillingCharge {
   readonly amount: number;
 }
 
+export interface BillingCheckpoint {
+  readonly nextIndex: number;
+}
+
 export type BillingJobParameters = JobParameters & {
   readonly tenant: string;
   readonly run?: string;
@@ -21,6 +25,6 @@ export type BillingJobParameters = JobParameters & {
 export type BillingStepDefinition = ChunkStepDefinition<
   BillingAccount,
   BillingCharge,
-  unknown,
+  BillingCheckpoint,
   BillingJobParameters
 >;

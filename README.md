@@ -410,8 +410,8 @@ await app.get(NestBatchRunner).run("daily-billing", { tenant: "acme" });
 
 Nest providers can also inject `BatchContextAccessor` instead of threading the
 runtime context through every method signature. The accessor is backed by
-`AsyncLocalStorage`, so `getRequiredParameters()` and `getRequiredSignal()` are
-available only while a batch callback is executing.
+`AsyncLocalStorage`, so `getRequiredParameters()`, `getCheckpoint()`, and
+`getRequiredSignal()` are available only while a batch callback is executing.
 
 ```ts
 import { Injectable } from "@nestjs/common";
@@ -423,10 +423,11 @@ class BillingService {
 
   chargeAccount() {
     const parameters = this.batchContext.getRequiredParameters();
+    const checkpoint = this.batchContext.getCheckpoint<{ nextIndex: number }>();
     const signal = this.batchContext.getRequiredSignal();
 
     signal.throwIfAborted();
-    return `charged ${String(parameters.tenant)}`;
+    return `charged ${String(parameters.tenant)} from ${checkpoint?.nextIndex ?? 0}`;
   }
 }
 ```

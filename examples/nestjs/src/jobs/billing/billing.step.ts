@@ -5,37 +5,46 @@ import { BatchContextAccessor, BatchProcessor, BatchReader, BatchWriter } from "
 import type {
   BillingAccount,
   BillingCharge,
+  BillingCheckpoint,
   BillingJobParameters,
   BillingStepDefinition
 } from "./billing.types.js";
 
 export const writtenCharges: BillingCharge[] = [];
 
-type BillingReader = Reader<BillingAccount, unknown, BillingJobParameters>;
-type BillingProcessor = Processor<BillingAccount, BillingCharge, unknown, BillingJobParameters>;
-type BillingWriter = Writer<BillingCharge, unknown, BillingJobParameters>;
-
 @BatchReader("charge-accounts-reader")
-export class ChargeAccountsReader implements BillingReader {
+export class ChargeAccountsReader implements Reader<BillingAccount, BillingCheckpoint, BillingJobParameters> {
   constructor(@Inject(BatchContextAccessor) private readonly batchContext: BatchContextAccessor) {}
 
-  open(): ReaderSession<BillingAccount> {
+  open(): ReaderSession<BillingAccount, BillingCheckpoint> {
     const parameters = this.batchContext.getRequiredParameters<BillingJobParameters>();
+    const checkpoint = this.batchContext.getCheckpoint<BillingCheckpoint>();
     const signal = this.batchContext.getRequiredSignal();
     const { tenant } = parameters;
+    const accounts: readonly BillingAccount[] = [
+      { id: `${tenant}-account-1`, tenant, status: "active", amount: 1200 },
+      { id: `${tenant}-account-2`, tenant, status: "paused", amount: 9900 }
+    ];
+    let nextIndex = checkpoint?.nextIndex ?? 0;
 
     return {
       async *[Symbol.asyncIterator]() {
-        signal.throwIfAborted();
-        yield { id: `${tenant}-account-1`, tenant, status: "active", amount: 1200 };
-        yield { id: `${tenant}-account-2`, tenant, status: "paused", amount: 9900 };
+        for (let index = nextIndex; index < accounts.length; index += 1) {
+          signal.throwIfAborted();
+          nextIndex = index + 1;
+          yield accounts[index]!;
+        }
+      },
+      checkpoint() {
+        return { nextIndex };
       }
     };
   }
 }
 
 @BatchProcessor("charge-accounts-processor")
-export class ChargeAccountsProcessor implements BillingProcessor {
+export class ChargeAccountsProcessor
+  implements Processor<BillingAccount, BillingCharge, BillingCheckpoint, BillingJobParameters> {
   constructor(@Inject(BatchContextAccessor) private readonly batchContext: BatchContextAccessor) {}
 
   process(account: BillingAccount) {
@@ -54,18 +63,18 @@ export class ChargeAccountsProcessor implements BillingProcessor {
 }
 
 @BatchWriter("billing-charge-writer")
-export class BillingChargeWriter implements BillingWriter {
+export class BillingChargeWriter implements Writer<BillingCharge, BillingCheckpoint, BillingJobParameters> {
   write(charges: readonly BillingCharge[]) {
     writtenCharges.push(...charges);
   }
 }
 
 export const createChargeAccountsStep = (
-  reader: BillingReader,
-  processor: BillingProcessor,
-  writer: BillingWriter
+  reader: ChargeAccountsReader,
+  processor: ChargeAccountsProcessor,
+  writer: BillingChargeWriter
 ): BillingStepDefinition =>
-  defineChunkStep({
+  defineChunkStep<BillingAccount, BillingCharge, BillingCheckpoint, BillingJobParameters>({
     name: "charge-accounts",
     chunkSize: 50,
     reader,

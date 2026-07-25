@@ -417,7 +417,7 @@ await app.get(NestBatchRunner).run("daily-billing", { tenant: "acme" });
 
 Nest provider에서는 모든 method signature로 runtime context를 전달하지 않고
 `BatchContextAccessor`를 주입해 사용할 수도 있습니다. accessor는
-`AsyncLocalStorage` 기반이므로 `getRequiredParameters()`와
+`AsyncLocalStorage` 기반이므로 `getRequiredParameters()`, `getCheckpoint()`,
 `getRequiredSignal()`은 batch callback 실행 중에만 사용할 수 있습니다.
 
 ```ts
@@ -430,10 +430,11 @@ class BillingService {
 
   chargeAccount() {
     const parameters = this.batchContext.getRequiredParameters();
+    const checkpoint = this.batchContext.getCheckpoint<{ nextIndex: number }>();
     const signal = this.batchContext.getRequiredSignal();
 
     signal.throwIfAborted();
-    return `charged ${String(parameters.tenant)}`;
+    return `charged ${String(parameters.tenant)} from ${checkpoint?.nextIndex ?? 0}`;
   }
 }
 ```
