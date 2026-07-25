@@ -1,12 +1,17 @@
 import type { SkipItem } from "../skip-item.js";
 import type { ChunkReader } from "../readers/reader.js";
-import type { BatchExecutionId } from "./common.js";
+import type { BatchExecutionId, JobParameters } from "./common.js";
+import type { StepRuntimeContext } from "./context.js";
 import type { PartitionedStepDefinition } from "./partitioned-step.js";
 
 export type ChunkFailurePhase = "read" | "process" | "write";
 
-export interface ChunkRetryContext<Input = unknown, Output = unknown, TCheckpoint = unknown>
-  extends ChunkStepExecutionContext<TCheckpoint> {
+export interface ChunkRetryContext<
+  Input = unknown,
+  Output = unknown,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> extends ChunkStepExecutionContext<TCheckpoint, Parameters> {
   readonly phase: ChunkFailurePhase;
   readonly error: unknown;
   readonly attempt: number;
@@ -17,8 +22,11 @@ export interface ChunkRetryContext<Input = unknown, Output = unknown, TCheckpoin
   readonly skipCount: number;
 }
 
-export interface ChunkSkipContext<Input = unknown, TCheckpoint = unknown>
-  extends ChunkStepExecutionContext<TCheckpoint> {
+export interface ChunkSkipContext<
+  Input = unknown,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> extends ChunkStepExecutionContext<TCheckpoint, Parameters> {
   readonly phase: "process";
   readonly error: unknown;
   readonly item: Input;
@@ -40,30 +48,49 @@ export interface SkipPolicy<Input = unknown, TCheckpoint = unknown> {
   canSkip(context: ChunkSkipContext<Input, TCheckpoint>): boolean | Promise<boolean>;
 }
 
-export interface StepExecutionContext<Input = unknown> {
+export interface TaskletStepExecutionContext<
+  Input = unknown,
+  Parameters extends JobParameters = JobParameters
+> extends Partial<StepRuntimeContext<Parameters>> {
   readonly input?: Input;
   readonly signal: AbortSignal;
   readonly checkpoint?: unknown;
 }
 
-export interface ChunkStepExecutionContext<TCheckpoint = unknown> {
+export type StepExecutionContext<
+  Input = unknown,
+  Parameters extends JobParameters = JobParameters
+> = TaskletStepExecutionContext<Input, Parameters>;
+
+export interface ChunkStepExecutionContext<
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> extends Partial<StepRuntimeContext<Parameters, TCheckpoint>> {
   readonly signal: AbortSignal;
   readonly checkpoint?: TCheckpoint;
 }
 
-export interface ChunkItemContext<Input = unknown, TCheckpoint = unknown>
-  extends ChunkStepExecutionContext<TCheckpoint> {
+export interface ChunkItemContext<
+  Input = unknown,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> extends ChunkStepExecutionContext<TCheckpoint, Parameters> {
   readonly item: Input;
   readonly index: number;
 }
 
-export interface ChunkWriteContext<TCheckpoint = unknown> extends ChunkStepExecutionContext<TCheckpoint> {
+export interface ChunkWriteContext<
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> extends ChunkStepExecutionContext<TCheckpoint, Parameters> {
   readonly chunkIndex: number;
   readonly attempt: number;
 }
 
-export interface ChunkCheckpointContext<TCheckpoint = unknown>
-  extends ChunkStepExecutionContext<TCheckpoint> {
+export interface ChunkCheckpointContext<
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> extends ChunkStepExecutionContext<TCheckpoint, Parameters> {
   readonly executionId: BatchExecutionId;
   readonly stepName: string;
   readonly chunkIndex: number;
@@ -90,7 +117,7 @@ export type ChunkWriter<Output, TCheckpoint = unknown> = Writer<Output, TCheckpo
 export interface TaskletStepDefinition<Input = unknown, Output = unknown> {
   readonly kind?: "tasklet";
   readonly name: string;
-  readonly execute: (context: StepExecutionContext<Input>) => Promise<Output> | Output;
+  readonly execute: (context: TaskletStepExecutionContext<Input>) => Promise<Output> | Output;
 }
 
 export interface ChunkStepDefinition<Input = unknown, Output = Input, TCheckpoint = unknown> {

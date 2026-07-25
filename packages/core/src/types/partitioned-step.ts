@@ -1,4 +1,6 @@
 import type { BatchExecutionId, BatchStepExecutionId } from "./common.js";
+import type { JobParameters } from "./common.js";
+import type { StepRuntimeContext } from "./context.js";
 import type { PartitionExecutionId } from "./partition.js";
 
 export interface PartitionExecutionResult {
@@ -8,7 +10,10 @@ export interface PartitionExecutionResult {
   readonly retryCount?: number;
 }
 
-export interface PartitionExecutionContext<TPartition = unknown> {
+export interface PartitionExecutionContext<
+  TPartition = unknown,
+  Parameters extends JobParameters = JobParameters
+> extends Partial<StepRuntimeContext<Parameters>> {
   readonly jobExecutionId: BatchExecutionId;
   readonly stepExecutionId: BatchStepExecutionId;
   readonly partitionExecutionId: PartitionExecutionId;

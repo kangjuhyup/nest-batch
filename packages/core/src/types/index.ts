@@ -1,4 +1,5 @@
 export type * from "./common.js";
+export type * from "./context.js";
 export type * from "./execution-engine.js";
 export type * from "./execution.js";
 export type * from "./job.js";

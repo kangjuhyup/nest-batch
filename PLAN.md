@@ -56,11 +56,11 @@ context는 두 종류로 나눈다.
 
 **Produces:** public context contract.
 
-- [ ] `JobRuntimeContext<Parameters>` 타입을 추가한다.
-- [ ] `StepRuntimeContext<Parameters, TCheckpoint>` 타입을 추가한다.
-- [ ] `TaskletStepExecutionContext`, `ChunkStepExecutionContext`, `PartitionExecutionContext`가 공통 runtime context를 확장하게 정리한다.
-- [ ] context에 포함할 최소 필드를 확정한다: `jobName`, `jobExecutionId`, `stepName`, `stepExecutionId`, `parameters`, `signal`, `checkpoint`, `restart`.
-- [ ] `stepIndex`는 public context에 노출할지 내부 runner 전용으로 유지할지 결정한다.
+- [x] `JobRuntimeContext<Parameters>` 타입을 추가한다.
+- [x] `StepRuntimeContext<Parameters, TCheckpoint>` 타입을 추가한다.
+- [x] `TaskletStepExecutionContext`, `ChunkStepExecutionContext`, `PartitionExecutionContext`가 공통 runtime context를 확장하게 정리한다.
+- [x] context에 포함할 최소 필드를 확정한다: `jobName`, `jobExecutionId`, `stepName`, `stepExecutionId`, `parameters`, `signal`, `checkpoint`, `restart`.
+- [x] `stepIndex`는 public context에 노출할지 내부 runner 전용으로 유지할지 결정한다.
 
 ## Task 3: Runner에서 Context 생성과 전달 구현
 
