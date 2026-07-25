@@ -121,9 +121,9 @@ context는 두 종류로 나눈다.
 
 **Produces:** core runtime 테스트에서 사용할 durable context store.
 
-- [ ] `InMemoryExecutionContextStore`를 추가한다.
-- [ ] restart 시 이전 failed execution context를 읽고 새 execution에서 이어 쓸 수 있는지 테스트한다.
-- [ ] context 값이 checkpoint와 독립적으로 삭제/갱신되는지 테스트한다.
+- [x] `InMemoryExecutionContextStore`를 추가한다.
+- [x] restart 시 이전 failed execution context를 읽고 새 execution에서 이어 쓸 수 있는지 테스트한다.
+- [x] context 값이 checkpoint와 독립적으로 삭제/갱신되는지 테스트한다.
 
 ## Task 7: SQL Execution Context Store 구현
 
