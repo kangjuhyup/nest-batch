@@ -33,9 +33,13 @@ const assertMaxConcurrency = (maxConcurrency: number | undefined): void => {
   }
 };
 
-export const defineStep = <Input = unknown, Output = unknown>(
-  definition: TaskletStepDefinition<Input, Output>
-): TaskletStepDefinition<Input, Output> => {
+export const defineStep = <
+  Input = unknown,
+  Output = unknown,
+  Parameters extends JobParameters = JobParameters
+>(
+  definition: TaskletStepDefinition<Input, Output, Parameters>
+): TaskletStepDefinition<Input, Output, Parameters> => {
   assertName("Step", definition.name);
 
   return Object.freeze({
@@ -44,9 +48,12 @@ export const defineStep = <Input = unknown, Output = unknown>(
   });
 };
 
-export const definePartitionedStep = <TPartition = unknown>(
-  definition: PartitionedStepOptions<TPartition>
-): PartitionedStepDefinition<TPartition> => {
+export const definePartitionedStep = <
+  TPartition = unknown,
+  Parameters extends JobParameters = JobParameters
+>(
+  definition: PartitionedStepOptions<TPartition, Parameters>
+): PartitionedStepDefinition<TPartition, Parameters> => {
   assertName("Step", definition.name);
   assertMaxConcurrency(definition.maxConcurrency);
 
@@ -57,17 +64,31 @@ export const definePartitionedStep = <TPartition = unknown>(
   });
 };
 
-export function defineChunkStep<Input = unknown, TCheckpoint = unknown>(
-  definition: ChunkStepWithoutProcessorOptions<Input, TCheckpoint>
-): ChunkStepDefinition<Input, Input, TCheckpoint>;
+export function defineChunkStep<
+  Input = unknown,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+>(
+  definition: ChunkStepWithoutProcessorOptions<Input, TCheckpoint, Parameters>
+): ChunkStepDefinition<Input, Input, TCheckpoint, Parameters>;
 
-export function defineChunkStep<Input = unknown, Output = unknown, TCheckpoint = unknown>(
-  definition: ChunkStepWithProcessorOptions<Input, Output, TCheckpoint>
-): ChunkStepDefinition<Input, Output, TCheckpoint>;
+export function defineChunkStep<
+  Input = unknown,
+  Output = unknown,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+>(
+  definition: ChunkStepWithProcessorOptions<Input, Output, TCheckpoint, Parameters>
+): ChunkStepDefinition<Input, Output, TCheckpoint, Parameters>;
 
-export function defineChunkStep<Input = unknown, Output = Input, TCheckpoint = unknown>(
-  definition: ChunkStepOptions<Input, Output, TCheckpoint>
-): ChunkStepDefinition<Input, Output, TCheckpoint> {
+export function defineChunkStep<
+  Input = unknown,
+  Output = Input,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+>(
+  definition: ChunkStepOptions<Input, Output, TCheckpoint, Parameters>
+): ChunkStepDefinition<Input, Output, TCheckpoint, Parameters> {
   assertName("Step", definition.name);
   assertChunkSize(definition.chunkSize);
 
@@ -76,7 +97,7 @@ export function defineChunkStep<Input = unknown, Output = Input, TCheckpoint = u
     kind: "chunk" as const,
     name: definition.name.trim(),
     reader: normalizeReader(definition.reader)
-  }) as ChunkStepDefinition<Input, Output, TCheckpoint>;
+  }) as ChunkStepDefinition<Input, Output, TCheckpoint, Parameters>;
 }
 
 export const defineJob = <Parameters extends JobParameters = JobParameters>(

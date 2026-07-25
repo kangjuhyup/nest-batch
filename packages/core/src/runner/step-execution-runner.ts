@@ -8,6 +8,7 @@ import type {
   BatchExecutionId,
   BatchStepExecutionId,
   DatabaseBatchStorage,
+  JobParameters,
   StepExecution
 } from "../types/index.js";
 import type { StepRunContext, StepRunResult } from "./step-run-context.js";
@@ -22,9 +23,9 @@ export interface StepExecutionRunnerOptions {
   readonly now: () => Date;
 }
 
-export const runStepExecution = async (
-  step: AnyStepDefinition,
-  context: StepRunContext,
+export const runStepExecution = async <Parameters extends JobParameters>(
+  step: AnyStepDefinition<Parameters>,
+  context: StepRunContext<Parameters>,
   options: StepExecutionRunnerOptions
 ): Promise<StepRunResult> => {
   const { storage } = options;

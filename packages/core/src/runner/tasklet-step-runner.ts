@@ -1,4 +1,4 @@
-import type { CheckpointStore, TaskletStepDefinition } from "../types/index.js";
+import type { CheckpointStore, JobParameters, TaskletStepDefinition } from "../types/index.js";
 import { requireSignal } from "./signals.js";
 import {
   createStepRuntimeContext,
@@ -6,9 +6,13 @@ import {
   type StepRunResult
 } from "./step-run-context.js";
 
-export const runTaskletStep = async <Input = unknown, Output = unknown>(
-  step: TaskletStepDefinition<Input, Output>,
-  context: ActiveStepRunContext,
+export const runTaskletStep = async <
+  Input = unknown,
+  Output = unknown,
+  Parameters extends JobParameters = JobParameters
+>(
+  step: TaskletStepDefinition<Input, Output, Parameters>,
+  context: ActiveStepRunContext<Parameters>,
   checkpointStore: CheckpointStore
 ): Promise<StepRunResult> => {
   const checkpoint = await checkpointStore.read(context.checkpointExecutionId, step.name);

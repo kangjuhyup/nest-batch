@@ -13,7 +13,7 @@ export interface PartitionExecutionResult {
 export interface PartitionExecutionContext<
   TPartition = unknown,
   Parameters extends JobParameters = JobParameters
-> extends Partial<StepRuntimeContext<Parameters>> {
+> extends StepRuntimeContext<Parameters> {
   readonly jobExecutionId: BatchExecutionId;
   readonly stepExecutionId: BatchStepExecutionId;
   readonly partitionExecutionId: PartitionExecutionId;
@@ -22,18 +22,24 @@ export interface PartitionExecutionContext<
   readonly signal: AbortSignal;
 }
 
-export interface PartitionedStepDefinition<TPartition = unknown> {
+export interface PartitionedStepDefinition<
+  TPartition = unknown,
+  Parameters extends JobParameters = JobParameters
+> {
   readonly kind: "partitioned";
   readonly name: string;
   readonly maxConcurrency?: number;
   readonly partitions: () => readonly TPartition[] | Promise<readonly TPartition[]>;
   readonly execute: (
     partition: TPartition,
-    context: PartitionExecutionContext<TPartition>
+    context: PartitionExecutionContext<TPartition, Parameters>
   ) => Promise<PartitionExecutionResult | void> | PartitionExecutionResult | void;
 }
 
-export type PartitionedStepOptions<TPartition = unknown> = Omit<
-  PartitionedStepDefinition<TPartition>,
+export type PartitionedStepOptions<
+  TPartition = unknown,
+  Parameters extends JobParameters = JobParameters
+> = Omit<
+  PartitionedStepDefinition<TPartition, Parameters>,
   "kind"
 >;

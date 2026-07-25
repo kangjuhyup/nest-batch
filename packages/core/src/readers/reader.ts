@@ -1,3 +1,4 @@
+import type { JobParameters } from "../types/common.js";
 import type { ChunkStepExecutionContext } from "../types/step.js";
 import { createReader, isReaderDefinition, type ReaderDefinition } from "./definition-reader.js";
 
@@ -6,24 +7,40 @@ export interface ReaderSession<Item, TCheckpoint = unknown> extends AsyncIterabl
   close?(): void | Promise<void>;
 }
 
-export interface Reader<Item, TCheckpoint = unknown> {
+export interface Reader<
+  Item,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> {
   open(
-    context: ChunkStepExecutionContext<TCheckpoint>
+    context: ChunkStepExecutionContext<TCheckpoint, Parameters>
   ): ReaderSession<Item, TCheckpoint> | Promise<ReaderSession<Item, TCheckpoint>>;
 }
 
-export interface LegacyReader<Item, TCheckpoint = unknown> {
-  read(context: ChunkStepExecutionContext<TCheckpoint>): AsyncIterable<Item> | Iterable<Item>;
+export interface LegacyReader<
+  Item,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> {
+  read(context: ChunkStepExecutionContext<TCheckpoint, Parameters>): AsyncIterable<Item> | Iterable<Item>;
 }
 
-export type ChunkReader<Item, TCheckpoint = unknown> =
-  | Reader<Item, TCheckpoint>
-  | LegacyReader<Item, TCheckpoint>
+export type ChunkReader<
+  Item,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> =
+  | Reader<Item, TCheckpoint, Parameters>
+  | LegacyReader<Item, TCheckpoint, Parameters>
   | ReaderDefinition<Item, TCheckpoint>;
 
-export const openReader = async <Item, TCheckpoint = unknown>(
-  reader: ChunkReader<Item, TCheckpoint>,
-  context: ChunkStepExecutionContext<TCheckpoint>
+export const openReader = async <
+  Item,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+>(
+  reader: ChunkReader<Item, TCheckpoint, Parameters>,
+  context: ChunkStepExecutionContext<TCheckpoint, Parameters>
 ): Promise<ReaderSession<Item, TCheckpoint>> => {
   if (isReaderDefinition(reader)) {
     return createReader(reader).open(context);
@@ -67,8 +84,12 @@ export const createIterableSession = <Item, TCheckpoint = unknown>(
   }
 });
 
-const isSessionReader = <Item, TCheckpoint>(
-  reader: ChunkReader<Item, TCheckpoint>
-): reader is Reader<Item, TCheckpoint> => {
+const isSessionReader = <
+  Item,
+  TCheckpoint,
+  Parameters extends JobParameters
+>(
+  reader: ChunkReader<Item, TCheckpoint, Parameters>
+): reader is Reader<Item, TCheckpoint, Parameters> => {
   return "open" in reader && typeof reader.open === "function";
 };

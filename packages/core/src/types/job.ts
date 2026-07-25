@@ -23,7 +23,7 @@ export interface BatchEventListenerRegistration<Event extends BatchEvent = Batch
 
 export interface JobDefinition<Parameters extends JobParameters = JobParameters> {
   readonly name: string;
-  readonly steps: readonly AnyStepDefinition[];
+  readonly steps: readonly AnyStepDefinition<Parameters>[];
   readonly parametersSchema?: (parameters: unknown) => Parameters;
   readonly listeners?: readonly BatchEventListenerRegistration[];
 }

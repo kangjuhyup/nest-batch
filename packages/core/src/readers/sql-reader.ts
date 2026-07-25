@@ -100,11 +100,9 @@ export const createSqlCursorReader = <
 ): SqlCursorReader<Item, Cursor, TCheckpoint> => {
   validatePositiveInteger(options.pageSize, "pageSize");
   const cursorOptions: CursorReaderOptions<Item, Cursor, TCheckpoint> = {
-    fetch({ cursor, signal, checkpoint }) {
+    fetch(context) {
       return options.query({
-        signal,
-        checkpoint,
-        cursor,
+        ...context,
         pageSize: options.pageSize
       });
     },

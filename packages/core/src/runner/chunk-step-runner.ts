@@ -5,6 +5,7 @@ import type {
   ChunkRetryContext,
   ChunkSkipContext,
   ChunkStepDefinition,
+  JobParameters,
   RetryPolicy,
   SkipPolicy
 } from "../types/index.js";
@@ -17,9 +18,14 @@ import {
   type StepRunResult
 } from "./step-run-context.js";
 
-export const runChunkStep = async <Input, Output, TCheckpoint>(
-  step: ChunkStepDefinition<Input, Output, TCheckpoint>,
-  context: ActiveStepRunContext,
+export const runChunkStep = async <
+  Input,
+  Output,
+  TCheckpoint,
+  Parameters extends JobParameters = JobParameters
+>(
+  step: ChunkStepDefinition<Input, Output, TCheckpoint, Parameters>,
+  context: ActiveStepRunContext<Parameters>,
   checkpointStore: CheckpointStore
 ): Promise<StepRunResult> => {
   let checkpoint = await checkpointStore.read<TCheckpoint>(context.checkpointExecutionId, step.name);
@@ -65,7 +71,7 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
 
         return { skipped: false, output: processed as Output };
       } catch (error) {
-        const retryContext: ChunkRetryContext<Input, Output, TCheckpoint> = {
+        const retryContext: ChunkRetryContext<Input, Output, TCheckpoint, Parameters> = {
           ...createRuntimeContext(),
           phase: "process",
           error,
@@ -128,7 +134,7 @@ export const runChunkStep = async <Input, Output, TCheckpoint>(
         });
         return;
       } catch (error) {
-        const retryContext: ChunkRetryContext<Input, Output, TCheckpoint> = {
+        const retryContext: ChunkRetryContext<Input, Output, TCheckpoint, Parameters> = {
           ...createRuntimeContext(),
           phase: "write",
           error,
@@ -285,23 +291,37 @@ class ChunkReadFailure extends Error {
   }
 }
 
-const shouldRetry = async <Input, Output, TCheckpoint>(
-  policy: RetryPolicy<Input, Output, TCheckpoint> | undefined,
-  context: ChunkRetryContext<Input, Output, TCheckpoint>
+const shouldRetry = async <
+  Input,
+  Output,
+  TCheckpoint,
+  Parameters extends JobParameters
+>(
+  policy: RetryPolicy<Input, Output, TCheckpoint, Parameters> | undefined,
+  context: ChunkRetryContext<Input, Output, TCheckpoint, Parameters>
 ): Promise<boolean> => {
   return policy ? await policy.canRetry(context) : false;
 };
 
-const shouldSkip = async <Input, TCheckpoint>(
-  policy: SkipPolicy<Input, TCheckpoint> | undefined,
-  context: ChunkSkipContext<Input, TCheckpoint>
+const shouldSkip = async <
+  Input,
+  TCheckpoint,
+  Parameters extends JobParameters
+>(
+  policy: SkipPolicy<Input, TCheckpoint, Parameters> | undefined,
+  context: ChunkSkipContext<Input, TCheckpoint, Parameters>
 ): Promise<boolean> => {
   return policy ? await policy.canSkip(context) : false;
 };
 
-const backoff = async <Input, Output, TCheckpoint>(
-  policy: RetryPolicy<Input, Output, TCheckpoint> | undefined,
-  context: ChunkRetryContext<Input, Output, TCheckpoint>,
+const backoff = async <
+  Input,
+  Output,
+  TCheckpoint,
+  Parameters extends JobParameters
+>(
+  policy: RetryPolicy<Input, Output, TCheckpoint, Parameters> | undefined,
+  context: ChunkRetryContext<Input, Output, TCheckpoint, Parameters>,
   signal: AbortSignal
 ): Promise<void> => {
   const backoffMs = policy?.backoffMs ? await policy.backoffMs(context) : 0;

@@ -92,10 +92,10 @@ context는 두 종류로 나눈다.
 
 **Produces:** job parameters 타입이 step context까지 자연스럽게 이어진다.
 
-- [ ] `JobDefinition<Parameters>`의 `Parameters` 타입을 step context로 전달할 수 있는 generic 구조를 검토한다.
-- [ ] 기존 `defineStep<Input, Output>()`, `defineChunkStep<Input, Output, TCheckpoint>()` 호출이 과도하게 복잡해지지 않게 overload를 유지한다.
-- [ ] 사용자가 명시 타입을 주지 않아도 기본 `JobParameters`로 동작하게 한다.
-- [ ] public export 변경 후 `tsc -b`로 downstream 타입 오류를 확인한다.
+- [x] `JobDefinition<Parameters>`의 `Parameters` 타입을 step context로 전달할 수 있는 generic 구조를 검토한다.
+- [x] 기존 `defineStep<Input, Output>()`, `defineChunkStep<Input, Output, TCheckpoint>()` 호출이 과도하게 복잡해지지 않게 overload를 유지한다.
+- [x] 사용자가 명시 타입을 주지 않아도 기본 `JobParameters`로 동작하게 한다.
+- [x] public export 변경 후 `tsc -b`로 downstream 타입 오류를 확인한다.
 
 ## Task 5: Durable Execution Context Contract 설계
 

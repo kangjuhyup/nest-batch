@@ -35,23 +35,32 @@ export interface ChunkSkipContext<
   readonly skipCount: number;
 }
 
-export interface RetryPolicy<Input = unknown, Output = unknown, TCheckpoint = unknown> {
+export interface RetryPolicy<
+  Input = unknown,
+  Output = unknown,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> {
   canRetry(
-    context: ChunkRetryContext<Input, Output, TCheckpoint>
+    context: ChunkRetryContext<Input, Output, TCheckpoint, Parameters>
   ): boolean | Promise<boolean>;
   backoffMs?(
-    context: ChunkRetryContext<Input, Output, TCheckpoint>
+    context: ChunkRetryContext<Input, Output, TCheckpoint, Parameters>
   ): number | Promise<number>;
 }
 
-export interface SkipPolicy<Input = unknown, TCheckpoint = unknown> {
-  canSkip(context: ChunkSkipContext<Input, TCheckpoint>): boolean | Promise<boolean>;
+export interface SkipPolicy<
+  Input = unknown,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> {
+  canSkip(context: ChunkSkipContext<Input, TCheckpoint, Parameters>): boolean | Promise<boolean>;
 }
 
 export interface TaskletStepExecutionContext<
   Input = unknown,
   Parameters extends JobParameters = JobParameters
-> extends Partial<StepRuntimeContext<Parameters>> {
+> extends StepRuntimeContext<Parameters> {
   readonly input?: Input;
   readonly signal: AbortSignal;
   readonly checkpoint?: unknown;
@@ -65,7 +74,7 @@ export type StepExecutionContext<
 export interface ChunkStepExecutionContext<
   TCheckpoint = unknown,
   Parameters extends JobParameters = JobParameters
-> extends Partial<StepRuntimeContext<Parameters, TCheckpoint>> {
+> extends StepRuntimeContext<Parameters, TCheckpoint> {
   readonly signal: AbortSignal;
   readonly checkpoint?: TCheckpoint;
 }
@@ -99,62 +108,107 @@ export interface ChunkCheckpointContext<
   readonly skipCount: number;
 }
 
-export interface Processor<Input, Output, TCheckpoint = unknown> {
+export interface Processor<
+  Input,
+  Output,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> {
   process(
     item: Input,
-    context: ChunkItemContext<Input, TCheckpoint>
+    context: ChunkItemContext<Input, TCheckpoint, Parameters>
   ): Output | SkipItem | Promise<Output | SkipItem>;
 }
 
-export interface Writer<Output, TCheckpoint = unknown> {
-  write(items: readonly Output[], context: ChunkWriteContext<TCheckpoint>): Promise<void> | void;
+export interface Writer<
+  Output,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> {
+  write(items: readonly Output[], context: ChunkWriteContext<TCheckpoint, Parameters>): Promise<void> | void;
 }
 
-export type ChunkProcessor<Input, Output, TCheckpoint = unknown> = Processor<Input, Output, TCheckpoint>;
+export type ChunkProcessor<
+  Input,
+  Output,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> = Processor<Input, Output, TCheckpoint, Parameters>;
 
-export type ChunkWriter<Output, TCheckpoint = unknown> = Writer<Output, TCheckpoint>;
+export type ChunkWriter<
+  Output,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> = Writer<Output, TCheckpoint, Parameters>;
 
-export interface TaskletStepDefinition<Input = unknown, Output = unknown> {
+export interface TaskletStepDefinition<
+  Input = unknown,
+  Output = unknown,
+  Parameters extends JobParameters = JobParameters
+> {
   readonly kind?: "tasklet";
   readonly name: string;
-  readonly execute: (context: TaskletStepExecutionContext<Input>) => Promise<Output> | Output;
+  readonly execute: (context: TaskletStepExecutionContext<Input, Parameters>) => Promise<Output> | Output;
 }
 
-export interface ChunkStepDefinition<Input = unknown, Output = Input, TCheckpoint = unknown> {
+export interface ChunkStepDefinition<
+  Input = unknown,
+  Output = Input,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> {
   readonly kind: "chunk";
   readonly name: string;
   readonly chunkSize: number;
-  readonly reader: ChunkReader<Input, TCheckpoint>;
-  readonly processor?: ChunkProcessor<Input, Output, TCheckpoint>;
-  readonly writer: ChunkWriter<Output, TCheckpoint>;
-  readonly retryPolicy?: RetryPolicy<Input, Output, TCheckpoint>;
-  readonly skipPolicy?: SkipPolicy<Input, TCheckpoint>;
+  readonly reader: ChunkReader<Input, TCheckpoint, Parameters>;
+  readonly processor?: ChunkProcessor<Input, Output, TCheckpoint, Parameters>;
+  readonly writer: ChunkWriter<Output, TCheckpoint, Parameters>;
+  readonly retryPolicy?: RetryPolicy<Input, Output, TCheckpoint, Parameters>;
+  readonly skipPolicy?: SkipPolicy<Input, TCheckpoint, Parameters>;
   readonly checkpoint?: (
-    context: ChunkCheckpointContext<TCheckpoint>
+    context: ChunkCheckpointContext<TCheckpoint, Parameters>
   ) => Promise<TCheckpoint | undefined> | TCheckpoint | undefined;
 }
 
-export type ChunkStepWithoutProcessorOptions<Input = unknown, TCheckpoint = unknown> = Omit<
-  ChunkStepDefinition<Input, Input, TCheckpoint>,
+export type ChunkStepWithoutProcessorOptions<
+  Input = unknown,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> = Omit<
+  ChunkStepDefinition<Input, Input, TCheckpoint, Parameters>,
   "kind" | "processor"
 > & {
   readonly processor?: undefined;
 };
 
-export type ChunkStepWithProcessorOptions<Input = unknown, Output = unknown, TCheckpoint = unknown> = Omit<
-  ChunkStepDefinition<Input, Output, TCheckpoint>,
+export type ChunkStepWithProcessorOptions<
+  Input = unknown,
+  Output = unknown,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> = Omit<
+  ChunkStepDefinition<Input, Output, TCheckpoint, Parameters>,
   "kind"
 > & {
-  readonly processor: ChunkProcessor<Input, Output, TCheckpoint>;
+  readonly processor: ChunkProcessor<Input, Output, TCheckpoint, Parameters>;
 };
 
-export type ChunkStepOptions<Input = unknown, Output = Input, TCheckpoint = unknown> =
-  | ChunkStepWithoutProcessorOptions<Input, TCheckpoint>
-  | ChunkStepWithProcessorOptions<Input, Output, TCheckpoint>;
+export type ChunkStepOptions<
+  Input = unknown,
+  Output = Input,
+  TCheckpoint = unknown,
+  Parameters extends JobParameters = JobParameters
+> =
+  | ChunkStepWithoutProcessorOptions<Input, TCheckpoint, Parameters>
+  | ChunkStepWithProcessorOptions<Input, Output, TCheckpoint, Parameters>;
 
-export type StepDefinition<Input = unknown, Output = unknown> =
-  | TaskletStepDefinition<Input, Output>
-  | ChunkStepDefinition<Input, Output>
-  | PartitionedStepDefinition;
+export type StepDefinition<
+  Input = unknown,
+  Output = unknown,
+  Parameters extends JobParameters = JobParameters
+> =
+  | TaskletStepDefinition<Input, Output, Parameters>
+  | ChunkStepDefinition<Input, Output, unknown, Parameters>
+  | PartitionedStepDefinition<unknown, Parameters>;
 
-export type AnyStepDefinition = StepDefinition<any, any>;
+export type AnyStepDefinition<Parameters extends JobParameters = JobParameters> = StepDefinition<any, any, Parameters>;

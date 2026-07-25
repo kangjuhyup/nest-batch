@@ -70,8 +70,7 @@ export const createPagingReader = <
           while (true) {
             context.signal.throwIfAborted();
             const items = await options.fetch({
-              signal: context.signal,
-              checkpoint: context.checkpoint,
+              ...context,
               page,
               pageSize: options.pageSize
             });

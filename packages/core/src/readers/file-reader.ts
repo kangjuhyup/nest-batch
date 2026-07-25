@@ -87,8 +87,7 @@ export const createFileReader = <
     const startOffset = context.checkpoint?.offset ?? 0;
     validateNonNegativeInteger(startOffset, "checkpoint.offset");
     const source = await options.open({
-      signal: context.signal,
-      checkpoint: context.checkpoint,
+      ...context,
       offset: startOffset
     });
     let currentCheckpoint: TCheckpoint | undefined = context.checkpoint;

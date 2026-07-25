@@ -101,8 +101,7 @@ export const createHttpReader = <
           while (true) {
             context.signal.throwIfAborted();
             const response = await options.request({
-              signal: context.signal,
-              checkpoint: context.checkpoint,
+              ...context,
               page,
               pageSize: options.pageSize
             });

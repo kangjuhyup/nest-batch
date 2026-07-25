@@ -1,5 +1,6 @@
 import type {
   JobRepository,
+  JobParameters,
   PartitionExecution,
   PartitionExecutionResult,
   PartitionedStepDefinition
@@ -18,9 +19,12 @@ export interface PartitionedStepRunnerOptions {
   readonly now: () => Date;
 }
 
-export const runPartitionedStep = async <TPartition>(
-  step: PartitionedStepDefinition<TPartition>,
-  context: ActiveStepRunContext,
+export const runPartitionedStep = async <
+  TPartition,
+  Parameters extends JobParameters = JobParameters
+>(
+  step: PartitionedStepDefinition<TPartition, Parameters>,
+  context: ActiveStepRunContext<Parameters>,
   options: PartitionedStepRunnerOptions
 ): Promise<StepRunResult> => {
   const signal = requireSignal(context.signal);
@@ -61,9 +65,12 @@ export const runPartitionedStep = async <TPartition>(
   return aggregatePartitionExecutions(executions);
 };
 
-const runPartitionWorker = async <TPartition>(
-  step: PartitionedStepDefinition<TPartition>,
-  context: ActiveStepRunContext,
+const runPartitionWorker = async <
+  TPartition,
+  Parameters extends JobParameters
+>(
+  step: PartitionedStepDefinition<TPartition, Parameters>,
+  context: ActiveStepRunContext<Parameters>,
   options: PartitionedStepRunnerOptions,
   workerIndex: number,
   signal: AbortSignal,
@@ -91,9 +98,12 @@ const runPartitionWorker = async <TPartition>(
   }
 };
 
-const executeClaimedPartition = async <TPartition>(
-  step: PartitionedStepDefinition<TPartition>,
-  context: ActiveStepRunContext,
+const executeClaimedPartition = async <
+  TPartition,
+  Parameters extends JobParameters
+>(
+  step: PartitionedStepDefinition<TPartition, Parameters>,
+  context: ActiveStepRunContext<Parameters>,
   options: PartitionedStepRunnerOptions,
   claimed: PartitionExecution,
   signal: AbortSignal
