@@ -79,6 +79,11 @@ export interface ChunkStepExecutionContext<
   readonly checkpoint?: TCheckpoint;
 }
 
+export type ChunkReaderContext<
+  Parameters extends JobParameters = JobParameters,
+  TCheckpoint = unknown
+> = ChunkStepExecutionContext<TCheckpoint, Parameters>;
+
 export interface ChunkItemContext<
   Input = unknown,
   TCheckpoint = unknown,
@@ -88,6 +93,12 @@ export interface ChunkItemContext<
   readonly index: number;
 }
 
+export type ChunkProcessorContext<
+  Parameters extends JobParameters = JobParameters,
+  Input = unknown,
+  TCheckpoint = unknown
+> = ChunkItemContext<Input, TCheckpoint, Parameters>;
+
 export interface ChunkWriteContext<
   TCheckpoint = unknown,
   Parameters extends JobParameters = JobParameters
@@ -95,6 +106,11 @@ export interface ChunkWriteContext<
   readonly chunkIndex: number;
   readonly attempt: number;
 }
+
+export type ChunkWriterContext<
+  Parameters extends JobParameters = JobParameters,
+  TCheckpoint = unknown
+> = ChunkWriteContext<TCheckpoint, Parameters>;
 
 export interface ChunkCheckpointContext<
   TCheckpoint = unknown,
@@ -107,6 +123,11 @@ export interface ChunkCheckpointContext<
   readonly writeCount: number;
   readonly skipCount: number;
 }
+
+export type ChunkCheckpointCallbackContext<
+  Parameters extends JobParameters = JobParameters,
+  TCheckpoint = unknown
+> = ChunkCheckpointContext<TCheckpoint, Parameters>;
 
 export interface Processor<
   Input,

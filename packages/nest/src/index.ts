@@ -13,6 +13,8 @@ export {
   BATCH_WRITER_METADATA,
   NEST_BATCH_OPTIONS
 } from "./constants.js";
+export { BatchContextAccessor } from "./batch-context-accessor.js";
+export type { NestBatchExecutionContext } from "./batch-context.types.js";
 export { BatchJob, BatchProcessor, BatchReader, BatchStep, BatchWriter } from "./decorators.js";
 export type {
   BatchJobOptions,

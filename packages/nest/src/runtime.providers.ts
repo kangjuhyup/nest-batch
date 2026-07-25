@@ -8,17 +8,22 @@ import {
   BATCH_WORK_QUEUE,
   NEST_BATCH_OPTIONS
 } from "./constants.js";
+import { BatchContextAccessor } from "./batch-context-accessor.js";
+import { BatchContextStorage } from "./batch-context.storage.js";
 import type { NestBatchModuleOptions } from "./module-options.js";
 import { NestBatchRegistry } from "./registry.js";
 import { NestBatchRunner } from "./runner.service.js";
 
 export const NEST_BATCH_RUNTIME_EXPORTS = [
   BATCH_RUNNER,
+  BatchContextAccessor,
   NestBatchRegistry,
   NestBatchRunner
 ] as const;
 
 export const createRuntimeProviders = (options?: NestBatchModuleOptions): Provider[] => [
+  BatchContextStorage,
+  BatchContextAccessor,
   NestBatchRegistry,
   ...createRuntimeOptionProviders(options),
   {

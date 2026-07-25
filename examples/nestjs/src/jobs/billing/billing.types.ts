@@ -1,4 +1,4 @@
-import type { JobParameters } from "@nest-batch/core";
+import type { ChunkStepDefinition, JobParameters } from "@nest-batch/core";
 
 export interface BillingAccount {
   readonly id: string;
@@ -17,3 +17,10 @@ export type BillingJobParameters = JobParameters & {
   readonly tenant: string;
   readonly run?: string;
 };
+
+export type BillingStepDefinition = ChunkStepDefinition<
+  BillingAccount,
+  BillingCharge,
+  unknown,
+  BillingJobParameters
+>;

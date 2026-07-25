@@ -14,6 +14,7 @@ import {
   BatchReader,
   BatchStep,
   BatchWriter,
+  BatchContextAccessor,
   NestBatchRegistry,
   NestBatchModule,
   NestBatchRunner,
@@ -37,6 +38,7 @@ describe("nest package exports / nest package export를 검증한다", () => {
     expect(typeof BatchReader).toBe("function");
     expect(typeof BatchProcessor).toBe("function");
     expect(typeof BatchWriter).toBe("function");
+    expect(typeof BatchContextAccessor).toBe("function");
     expect(typeof NestBatchRegistry).toBe("function");
     expect(typeof NestBatchRunner).toBe("function");
     expect(typeof NestBatchModule.forRoot).toBe("function");
@@ -52,5 +54,7 @@ describe("nest package exports / nest package export를 검증한다", () => {
     expect(publicApi).not.toHaveProperty("NEST_BATCH_STORAGE_EXPORTS");
     expect(publicApi).not.toHaveProperty("createRuntimeProviders");
     expect(publicApi).not.toHaveProperty("NEST_BATCH_RUNTIME_EXPORTS");
+    expect(publicApi).not.toHaveProperty("BatchContextStorage");
+    expect(publicApi).not.toHaveProperty("bindStepDefinitionContext");
   });
 });

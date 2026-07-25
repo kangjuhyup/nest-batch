@@ -28,11 +28,10 @@ provider에서 core `defineChunkStep`으로 chunk step을 조립합니다.
 Nest provider는 singleton으로 재사용될 수 있으므로 `Reader` instance field에
 cursor나 offset을 저장하지 않고, `open()`이 반환하는 `ReaderSession` 안에서
 실행 상태를 관리합니다.
-`billing.step.ts`의 reader와 processor는 core runtime context의
-`context.parameters.tenant`를 읽어 tenant별 account id와 charge payload를 만듭니다.
-Nest integration은 request-scoped provider처럼 보이는 별도 `BatchContext` injection
-API를 만들지 않고, core callback 인자로 전달되는 batch execution scoped context를
-그대로 사용합니다.
+`billing.step.ts`의 reader와 processor는 `BatchContextAccessor`를 주입받아
+현재 batch callback의 `parameters`와 `signal`을 읽고, tenant별 account id와
+charge payload를 만듭니다. accessor는 `AsyncLocalStorage` 기반이므로 batch
+callback 실행 중에만 context를 제공합니다.
 `ReaderExamplesModule`은 `createIterableReader`, `createFunctionReader`,
 `createCursorReader`, `createPagingReader`를 Nest `@BatchReader` provider로 감싼
 예제를 제공합니다.

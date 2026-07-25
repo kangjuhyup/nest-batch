@@ -11,6 +11,7 @@ import {
   BATCH_RUNNER,
   BATCH_WORKER_POOL,
   BATCH_WORK_QUEUE,
+  BatchContextAccessor,
   NestBatchRegistry,
   NestBatchModule,
   NestBatchRunner,
@@ -26,6 +27,7 @@ describe("NestBatchModule / NestBatchModule", () => {
     const providers = dynamicModule.providers ?? [];
 
     expect(dynamicModule.module).toBe(NestBatchModule);
+    expect(dynamicModule.global).toBe(true);
     expect(dynamicModule.imports).toEqual([DiscoveryModule]);
     expect(findValueProvider(providers, NEST_BATCH_OPTIONS).useValue).toEqual({
       defaultTimeoutMs: 5000,
@@ -40,6 +42,7 @@ describe("NestBatchModule / NestBatchModule", () => {
         BATCH_CHECKPOINT_STORE,
         BATCH_LOCK_MANAGER,
         BATCH_RUNNER,
+        BatchContextAccessor,
         NestBatchRegistry,
         NestBatchRunner
       ])
@@ -139,6 +142,7 @@ describe("NestBatchModule / NestBatchModule", () => {
         BATCH_CHECKPOINT_STORE,
         BATCH_LOCK_MANAGER,
         BATCH_RUNNER,
+        BatchContextAccessor,
         NestBatchRegistry,
         NestBatchRunner
       ])
@@ -153,6 +157,7 @@ describe("NestBatchModule / NestBatchModule", () => {
     });
     const optionsProvider = findFactoryProvider(dynamicModule.providers ?? [], NEST_BATCH_OPTIONS);
 
+    expect(dynamicModule.global).toBe(true);
     expect(dynamicModule.imports).toEqual([DiscoveryModule, importedModule]);
     expect(optionsProvider.inject).toEqual([]);
   });

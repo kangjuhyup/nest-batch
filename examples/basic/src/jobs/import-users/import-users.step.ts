@@ -1,11 +1,11 @@
 import { defineChunkStep, skipItem } from "@nest-batch/core";
-import type { ChunkStepExecutionContext, Processor, Reader, ReaderSession, Writer } from "@nest-batch/core";
+import type { ChunkReaderContext, Processor, Reader, ReaderSession, Writer } from "@nest-batch/core";
 import type { ImportedUser, SourceUser } from "./import-users.types.js";
 
 export const writtenUsers: ImportedUser[] = [];
 
 export class ImportUsersReader implements Reader<SourceUser> {
-  open({ signal }: ChunkStepExecutionContext): ReaderSession<SourceUser> {
+  open({ signal }: ChunkReaderContext): ReaderSession<SourceUser> {
     return {
       async *[Symbol.asyncIterator]() {
         signal.throwIfAborted();

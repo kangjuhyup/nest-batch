@@ -1,10 +1,12 @@
 import "reflect-metadata";
 import { defineStep } from "@nest-batch/core";
+import type { JobParameters, StepExecutionContext } from "@nest-batch/core";
 import { InMemoryBatchStorage } from "@nest-batch/inmemory";
-import { Module } from "@nestjs/common";
+import { Inject, Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { describe, expect, it } from "vitest";
 import {
+  BatchContextAccessor,
   BatchJob,
   BatchProcessor,
   BatchReader,
@@ -16,6 +18,8 @@ import {
 } from "../src/index.js";
 
 describe("NestBatchRegistry / NestBatchRegistry", () => {
+  type BillingParameters = JobParameters & { readonly tenant: string };
+
   it("discovers decorated jobs and components / decorator가 붙은 job과 component를 발견한다", async () => {
     const storage = new InMemoryBatchStorage();
 
@@ -87,12 +91,36 @@ describe("NestBatchRegistry / NestBatchRegistry", () => {
       readonly parameters: { readonly tenant: string };
       readonly restart: boolean;
     }> = [];
+    const accessorContexts: Array<{
+      readonly jobName: string;
+      readonly jobExecutionId: string;
+      readonly stepName: string;
+      readonly parameters: BillingParameters;
+      readonly signalAborted: boolean;
+    }> = [];
 
     class BillingJob {
+      constructor(@Inject(BatchContextAccessor) private readonly batchContext: BatchContextAccessor) {}
+
       chargeAccounts() {
-        return defineStep<unknown, string, { readonly tenant: string }>({
+        const batchContext = this.batchContext;
+
+        return defineStep<unknown, string, BillingParameters>({
           name: "charge-accounts",
           execute(context) {
+            const accessorContext = batchContext.getRequiredContext<
+              StepExecutionContext<unknown, BillingParameters>
+            >();
+            const parameters = batchContext.getRequiredParameters<BillingParameters>();
+            const signal = batchContext.getRequiredSignal();
+
+            accessorContexts.push({
+              jobName: accessorContext.jobName,
+              jobExecutionId: accessorContext.jobExecutionId,
+              stepName: accessorContext.stepName,
+              parameters,
+              signalAborted: signal.aborted
+            });
             receivedContexts.push({
               jobName: context.jobName,
               jobExecutionId: context.jobExecutionId,
@@ -136,6 +164,9 @@ describe("NestBatchRegistry / NestBatchRegistry", () => {
 
     try {
       const runner = app.get(NestBatchRunner);
+      const batchContext = app.get(BatchContextAccessor);
+
+      expect(batchContext.getContext()).toBeUndefined();
       const execution = await runner.run(
         "daily-billing",
         { tenant: "acme" },
@@ -157,6 +188,16 @@ describe("NestBatchRegistry / NestBatchRegistry", () => {
           restart: false
         }
       ]);
+      expect(accessorContexts).toEqual([
+        {
+          jobName: "daily-billing",
+          jobExecutionId: "nestjs-discovered-execution",
+          stepName: "charge-accounts",
+          parameters: { tenant: "acme" },
+          signalAborted: false
+        }
+      ]);
+      expect(batchContext.getContext()).toBeUndefined();
     } finally {
       await app.close();
     }

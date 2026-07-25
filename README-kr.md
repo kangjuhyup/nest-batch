@@ -383,10 +383,10 @@ const job = defineJob({
 ## Nest Integration
 
 `NestBatchModule.forRoot()`는 `DatabaseBatchStorage`, repository, checkpoint,
-lock, 기본 `BATCH_RUNNER`, `NestBatchRegistry`, `NestBatchRunner`를 연결합니다.
-application bootstrap 시점에 `NestBatchRegistry`는 `@BatchJob`,
-`@BatchStep`, `@BatchReader`, `@BatchProcessor`, `@BatchWriter`가 붙은 provider를
-발견합니다.
+lock, 기본 `BATCH_RUNNER`, `BatchContextAccessor`, `NestBatchRegistry`,
+`NestBatchRunner`를 연결합니다. application bootstrap 시점에 `NestBatchRegistry`는
+`@BatchJob`, `@BatchStep`, `@BatchReader`, `@BatchProcessor`, `@BatchWriter`가
+붙은 provider를 발견합니다.
 
 ```ts
 import { Module } from "@nestjs/common";
@@ -413,6 +413,29 @@ class BillingJob {
 class AppModule {}
 
 await app.get(NestBatchRunner).run("daily-billing", { tenant: "acme" });
+```
+
+Nest provider에서는 모든 method signature로 runtime context를 전달하지 않고
+`BatchContextAccessor`를 주입해 사용할 수도 있습니다. accessor는
+`AsyncLocalStorage` 기반이므로 `getRequiredParameters()`와
+`getRequiredSignal()`은 batch callback 실행 중에만 사용할 수 있습니다.
+
+```ts
+import { Injectable } from "@nestjs/common";
+import { BatchContextAccessor } from "@nest-batch/nest";
+
+@Injectable()
+class BillingService {
+  constructor(private readonly batchContext: BatchContextAccessor) {}
+
+  chargeAccount() {
+    const parameters = this.batchContext.getRequiredParameters();
+    const signal = this.batchContext.getRequiredSignal();
+
+    signal.throwIfAborted();
+    return `charged ${String(parameters.tenant)}`;
+  }
+}
 ```
 
 custom runner가 필요하면 `forRoot()` 또는 `forRootAsync()`에 `batchRunner`를
@@ -483,7 +506,7 @@ processor 실패 item을 건너뛰는 데만 적용됩니다. writer 실패 skip
 
 ```ts
 import { defineChunkStep, skipItem } from "@nest-batch/core";
-import type { ChunkStepExecutionContext, Processor, Reader, ReaderSession, Writer } from "@nest-batch/core";
+import type { ChunkReaderContext, Processor, Reader, ReaderSession, Writer } from "@nest-batch/core";
 
 interface SourceUser {
   readonly id: string;
@@ -495,7 +518,7 @@ interface ImportedUser {
 }
 
 class UserReader implements Reader<SourceUser> {
-  open({ signal }: ChunkStepExecutionContext): ReaderSession<SourceUser> {
+  open({ signal }: ChunkReaderContext): ReaderSession<SourceUser> {
     return {
       async *[Symbol.asyncIterator]() {
         signal.throwIfAborted();

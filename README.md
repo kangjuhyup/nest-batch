@@ -376,10 +376,10 @@ const job = defineJob({
 ## Nest Integration
 
 `NestBatchModule.forRoot()` wires `DatabaseBatchStorage`, repository,
-checkpoint, lock, the default `BATCH_RUNNER`, `NestBatchRegistry`, and
-`NestBatchRunner`. On application bootstrap, `NestBatchRegistry` discovers
-providers decorated with `@BatchJob`, `@BatchStep`, `@BatchReader`,
-`@BatchProcessor`, and `@BatchWriter`.
+checkpoint, lock, the default `BATCH_RUNNER`, `BatchContextAccessor`,
+`NestBatchRegistry`, and `NestBatchRunner`. On application bootstrap,
+`NestBatchRegistry` discovers providers decorated with `@BatchJob`,
+`@BatchStep`, `@BatchReader`, `@BatchProcessor`, and `@BatchWriter`.
 
 ```ts
 import { Module } from "@nestjs/common";
@@ -406,6 +406,29 @@ class BillingJob {
 class AppModule {}
 
 await app.get(NestBatchRunner).run("daily-billing", { tenant: "acme" });
+```
+
+Nest providers can also inject `BatchContextAccessor` instead of threading the
+runtime context through every method signature. The accessor is backed by
+`AsyncLocalStorage`, so `getRequiredParameters()` and `getRequiredSignal()` are
+available only while a batch callback is executing.
+
+```ts
+import { Injectable } from "@nestjs/common";
+import { BatchContextAccessor } from "@nest-batch/nest";
+
+@Injectable()
+class BillingService {
+  constructor(private readonly batchContext: BatchContextAccessor) {}
+
+  chargeAccount() {
+    const parameters = this.batchContext.getRequiredParameters();
+    const signal = this.batchContext.getRequiredSignal();
+
+    signal.throwIfAborted();
+    return `charged ${String(parameters.tenant)}`;
+  }
+}
 ```
 
 If you need a custom runner, pass `batchRunner` to `forRoot()` or
@@ -476,7 +499,7 @@ processor 실패 item을 건너뛰는 데만 적용됩니다. writer 실패 skip
 
 ```ts
 import { defineChunkStep, skipItem } from "@nest-batch/core";
-import type { ChunkStepExecutionContext, Processor, Reader, ReaderSession, Writer } from "@nest-batch/core";
+import type { ChunkReaderContext, Processor, Reader, ReaderSession, Writer } from "@nest-batch/core";
 
 interface SourceUser {
   readonly id: string;
@@ -488,7 +511,7 @@ interface ImportedUser {
 }
 
 class UserReader implements Reader<SourceUser> {
-  open({ signal }: ChunkStepExecutionContext): ReaderSession<SourceUser> {
+  open({ signal }: ChunkReaderContext): ReaderSession<SourceUser> {
     return {
       async *[Symbol.asyncIterator]() {
         signal.throwIfAborted();
