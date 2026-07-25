@@ -90,6 +90,8 @@ const createPartitionExecution = (
   stepName: "load-users",
   status: "created",
   partition: { shard: 0 },
+  heartbeatAt: undefined,
+  claimExpiresAt: undefined,
   readCount: 0,
   writeCount: 0,
   skipCount: 0,
@@ -404,6 +406,8 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
       "created",
       JSON.stringify({ shard: 0 }),
       null,
+      null,
+      null,
       0,
       0,
       0,
@@ -436,6 +440,8 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
       "completed",
       JSON.stringify({ shard: 0 }),
       "worker-1",
+      null,
+      null,
       10,
       9,
       1,
@@ -455,6 +461,8 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
         status: "completed",
         partition: { shard: 0 },
         owner_id: "worker-1",
+        heartbeat_at: null,
+        claim_expires_at: null,
         read_count: 10,
         write_count: 9,
         skip_count: 1,
@@ -496,6 +504,8 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
         status: "created",
         partition: { shard: 0 },
         owner_id: null,
+        heartbeat_at: null,
+        claim_expires_at: null,
         read_count: 0,
         write_count: 0,
         skip_count: 0,
@@ -506,6 +516,7 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
         failure_reason: null
       }
     ]);
+    pool.queueResult(1);
     pool.queueResult(1);
     pool.queueResult(1);
 
@@ -520,6 +531,7 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
         status: "running",
         ownerId: "worker-1",
         createdAt,
+        heartbeatAt: claimedAt,
         startedAt: claimedAt
       })
     );
@@ -533,6 +545,87 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
     expect(pool.calls[1]?.sql).toContain("FOR UPDATE SKIP LOCKED");
     expect(pool.calls[2]?.values).toContain("worker-1");
     expect(pool.releasedConnections).toBe(1);
+  });
+
+  it("recovers stale running partition executions / 오래된 running partition execution을 회수한다", async () => {
+    const pool = new FakePostgresPool();
+    const repository = new PostgresJobRepository({ pool, schema: "batch", tablePrefix: "nb" });
+    const createdAt = new Date("2026-07-19T00:00:00.000Z");
+    const heartbeatAt = new Date("2026-07-19T00:00:00.000Z");
+    const claimedAt = new Date("2026-07-19T00:01:00.000Z");
+    const staleBefore = new Date("2026-07-19T00:00:30.000Z");
+
+    pool.queueResult(1);
+    pool.queueRows([
+      {
+        id: "partition-1",
+        step_execution_id: "step-execution-1",
+        step_name: "load-users",
+        status: "running",
+        partition: { shard: 0 },
+        owner_id: "dead-worker",
+        heartbeat_at: heartbeatAt,
+        claim_expires_at: null,
+        read_count: 0,
+        write_count: 0,
+        skip_count: 0,
+        retry_count: 0,
+        created_at: createdAt,
+        started_at: heartbeatAt,
+        ended_at: null,
+        failure_reason: null
+      }
+    ]);
+    pool.queueResult(1);
+
+    await expect(
+      repository.claimPartitionExecution({
+        stepExecutionId: "step-execution-1",
+        ownerId: "worker-2",
+        staleAfterMs: 30_000,
+        now: claimedAt
+      })
+    ).resolves.toEqual(
+      createPartitionExecution({
+        status: "running",
+        ownerId: "worker-2",
+        createdAt,
+        startedAt: heartbeatAt,
+        heartbeatAt: claimedAt,
+        claimExpiresAt: new Date("2026-07-19T00:01:30.000Z")
+      })
+    );
+
+    expect(pool.calls[1]?.sql).toContain("heartbeat_at < $2::timestamptz");
+    expect(pool.calls[1]?.values).toEqual(["step-execution-1", staleBefore]);
+  });
+
+  it("guards partition completion by owner / partition 완료를 owner로 보호한다", async () => {
+    const pool = new FakePostgresPool();
+    const repository = new PostgresJobRepository({ pool, schema: "batch", tablePrefix: "nb" });
+
+    pool.queueResult(0);
+    await expect(
+      repository.completePartitionExecution(
+        createPartitionExecution({
+          status: "completed",
+          ownerId: "worker-2"
+        }),
+        "worker-1"
+      )
+    ).resolves.toBe(false);
+
+    pool.queueResult(1);
+    await expect(
+      repository.completePartitionExecution(
+        createPartitionExecution({
+          status: "completed",
+          ownerId: "worker-1"
+        }),
+        "worker-1"
+      )
+    ).resolves.toBe(true);
+    expect(pool.calls[0]?.sql).toContain("AND owner_id = $17");
   });
 
   it("stores and removes checkpoints through postgres upsert SQL / postgres upsert SQL로 checkpoint를 저장하고 삭제한다", async () => {
@@ -590,7 +683,7 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
   it("creates schema tables with qualified postgres identifiers / 정규화한 postgres identifier로 schema table을 생성한다", async () => {
     const pool = new FakePostgresPool();
 
-    for (let index = 0; index < 13; index += 1) {
+    for (let index = 0; index < 14; index += 1) {
       pool.queueResult(1);
     }
     await ensurePostgresSchema({ pool, schema: "batch", tablePrefix: "nb" });
@@ -607,6 +700,7 @@ describe("postgres adapter / postgres adapter를 검증한다", () => {
       expect.stringContaining('CREATE TABLE IF NOT EXISTS "batch"."nb_partition_executions"'),
       expect.stringContaining('CREATE INDEX IF NOT EXISTS "idx_nb_partition_executions_step_status"'),
       expect.stringContaining('CREATE TABLE IF NOT EXISTS "batch"."nb_checkpoints"'),
+      expect.stringContaining('CREATE TABLE IF NOT EXISTS "batch"."nb_execution_contexts"'),
       expect.stringContaining('CREATE TABLE IF NOT EXISTS "batch"."nb_locks"'),
       expect.stringContaining('CREATE INDEX IF NOT EXISTS "idx_nb_locks_expires_at"')
     ]);

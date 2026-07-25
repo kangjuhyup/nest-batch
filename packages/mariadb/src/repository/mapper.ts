@@ -55,6 +55,8 @@ export const toPartitionExecution = (row: MariaDbPartitionExecutionRow): Partiti
   status: parseMariaDbPartitionStatus(row.status),
   partition: parseMariaDbJson(row.partition),
   ownerId: typeof row.owner_id === "string" ? row.owner_id : undefined,
+  heartbeatAt: parseMariaDbOptionalDate(row.heartbeat_at),
+  claimExpiresAt: parseMariaDbOptionalDate(row.claim_expires_at),
   readCount: parseMariaDbCount(row.read_count, "read_count"),
   writeCount: parseMariaDbCount(row.write_count, "write_count"),
   skipCount: parseMariaDbCount(row.skip_count, "skip_count"),

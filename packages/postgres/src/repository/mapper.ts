@@ -55,6 +55,8 @@ export const toPartitionExecution = (row: PostgresPartitionExecutionRow): Partit
   status: parsePostgresPartitionStatus(row.status),
   partition: parsePostgresJson(row.partition),
   ownerId: typeof row.owner_id === "string" ? row.owner_id : undefined,
+  heartbeatAt: parsePostgresOptionalDate(row.heartbeat_at),
+  claimExpiresAt: parsePostgresOptionalDate(row.claim_expires_at),
   readCount: parsePostgresCount(row.read_count, "read_count"),
   writeCount: parsePostgresCount(row.write_count, "write_count"),
   skipCount: parsePostgresCount(row.skip_count, "skip_count"),

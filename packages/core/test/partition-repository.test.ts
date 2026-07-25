@@ -68,4 +68,99 @@ describe("partition repository contract / partition repository contract", () => 
       })
     ).resolves.toBeUndefined();
   });
+
+  it("recovers stale running partitions / 오래된 running partition을 회수한다", async () => {
+    const repository = new InMemoryJobRepository();
+    const heartbeatAt = new Date("2026-07-25T00:00:00.000Z");
+    const claimedAt = new Date("2026-07-25T00:01:00.000Z");
+
+    await repository.createPartitionExecution(
+      createPartition({
+        status: "running",
+        ownerId: "dead-worker",
+        heartbeatAt,
+        startedAt: heartbeatAt
+      })
+    );
+
+    await expect(
+      repository.claimPartitionExecution({
+        stepExecutionId: "step-execution-1",
+        ownerId: "worker-2",
+        staleAfterMs: 30_000,
+        now: claimedAt
+      })
+    ).resolves.toMatchObject({
+      id: "partition-1",
+      status: "running",
+      ownerId: "worker-2",
+      heartbeatAt: claimedAt,
+      claimExpiresAt: new Date("2026-07-25T00:01:30.000Z")
+    });
+  });
+
+  it("does not recover fresh running partitions / 최신 running partition은 회수하지 않는다", async () => {
+    const repository = new InMemoryJobRepository();
+
+    await repository.createPartitionExecution(
+      createPartition({
+        status: "running",
+        ownerId: "worker-1",
+        heartbeatAt: new Date("2026-07-25T00:00:45.000Z"),
+        startedAt: new Date("2026-07-25T00:00:00.000Z")
+      })
+    );
+
+    await expect(
+      repository.claimPartitionExecution({
+        stepExecutionId: "step-execution-1",
+        ownerId: "worker-2",
+        staleAfterMs: 30_000,
+        now: new Date("2026-07-25T00:01:00.000Z")
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it("updates heartbeat only for current owner / 현재 owner만 heartbeat를 갱신한다", async () => {
+    const repository = new InMemoryJobRepository();
+    const heartbeatAt = new Date("2026-07-25T00:01:00.000Z");
+
+    await repository.createPartitionExecution(
+      createPartition({
+        status: "running",
+        ownerId: "worker-1"
+      })
+    );
+
+    await expect(
+      repository.heartbeatPartitionExecution("partition-1", "worker-2", heartbeatAt)
+    ).resolves.toBe(false);
+    await expect(
+      repository.heartbeatPartitionExecution("partition-1", "worker-1", heartbeatAt)
+    ).resolves.toBe(true);
+    await expect(repository.findPartitionExecutions("step-execution-1")).resolves.toMatchObject([
+      {
+        id: "partition-1",
+        heartbeatAt
+      }
+    ]);
+  });
+
+  it("completes only when owner matches / owner가 일치할 때만 완료한다", async () => {
+    const repository = new InMemoryJobRepository();
+    const running = createPartition({
+      status: "running",
+      ownerId: "worker-1",
+      startedAt: new Date("2026-07-25T00:01:00.000Z")
+    });
+
+    await repository.createPartitionExecution(running);
+
+    await expect(
+      repository.completePartitionExecution({ ...running, status: "completed" }, "worker-2")
+    ).resolves.toBe(false);
+    await expect(
+      repository.completePartitionExecution({ ...running, status: "completed" }, "worker-1")
+    ).resolves.toBe(true);
+  });
 });

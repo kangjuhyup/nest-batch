@@ -372,6 +372,69 @@ describe.each(storageCases)("full runtime flow e2e with $label / $label 전체 r
       "job.completed"
     ]);
   });
+
+  it("recovers stale running partitions / 오래된 running partition을 회수한다", async () => {
+    const heartbeatAt = new Date("2026-07-20T00:00:00.000Z");
+    const claimedAt = new Date("2026-07-20T00:01:00.000Z");
+    const stepExecutionId = `stale-partition-step-${storageCase.label}`;
+    const partitionId = `${stepExecutionId}:partition:000001`;
+
+    await storage.repository.createPartitionExecution({
+      id: partitionId,
+      stepExecutionId,
+      stepName: "partitioned-import",
+      status: "running",
+      partition: { shard: 0 },
+      ownerId: "dead-worker",
+      heartbeatAt,
+      startedAt: heartbeatAt,
+      readCount: 0,
+      writeCount: 0,
+      skipCount: 0,
+      retryCount: 0,
+      createdAt: heartbeatAt
+    });
+
+    const claimed = await storage.repository.claimPartitionExecution({
+      stepExecutionId,
+      ownerId: "worker-2",
+      staleAfterMs: 30_000,
+      now: claimedAt
+    });
+
+    expect(claimed).toMatchObject({
+      id: partitionId,
+      status: "running",
+      ownerId: "worker-2",
+      heartbeatAt: claimedAt,
+      claimExpiresAt: new Date("2026-07-20T00:01:30.000Z")
+    });
+
+    if (!claimed) {
+      throw new Error("Expected stale partition to be claimed.");
+    }
+
+    await expect(
+      storage.repository.completePartitionExecution(
+        {
+          ...claimed,
+          status: "completed",
+          endedAt: new Date("2026-07-20T00:02:00.000Z")
+        },
+        "dead-worker"
+      )
+    ).resolves.toBe(false);
+    await expect(
+      storage.repository.completePartitionExecution(
+        {
+          ...claimed,
+          status: "completed",
+          endedAt: new Date("2026-07-20T00:02:00.000Z")
+        },
+        "worker-2"
+      )
+    ).resolves.toBe(true);
+  });
 });
 
 const parseCliOutput = (output: string): unknown => JSON.parse(output) as unknown;

@@ -17,6 +17,7 @@ import type { MySqlBatchOptions } from "../options.js";
 import type { MySqlConnectionLike, MySqlPoolLike } from "../options.js";
 import {
   createMySqlTables,
+  affectedRowsFromMySqlResult,
   rowsFromMySqlResult,
   stringifyMySqlJson,
   type MySqlJobExecutionRow,
@@ -378,8 +379,10 @@ export class MySqlJobRepository implements JobRepository {
           step_execution_id,
           step_name,
           status,
-          partition,
+          \`partition\`,
           owner_id,
+          heartbeat_at,
+          claim_expires_at,
           read_count,
           write_count,
           skip_count,
@@ -389,7 +392,7 @@ export class MySqlJobRepository implements JobRepository {
           ended_at,
           failure_reason
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         execution.id,
@@ -398,6 +401,8 @@ export class MySqlJobRepository implements JobRepository {
         execution.status,
         stringifyMySqlJson(execution.partition),
         execution.ownerId ?? null,
+        execution.heartbeatAt ?? null,
+        execution.claimExpiresAt ?? null,
         execution.readCount,
         execution.writeCount,
         execution.skipCount,
@@ -424,8 +429,10 @@ export class MySqlJobRepository implements JobRepository {
           step_execution_id,
           step_name,
           status,
-          partition,
+          \`partition\`,
           owner_id,
+          heartbeat_at,
+          claim_expires_at,
           read_count,
           write_count,
           skip_count,
@@ -455,8 +462,10 @@ export class MySqlJobRepository implements JobRepository {
             step_execution_id,
             step_name,
             status,
-            partition,
+            \`partition\`,
             owner_id,
+            heartbeat_at,
+            claim_expires_at,
             read_count,
             write_count,
             skip_count,
@@ -467,12 +476,23 @@ export class MySqlJobRepository implements JobRepository {
             failure_reason
           FROM ${this.tables.partitionExecutions}
           WHERE step_execution_id = ?
-            AND status = 'created'
-          ORDER BY created_at ASC, id ASC
+            AND (
+              status = 'created'
+              OR (
+                status = 'running'
+                AND ? IS NOT NULL
+                AND heartbeat_at IS NOT NULL
+                AND heartbeat_at < ?
+              )
+            )
+          ORDER BY
+            CASE WHEN status = 'created' THEN 0 ELSE 1 END,
+            created_at ASC,
+            id ASC
           LIMIT 1
           FOR UPDATE SKIP LOCKED
         `,
-        [options.stepExecutionId]
+        [options.stepExecutionId, createStaleBefore(options), createStaleBefore(options)]
       );
       const [row] = rowsFromMySqlResult<MySqlPartitionExecutionRow>(result);
 
@@ -480,17 +500,43 @@ export class MySqlJobRepository implements JobRepository {
         return undefined;
       }
 
+      const execution = toPartitionExecution(row);
       const claimed: PartitionExecution = {
-        ...toPartitionExecution(row),
+        ...execution,
         status: "running",
         ownerId: options.ownerId,
-        startedAt: options.now
+        heartbeatAt: options.now,
+        claimExpiresAt: createClaimExpiresAt(options),
+        startedAt: execution.startedAt ?? options.now
       };
 
       await this.updatePartitionExecutionWithConnection(connection, claimed);
 
       return claimed;
     });
+  }
+
+  async heartbeatPartitionExecution(id: string, ownerId: string, now: Date): Promise<boolean> {
+    const result = await this.pool.execute(
+      `
+        UPDATE ${this.tables.partitionExecutions}
+        SET heartbeat_at = ?
+        WHERE id = ?
+          AND owner_id = ?
+          AND status = 'running'
+      `,
+      [now, id, ownerId]
+    );
+
+    return affectedRowsFromMySqlResult(result) > 0;
+  }
+
+  async completePartitionExecution(execution: PartitionExecution, ownerId: string): Promise<boolean> {
+    return this.updateOwnedPartitionExecution(this.pool, execution, ownerId);
+  }
+
+  async failPartitionExecution(execution: PartitionExecution, ownerId: string): Promise<boolean> {
+    return this.updateOwnedPartitionExecution(this.pool, execution, ownerId);
   }
 
   private async withTransaction<T>(
@@ -613,8 +659,10 @@ export class MySqlJobRepository implements JobRepository {
           step_execution_id = ?,
           step_name = ?,
           status = ?,
-          partition = ?,
+          \`partition\` = ?,
           owner_id = ?,
+          heartbeat_at = ?,
+          claim_expires_at = ?,
           read_count = ?,
           write_count = ?,
           skip_count = ?,
@@ -631,6 +679,8 @@ export class MySqlJobRepository implements JobRepository {
         execution.status,
         stringifyMySqlJson(execution.partition),
         execution.ownerId ?? null,
+        execution.heartbeatAt ?? null,
+        execution.claimExpiresAt ?? null,
         execution.readCount,
         execution.writeCount,
         execution.skipCount,
@@ -643,6 +693,69 @@ export class MySqlJobRepository implements JobRepository {
       ]
     );
   }
+
+  private async updateOwnedPartitionExecution(
+    connection: MySqlExecutor,
+    execution: PartitionExecution,
+    ownerId: string
+  ): Promise<boolean> {
+    const result = await connection.execute(
+      `
+        UPDATE ${this.tables.partitionExecutions}
+        SET
+          step_execution_id = ?,
+          step_name = ?,
+          status = ?,
+          \`partition\` = ?,
+          owner_id = ?,
+          heartbeat_at = ?,
+          claim_expires_at = ?,
+          read_count = ?,
+          write_count = ?,
+          skip_count = ?,
+          retry_count = ?,
+          created_at = ?,
+          started_at = ?,
+          ended_at = ?,
+          failure_reason = ?
+        WHERE id = ?
+          AND owner_id = ?
+      `,
+      [
+        execution.stepExecutionId,
+        execution.stepName,
+        execution.status,
+        stringifyMySqlJson(execution.partition),
+        execution.ownerId ?? null,
+        execution.heartbeatAt ?? null,
+        execution.claimExpiresAt ?? null,
+        execution.readCount,
+        execution.writeCount,
+        execution.skipCount,
+        execution.retryCount,
+        execution.createdAt,
+        execution.startedAt ?? null,
+        execution.endedAt ?? null,
+        execution.failureReason ?? null,
+        execution.id,
+        ownerId
+      ]
+    );
+
+    return affectedRowsFromMySqlResult(result) > 0;
+  }
 }
+
+const createStaleBefore = (options: PartitionClaimOptions): Date | null => {
+  return options.staleAfterMs === undefined
+    ? null
+    : new Date(options.now.getTime() - options.staleAfterMs);
+};
+
+const createClaimExpiresAt = (options: PartitionClaimOptions): Date | undefined => {
+  return options.staleAfterMs === undefined
+    ? undefined
+    : new Date(options.now.getTime() + options.staleAfterMs);
+};
 
 type MySqlExecutor = Pick<MySqlConnectionLike, "execute">;

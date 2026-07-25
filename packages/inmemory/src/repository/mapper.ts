@@ -26,7 +26,9 @@ export const clonePartitionExecution = <TPartition>(
   partition: cloneJsonLike(execution.partition),
   createdAt: new Date(execution.createdAt.getTime()),
   startedAt: cloneOptionalDate(execution.startedAt),
-  endedAt: cloneOptionalDate(execution.endedAt)
+  endedAt: cloneOptionalDate(execution.endedAt),
+  heartbeatAt: cloneOptionalDate(execution.heartbeatAt),
+  claimExpiresAt: cloneOptionalDate(execution.claimExpiresAt)
 });
 
 const cloneOptionalDate = (date?: Date): Date | undefined => {

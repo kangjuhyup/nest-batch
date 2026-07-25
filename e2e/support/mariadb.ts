@@ -120,6 +120,7 @@ const parseConnectionString = (connectionString: string, database: string): Mari
 const createTableNames = (tablePrefix: string): readonly string[] => [
   `${tablePrefix}_locks`,
   `${tablePrefix}_checkpoints`,
+  `${tablePrefix}_partition_executions`,
   `${tablePrefix}_step_executions`,
   `${tablePrefix}_job_executions`,
   `${tablePrefix}_job_instances`

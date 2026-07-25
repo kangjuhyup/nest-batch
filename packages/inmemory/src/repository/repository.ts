@@ -148,7 +148,7 @@ export class InMemoryJobRepository implements JobRepository {
   ): Promise<PartitionExecution | undefined> {
     const executions = this.partitionExecutions.get(options.stepExecutionId) ?? [];
     const partition = [...executions]
-      .filter((candidate) => candidate.status === "created")
+      .filter((candidate) => canClaimPartitionExecution(candidate, options))
       .sort(comparePartitionExecutionByCreatedAtAsc)[0];
 
     if (!partition) {
@@ -159,7 +159,9 @@ export class InMemoryJobRepository implements JobRepository {
       ...partition,
       status: "running",
       ownerId: options.ownerId,
-      startedAt: options.now
+      heartbeatAt: options.now,
+      claimExpiresAt: createClaimExpiresAt(options),
+      startedAt: partition.startedAt ?? options.now
     };
 
     await this.updatePartitionExecution(claimed);
@@ -167,10 +169,82 @@ export class InMemoryJobRepository implements JobRepository {
     return clonePartitionExecution(claimed);
   }
 
+  async heartbeatPartitionExecution(id: string, ownerId: string, now: Date): Promise<boolean> {
+    const execution = this.findPartitionExecutionById(id);
+
+    if (!execution || execution.status !== "running" || execution.ownerId !== ownerId) {
+      return false;
+    }
+
+    await this.updatePartitionExecution({
+      ...execution,
+      heartbeatAt: now
+    });
+
+    return true;
+  }
+
+  async completePartitionExecution(execution: PartitionExecution, ownerId: string): Promise<boolean> {
+    return this.updateOwnedPartitionExecution(execution, ownerId);
+  }
+
+  async failPartitionExecution(execution: PartitionExecution, ownerId: string): Promise<boolean> {
+    return this.updateOwnedPartitionExecution(execution, ownerId);
+  }
+
   private instanceKey(jobName: string, parametersHash: JobParametersHash): string {
     return `${jobName}:${parametersHash}`;
   }
+
+  private findPartitionExecutionById(id: string): PartitionExecution | undefined {
+    for (const executions of this.partitionExecutions.values()) {
+      const execution = executions.find((candidate) => candidate.id === id);
+
+      if (execution) {
+        return execution;
+      }
+    }
+
+    return undefined;
+  }
+
+  private async updateOwnedPartitionExecution(
+    execution: PartitionExecution,
+    ownerId: string
+  ): Promise<boolean> {
+    const stored = this.findPartitionExecutionById(execution.id);
+
+    if (!stored || stored.ownerId !== ownerId) {
+      return false;
+    }
+
+    await this.updatePartitionExecution(execution);
+
+    return true;
+  }
 }
+
+const canClaimPartitionExecution = (
+  execution: PartitionExecution,
+  options: PartitionClaimOptions
+): boolean => {
+  if (execution.status === "created") {
+    return true;
+  }
+
+  if (execution.status !== "running" || options.staleAfterMs === undefined) {
+    return false;
+  }
+
+  const staleBefore = options.now.getTime() - options.staleAfterMs;
+  return (execution.heartbeatAt?.getTime() ?? Number.POSITIVE_INFINITY) < staleBefore;
+};
+
+const createClaimExpiresAt = (options: PartitionClaimOptions): Date | undefined => {
+  return options.staleAfterMs === undefined
+    ? undefined
+    : new Date(options.now.getTime() + options.staleAfterMs);
+};
 
 const compareJobExecutionByCreatedAtAsc = (left: JobExecution, right: JobExecution): number => {
   const diff = left.createdAt.getTime() - right.createdAt.getTime();

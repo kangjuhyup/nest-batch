@@ -80,9 +80,10 @@ const runPartitionWorker = async <
   while (getFirstError() === undefined) {
     try {
       signal.throwIfAborted();
+      const ownerId = `${context.jobExecutionId}:${step.name}:partition-worker-${workerIndex}`;
       const claimed = await options.repository.claimPartitionExecution({
         stepExecutionId: options.stepExecutionId,
-        ownerId: `${context.jobExecutionId}:${step.name}:partition-worker-${workerIndex}`,
+        ownerId,
         now: options.now()
       });
 
@@ -90,7 +91,7 @@ const runPartitionWorker = async <
         return;
       }
 
-      await executeClaimedPartition(step, context, options, claimed, signal);
+      await executeClaimedPartition(step, context, options, claimed, ownerId, signal);
     } catch (error) {
       setFirstError(error);
       return;
@@ -106,6 +107,7 @@ const executeClaimedPartition = async <
   context: ActiveStepRunContext<Parameters>,
   options: PartitionedStepRunnerOptions,
   claimed: PartitionExecution,
+  ownerId: string,
   signal: AbortSignal
 ): Promise<void> => {
   try {
@@ -121,19 +123,23 @@ const executeClaimedPartition = async <
     });
     const counts = normalizePartitionExecutionResult(result);
 
-    await options.repository.updatePartitionExecution({
+    const completed = await options.repository.completePartitionExecution({
       ...claimed,
       ...counts,
       status: "completed",
       endedAt: options.now()
-    });
+    }, ownerId);
+
+    if (!completed) {
+      throw new Error(`Partition execution "${claimed.id}" is no longer owned by "${ownerId}".`);
+    }
   } catch (error) {
-    await options.repository.updatePartitionExecution({
+    await options.repository.failPartitionExecution({
       ...claimed,
       status: isAbortError(error) || signal.aborted ? "cancelled" : "failed",
       endedAt: options.now(),
       failureReason: errorToFailureReason(error)
-    });
+    }, ownerId);
     throw error;
   }
 };

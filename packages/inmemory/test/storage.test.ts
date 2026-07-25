@@ -48,6 +48,8 @@ const createPartitionExecution = (
   stepName: "load-users",
   status: "created",
   partition: { shard: 0 },
+  heartbeatAt: undefined,
+  claimExpiresAt: undefined,
   readCount: 0,
   writeCount: 0,
   skipCount: 0,
@@ -159,6 +161,7 @@ describe("inmemory batch storage / inmemory batch storage를 검증한다", () =
       createPartitionExecution({
         status: "running",
         ownerId: "worker-1",
+        heartbeatAt: claimedAt,
         startedAt: claimedAt
       })
     );

@@ -55,6 +55,8 @@ export const toPartitionExecution = (row: MySqlPartitionExecutionRow): Partition
   status: parseMySqlPartitionStatus(row.status),
   partition: parseMySqlJson(row.partition),
   ownerId: typeof row.owner_id === "string" ? row.owner_id : undefined,
+  heartbeatAt: parseMySqlOptionalDate(row.heartbeat_at),
+  claimExpiresAt: parseMySqlOptionalDate(row.claim_expires_at),
   readCount: parseMySqlCount(row.read_count, "read_count"),
   writeCount: parseMySqlCount(row.write_count, "write_count"),
   skipCount: parseMySqlCount(row.skip_count, "skip_count"),

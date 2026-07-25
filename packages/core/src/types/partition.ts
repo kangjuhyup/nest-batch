@@ -11,6 +11,8 @@ export interface PartitionExecution<TPartition = unknown> {
   readonly status: PartitionExecutionStatus;
   readonly partition: TPartition;
   readonly ownerId?: string;
+  readonly heartbeatAt?: Date;
+  readonly claimExpiresAt?: Date;
   readonly readCount: number;
   readonly writeCount: number;
   readonly skipCount: number;
@@ -25,4 +27,5 @@ export interface PartitionClaimOptions {
   readonly stepExecutionId: BatchStepExecutionId;
   readonly ownerId: string;
   readonly now: Date;
+  readonly staleAfterMs?: number;
 }

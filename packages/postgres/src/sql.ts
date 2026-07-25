@@ -68,6 +68,8 @@ export interface PostgresPartitionExecutionRow {
   readonly status: string;
   readonly partition: unknown;
   readonly owner_id: unknown;
+  readonly heartbeat_at: unknown;
+  readonly claim_expires_at: unknown;
   readonly read_count: unknown;
   readonly write_count: unknown;
   readonly skip_count: unknown;

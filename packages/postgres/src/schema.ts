@@ -82,6 +82,8 @@ export const ensurePostgresSchema = async (options: PostgresBatchOptions): Promi
       status TEXT NOT NULL,
       partition JSONB NOT NULL,
       owner_id TEXT NULL,
+      heartbeat_at TIMESTAMPTZ(3) NULL,
+      claim_expires_at TIMESTAMPTZ(3) NULL,
       read_count INTEGER NOT NULL,
       write_count INTEGER NOT NULL,
       skip_count INTEGER NOT NULL,

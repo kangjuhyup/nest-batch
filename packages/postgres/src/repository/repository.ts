@@ -17,6 +17,7 @@ import type { PostgresBatchOptions } from "../options.js";
 import type { PostgresClientLike, PostgresPoolLike } from "../options.js";
 import {
   createPostgresTables,
+  rowCountFromPostgresResult,
   rowsFromPostgresResult,
   stringifyPostgresJson,
   type PostgresJobExecutionRow,
@@ -378,6 +379,8 @@ export class PostgresJobRepository implements JobRepository {
           status,
           partition,
           owner_id,
+          heartbeat_at,
+          claim_expires_at,
           read_count,
           write_count,
           skip_count,
@@ -387,7 +390,7 @@ export class PostgresJobRepository implements JobRepository {
           ended_at,
           failure_reason
         )
-        VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       `,
       [
         execution.id,
@@ -396,6 +399,8 @@ export class PostgresJobRepository implements JobRepository {
         execution.status,
         stringifyPostgresJson(execution.partition),
         execution.ownerId ?? null,
+        execution.heartbeatAt ?? null,
+        execution.claimExpiresAt ?? null,
         execution.readCount,
         execution.writeCount,
         execution.skipCount,
@@ -424,6 +429,8 @@ export class PostgresJobRepository implements JobRepository {
           status,
           partition,
           owner_id,
+          heartbeat_at,
+          claim_expires_at,
           read_count,
           write_count,
           skip_count,
@@ -455,6 +462,8 @@ export class PostgresJobRepository implements JobRepository {
             status,
             partition,
             owner_id,
+            heartbeat_at,
+            claim_expires_at,
             read_count,
             write_count,
             skip_count,
@@ -465,12 +474,23 @@ export class PostgresJobRepository implements JobRepository {
             failure_reason
           FROM ${this.tables.partitionExecutions}
           WHERE step_execution_id = $1
-            AND status = 'created'
-          ORDER BY created_at ASC, id ASC
+            AND (
+              status = 'created'
+              OR (
+                status = 'running'
+                AND $2::timestamptz IS NOT NULL
+                AND heartbeat_at IS NOT NULL
+                AND heartbeat_at < $2::timestamptz
+              )
+            )
+          ORDER BY
+            CASE WHEN status = 'created' THEN 0 ELSE 1 END,
+            created_at ASC,
+            id ASC
           LIMIT 1
           FOR UPDATE SKIP LOCKED
         `,
-        [options.stepExecutionId]
+        [options.stepExecutionId, createStaleBefore(options)]
       );
       const [row] = rowsFromPostgresResult<PostgresPartitionExecutionRow>(result);
 
@@ -478,17 +498,43 @@ export class PostgresJobRepository implements JobRepository {
         return undefined;
       }
 
+      const execution = toPartitionExecution(row);
       const claimed: PartitionExecution = {
-        ...toPartitionExecution(row),
+        ...execution,
         status: "running",
         ownerId: options.ownerId,
-        startedAt: options.now
+        heartbeatAt: options.now,
+        claimExpiresAt: createClaimExpiresAt(options),
+        startedAt: execution.startedAt ?? options.now
       };
 
       await this.updatePartitionExecutionWithClient(client, claimed);
 
       return claimed;
     });
+  }
+
+  async heartbeatPartitionExecution(id: string, ownerId: string, now: Date): Promise<boolean> {
+    const result = await this.pool.query(
+      `
+        UPDATE ${this.tables.partitionExecutions}
+        SET heartbeat_at = $1
+        WHERE id = $2
+          AND owner_id = $3
+          AND status = 'running'
+      `,
+      [now, id, ownerId]
+    );
+
+    return rowCountFromPostgresResult(result) > 0;
+  }
+
+  async completePartitionExecution(execution: PartitionExecution, ownerId: string): Promise<boolean> {
+    return this.updateOwnedPartitionExecution(this.pool, execution, ownerId);
+  }
+
+  async failPartitionExecution(execution: PartitionExecution, ownerId: string): Promise<boolean> {
+    return this.updateOwnedPartitionExecution(this.pool, execution, ownerId);
   }
 
   private async withTransaction<T>(
@@ -613,15 +659,17 @@ export class PostgresJobRepository implements JobRepository {
           status = $3,
           partition = $4::jsonb,
           owner_id = $5,
-          read_count = $6,
-          write_count = $7,
-          skip_count = $8,
-          retry_count = $9,
-          created_at = $10,
-          started_at = $11,
-          ended_at = $12,
-          failure_reason = $13
-        WHERE id = $14
+          heartbeat_at = $6,
+          claim_expires_at = $7,
+          read_count = $8,
+          write_count = $9,
+          skip_count = $10,
+          retry_count = $11,
+          created_at = $12,
+          started_at = $13,
+          ended_at = $14,
+          failure_reason = $15
+        WHERE id = $16
       `,
       [
         execution.stepExecutionId,
@@ -629,6 +677,8 @@ export class PostgresJobRepository implements JobRepository {
         execution.status,
         stringifyPostgresJson(execution.partition),
         execution.ownerId ?? null,
+        execution.heartbeatAt ?? null,
+        execution.claimExpiresAt ?? null,
         execution.readCount,
         execution.writeCount,
         execution.skipCount,
@@ -641,4 +691,67 @@ export class PostgresJobRepository implements JobRepository {
       ]
     );
   }
+
+  private async updateOwnedPartitionExecution(
+    client: PostgresClientLike,
+    execution: PartitionExecution,
+    ownerId: string
+  ): Promise<boolean> {
+    const result = await client.query(
+      `
+        UPDATE ${this.tables.partitionExecutions}
+        SET
+          step_execution_id = $1,
+          step_name = $2,
+          status = $3,
+          partition = $4::jsonb,
+          owner_id = $5,
+          heartbeat_at = $6,
+          claim_expires_at = $7,
+          read_count = $8,
+          write_count = $9,
+          skip_count = $10,
+          retry_count = $11,
+          created_at = $12,
+          started_at = $13,
+          ended_at = $14,
+          failure_reason = $15
+        WHERE id = $16
+          AND owner_id = $17
+      `,
+      [
+        execution.stepExecutionId,
+        execution.stepName,
+        execution.status,
+        stringifyPostgresJson(execution.partition),
+        execution.ownerId ?? null,
+        execution.heartbeatAt ?? null,
+        execution.claimExpiresAt ?? null,
+        execution.readCount,
+        execution.writeCount,
+        execution.skipCount,
+        execution.retryCount,
+        execution.createdAt,
+        execution.startedAt ?? null,
+        execution.endedAt ?? null,
+        execution.failureReason ?? null,
+        execution.id,
+        ownerId
+      ]
+    );
+
+    return rowCountFromPostgresResult(result) > 0;
+  }
 }
+
+const createStaleBefore = (options: PartitionClaimOptions): Date | null => {
+  return options.staleAfterMs === undefined
+    ? null
+    : new Date(options.now.getTime() - options.staleAfterMs);
+};
+
+const createClaimExpiresAt = (options: PartitionClaimOptions): Date | undefined => {
+  return options.staleAfterMs === undefined
+    ? undefined
+    : new Date(options.now.getTime() + options.staleAfterMs);
+};
