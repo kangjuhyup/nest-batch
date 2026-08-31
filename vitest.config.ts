@@ -13,6 +13,7 @@ export default defineConfig({
       "@nest-batch/mysql": fromRoot("./packages/mysql/src/index.ts"),
       "@nest-batch/mariadb": fromRoot("./packages/mariadb/src/index.ts"),
       "@nest-batch/scheduler-core": fromRoot("./packages/scheduler-core/src/index.ts"),
+      "@nest-batch/scheduler-calendar": fromRoot("./packages/scheduler-calendar/src/index.ts"),
       "@nest-batch/queue-core": fromRoot("./packages/queue-core/src/index.ts"),
       "@nest-batch/queue-bullmq": fromRoot("./packages/queue-bullmq/src/index.ts"),
       "@nest-batch/worker-local": fromRoot("./packages/worker-local/src/index.ts"),

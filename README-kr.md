@@ -29,6 +29,7 @@ contract, BullMQ queue adapter 경계, production scheduling 1차 구현을 제�
 - `@nest-batch/queue-core`: queue-neutral `WorkQueue` contract와 worker loop.
 - `@nest-batch/queue-bullmq`: BullMQ-compatible `WorkQueue` adapter 경계.
 - `@nest-batch/scheduler-core`: framework-independent schedule definition, trigger evaluation, occurrence claim orchestration, dispatch helper.
+- `@nest-batch/scheduler-calendar`: 의존성이 작은 UTC daily, weekly, monthly trigger helper.
 - `@nest-batch/cli`: 운영 CLI 경계.
 
 ## Distributed Workers
@@ -94,10 +95,28 @@ scheduler dispatch는 at-least-once입니다. scheduler crash, queue redelivery,
 worker crash가 있으면 같은 occurrence가 다시 dispatch될 수 있으므로 writer와
 외부 side effect는 idempotency key 또는 natural unique constraint를 사용해야
 합니다.
+scheduler는 최신 terminal occurrence(`dispatched` 또는 `failed`)를 trigger
+기준으로 사용하므로 stale `claimed` occurrence는 claim TTL이 지난 뒤 다시
+회수될 수 있고, 영구히 건너뛰지 않습니다.
+
+UTC calendar schedule은 `scheduler-core` 밖에서 해석합니다. 기본 daily, weekly,
+monthly rule은 optional helper package를 사용할 수 있습니다.
+
+```ts
+import { createUtcDailyTrigger } from "@nest-batch/scheduler-calendar";
+
+const trigger = createUtcDailyTrigger({
+  startAt: new Date("2026-01-01T00:00:00.000Z"),
+  time: { hour: 9, minute: 30 }
+});
+```
 
 ```bash
 nest-batch schedule --once
 nest-batch schedule --poll-interval-ms 1000 --scheduler-id scheduler-1
+nest-batch schedule --list
+nest-batch schedule --status --schedule billing.daily
+nest-batch schedule --failed --schedule billing.daily --limit 10
 ```
 
 ## Development

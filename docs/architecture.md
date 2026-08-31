@@ -27,6 +27,13 @@ occurrence claim orchestration, and dispatch to `BatchRunner` or `WorkQueue`.
 It does not own job execution semantics, schedule discovery, database client
 construction, queue implementation details, or NestJS lifecycle policy.
 
+## `@nest-batch/scheduler-calendar`
+
+Scheduler calendar contains optional UTC daily, weekly, and monthly trigger
+helpers. It depends on `@nest-batch/scheduler-core` only through the
+`ScheduleTrigger` contract; full cron expression parsing and timezone/DST
+policy stay outside `scheduler-core`.
+
 ## `@nest-batch/nest`
 
 Nest integration contains module APIs, decorators, discovery, and lifecycle
@@ -89,6 +96,9 @@ Runtime work should treat failure and restart as normal paths:
 - distributed execution assumes at-least-once delivery
 - scheduler dispatch is at-least-once and uses deterministic occurrence ids
 - scheduler failure records dispatch failure, not job failure
+- scheduler trigger boundaries advance from terminal occurrence state, not from
+  still-claimed occurrence state
+- scheduler lifecycle events can be observed without changing dispatch semantics
 - schedule definitions live in application code; durable stores persist occurrence state
 - SQL adapter locks store `ownerId`, `acquiredAt`, and optional `expiresAt`; stale lock recovery is TTL based
 - idempotency expectations are documented near job parameters and retry behavior

@@ -1,5 +1,7 @@
 import type {
   ScheduleClaimOptions,
+  ScheduleFindLatestOccurrenceOptions,
+  ScheduleListOccurrencesOptions,
   ScheduleMarkDispatchedOptions,
   ScheduleMarkFailedOptions,
   ScheduleOccurrence,
@@ -44,20 +46,62 @@ export class MariaDbScheduleStore implements ScheduleStore {
     await ensureMariaDbScheduleSchema(this.options);
   }
 
-  async findLatestOccurrence(scheduleName: string): Promise<ScheduleOccurrence | undefined> {
+  async findLatestOccurrence(
+    scheduleName: string,
+    options: ScheduleFindLatestOccurrenceOptions = {}
+  ): Promise<ScheduleOccurrence | undefined> {
+    const values: unknown[] = [scheduleName];
+    const statusFilter = createMariaDbStatusFilter(options.statuses, values);
     const result = await this.pool.query(
       `
         SELECT *
         FROM ${this.tables.scheduleOccurrences}
-        WHERE schedule_name = ?
+        WHERE schedule_name = ?${statusFilter}
         ORDER BY scheduled_at DESC, occurrence_id DESC
         LIMIT 1
       `,
-      [scheduleName]
+      values
     );
     const [row] = rowsFromMariaDbResult<MariaDbScheduleOccurrenceRow>(result);
 
     return row ? mapMariaDbScheduleOccurrence(row) : undefined;
+  }
+
+  async listOccurrences(
+    options: ScheduleListOccurrencesOptions = {}
+  ): Promise<readonly ScheduleOccurrence[]> {
+    const values: unknown[] = [];
+    const filters: string[] = [];
+
+    if (options.scheduleName !== undefined) {
+      values.push(options.scheduleName);
+      filters.push("schedule_name = ?");
+    }
+
+    if (options.status !== undefined) {
+      assertScheduleStatus(options.status, "MariaDB schedule occurrence status filter");
+      values.push(options.status);
+      filters.push("status = ?");
+    }
+
+    const limit = normalizeLimit(options.limit);
+    const whereClause = filters.length === 0 ? "" : `WHERE ${filters.join(" AND ")}`;
+    const limitClause = limit === undefined ? "" : `LIMIT ${limit}`;
+
+    const result = await this.pool.query(
+      `
+        SELECT *
+        FROM ${this.tables.scheduleOccurrences}
+        ${whereClause}
+        ORDER BY scheduled_at DESC, occurrence_id DESC
+        ${limitClause}
+      `,
+      values
+    );
+
+    return rowsFromMariaDbResult<MariaDbScheduleOccurrenceRow>(result).map(
+      mapMariaDbScheduleOccurrence
+    );
   }
 
   async claimOccurrence(
@@ -198,4 +242,36 @@ const parseScheduleStatus = (status: string): ScheduleOccurrence["status"] => {
   }
 
   throw new TypeError("Invalid MariaDB schedule occurrence status.");
+};
+
+const createMariaDbStatusFilter = (
+  statuses: readonly ScheduleOccurrence["status"][] | undefined,
+  values: unknown[]
+): string => {
+  if (statuses === undefined || statuses.length === 0) {
+    return "";
+  }
+
+  for (const status of statuses) {
+    assertScheduleStatus(status, "MariaDB schedule occurrence status filter");
+    values.push(status);
+  }
+
+  return ` AND status IN (${statuses.map(() => "?").join(", ")})`;
+};
+
+const assertScheduleStatus = (status: string, context: string): void => {
+  if (status !== "claimed" && status !== "dispatched" && status !== "failed") {
+    throw new TypeError(`Invalid ${context}.`);
+  }
+};
+
+const normalizeLimit = (limit: number | undefined): number | undefined => {
+  if (limit === undefined) {
+    return undefined;
+  }
+  if (!Number.isSafeInteger(limit) || limit < 0) {
+    throw new TypeError("MariaDB schedule occurrence list limit must be a non-negative safe integer.");
+  }
+  return limit;
 };

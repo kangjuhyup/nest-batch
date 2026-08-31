@@ -1,5 +1,7 @@
 import type {
   ScheduleClaimOptions,
+  ScheduleFindLatestOccurrenceOptions,
+  ScheduleListOccurrencesOptions,
   ScheduleMarkDispatchedOptions,
   ScheduleMarkFailedOptions,
   ScheduleOccurrence,
@@ -10,19 +12,35 @@ import type {
 export class InMemoryScheduleStore implements ScheduleStore {
   private readonly occurrences = new Map<string, ScheduleOccurrence>();
 
-  async findLatestOccurrence(scheduleName: string): Promise<ScheduleOccurrence | undefined> {
+  async findLatestOccurrence(
+    scheduleName: string,
+    options: ScheduleFindLatestOccurrenceOptions = {}
+  ): Promise<ScheduleOccurrence | undefined> {
     const occurrence = [...this.occurrences.values()]
       .filter((candidate) => candidate.scheduleName === scheduleName)
+      .filter((candidate) => matchesStatuses(candidate, options.statuses))
       .sort(compareOccurrenceDesc)[0];
 
     return occurrence ? cloneOccurrence(occurrence) : undefined;
+  }
+
+  async listOccurrences(
+    options: ScheduleListOccurrencesOptions = {}
+  ): Promise<readonly ScheduleOccurrence[]> {
+    return [...this.occurrences.values()]
+      .filter((candidate) => options.scheduleName === undefined || candidate.scheduleName === options.scheduleName)
+      .filter((candidate) => options.status === undefined || candidate.status === options.status)
+      .sort(compareOccurrenceDesc)
+      .slice(0, normalizeLimit(options.limit))
+      .map(cloneOccurrence);
   }
 
   async claimOccurrence(
     candidate: ScheduleOccurrenceCandidate,
     options: ScheduleClaimOptions
   ): Promise<ScheduleOccurrence | undefined> {
-    const existing = this.occurrences.get(candidate.occurrenceId);
+    const key = occurrenceKey(candidate.scheduleName, candidate.occurrenceId);
+    const existing = this.occurrences.get(key);
 
     if (existing && !canReclaim(existing, options.claimedAt)) {
       return undefined;
@@ -38,7 +56,7 @@ export class InMemoryScheduleStore implements ScheduleStore {
           ? undefined
           : new Date(options.claimedAt.getTime() + options.claimTtlMs)
     };
-    this.occurrences.set(claimed.occurrenceId, cloneOccurrence(claimed));
+    this.occurrences.set(key, cloneOccurrence(claimed));
     return cloneOccurrence(claimed);
   }
 
@@ -70,16 +88,34 @@ export class InMemoryScheduleStore implements ScheduleStore {
     ownerId: string,
     next: ScheduleOccurrence
   ): boolean {
-    const stored = this.occurrences.get(occurrence.occurrenceId);
+    const stored = this.occurrences.get(occurrenceKey(occurrence.scheduleName, occurrence.occurrenceId));
 
     if (!stored || stored.status !== "claimed" || stored.ownerId !== ownerId) {
       return false;
     }
 
-    this.occurrences.set(occurrence.occurrenceId, cloneOccurrence(next));
+    this.occurrences.set(occurrenceKey(occurrence.scheduleName, occurrence.occurrenceId), cloneOccurrence(next));
     return true;
   }
 }
+
+const occurrenceKey = (scheduleName: string, occurrenceId: string): string =>
+  `${scheduleName}\u0000${occurrenceId}`;
+
+const matchesStatuses = (
+  occurrence: ScheduleOccurrence,
+  statuses: readonly ScheduleOccurrence["status"][] | undefined
+): boolean => statuses === undefined || statuses.length === 0 || statuses.includes(occurrence.status);
+
+const normalizeLimit = (limit: number | undefined): number | undefined => {
+  if (limit === undefined) {
+    return undefined;
+  }
+  if (!Number.isSafeInteger(limit) || limit < 0) {
+    throw new TypeError("Schedule occurrence list limit must be a non-negative safe integer.");
+  }
+  return limit;
+};
 
 const canReclaim = (occurrence: ScheduleOccurrence, now: Date): boolean =>
   occurrence.status === "claimed" &&

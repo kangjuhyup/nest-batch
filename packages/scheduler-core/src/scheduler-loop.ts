@@ -1,7 +1,9 @@
 import { createScheduleOccurrenceId } from "./occurrence-id.js";
 import type {
+  ScheduleEvent,
   ScheduleDefinition,
   ScheduleOccurrence,
+  ScheduleOccurrenceCandidate,
   SchedulerLoopOptions,
   SchedulerTickOptions,
   SchedulerTickResult
@@ -14,6 +16,7 @@ export class SchedulerLoop {
   constructor(private readonly options: SchedulerLoopOptions) {
     assertOwnerId(options.ownerId);
     assertPollInterval(options.pollIntervalMs ?? 1_000);
+    assertUniqueScheduleNames(options.schedules);
 
     this.schedules = options.schedules;
     this.pollIntervalMs = options.pollIntervalMs ?? 1_000;
@@ -42,19 +45,22 @@ export class SchedulerLoop {
       );
 
       if (!lock) {
+        await this.emit({
+          type: "schedule.lock.skipped",
+          scheduleName: schedule.name,
+          ownerId: this.options.ownerId,
+          observedAt: now
+        });
         continue;
       }
 
       try {
-        const latest = await this.options.store.findLatestOccurrence(schedule.name);
-        const due = schedule.trigger.getDueOccurrences({ after: latest?.scheduledAt, now });
-        const selected = selectDueOccurrences(schedule, due);
+        const selected = await this.selectCandidates(schedule, now);
 
-        for (const scheduledAt of selected) {
+        for (const candidate of selected) {
           signal.throwIfAborted();
-          const occurrenceId = createScheduleOccurrenceId(schedule.name, scheduledAt);
           const claimed = await this.options.store.claimOccurrence(
-            { scheduleName: schedule.name, occurrenceId, scheduledAt },
+            candidate,
             {
               ownerId: this.options.ownerId,
               claimedAt: now,
@@ -67,6 +73,15 @@ export class SchedulerLoop {
           }
 
           result.claimedOccurrences += 1;
+          await this.emit({
+            type: "schedule.occurrence.claimed",
+            scheduleName: schedule.name,
+            ownerId: this.options.ownerId,
+            observedAt: now,
+            occurrenceId: claimed.occurrenceId,
+            scheduledAt: claimed.scheduledAt,
+            claimExpiresAt: claimed.claimExpiresAt
+          });
           await this.dispatch(schedule, claimed, signal, now, result);
         }
       } finally {
@@ -86,7 +101,7 @@ export class SchedulerLoop {
         await delay(this.pollIntervalMs, controller.signal);
       }
     } catch (error) {
-      if (!isAbortError(error)) {
+      if (!controller.signal.aborted && !isAbortError(error)) {
         throw error;
       }
     } finally {
@@ -111,15 +126,89 @@ export class SchedulerLoop {
         })
       ) {
         result.dispatchedOccurrences += 1;
+        await this.emit({
+          type: "schedule.occurrence.dispatched",
+          scheduleName: schedule.name,
+          ownerId: this.options.ownerId,
+          observedAt: now,
+          occurrenceId: occurrence.occurrenceId,
+          scheduledAt: occurrence.scheduledAt,
+          dispatchedAt: now
+        });
       }
     } catch (error) {
+      if (signal.aborted || isAbortError(error)) {
+        throw error;
+      }
+
+      const failureReason = error instanceof Error ? error.message : String(error);
       await this.options.store.markFailed(occurrence, {
         ownerId: this.options.ownerId,
         failedAt: now,
-        failureReason: error instanceof Error ? error.message : String(error)
+        failureReason
+      });
+      await this.emit({
+        type: "schedule.occurrence.dispatch_failed",
+        scheduleName: schedule.name,
+        ownerId: this.options.ownerId,
+        observedAt: now,
+        occurrenceId: occurrence.occurrenceId,
+        scheduledAt: occurrence.scheduledAt,
+        failedAt: now,
+        failureReason
       });
       result.failedOccurrences += 1;
     }
+  }
+
+  private async emit(event: ScheduleEvent): Promise<void> {
+    try {
+      await this.options.observer?.onScheduleEvent(event);
+    } catch {
+      // Observer failures must not change scheduler state transitions.
+    }
+  }
+
+  private async selectCandidates(
+    schedule: ScheduleDefinition,
+    now: Date
+  ): Promise<readonly ScheduleOccurrenceCandidate[]> {
+    const reclaimable = await this.findReclaimableClaimedOccurrences(schedule, now);
+
+    if (reclaimable.length > 0) {
+      return reclaimable;
+    }
+
+    const latest = await this.options.store.findLatestOccurrence(schedule.name, {
+      statuses: ["dispatched", "failed"]
+    });
+    const due = schedule.trigger.getDueOccurrences({ after: latest?.scheduledAt, now });
+
+    return selectDueOccurrences(schedule, due).map((scheduledAt) => ({
+      scheduleName: schedule.name,
+      occurrenceId: createScheduleOccurrenceId(schedule.name, scheduledAt),
+      scheduledAt
+    }));
+  }
+
+  private async findReclaimableClaimedOccurrences(
+    schedule: ScheduleDefinition,
+    now: Date
+  ): Promise<readonly ScheduleOccurrenceCandidate[]> {
+    const occurrences = await this.options.store.listOccurrences({
+      scheduleName: schedule.name,
+      status: "claimed"
+    });
+
+    return occurrences
+      .filter((occurrence) => isReclaimable(occurrence, now))
+      .sort(compareOccurrenceAsc)
+      .slice(0, schedule.maxCatchUpOccurrences ?? 100)
+      .map((occurrence) => ({
+        scheduleName: occurrence.scheduleName,
+        occurrenceId: occurrence.occurrenceId,
+        scheduledAt: occurrence.scheduledAt
+      }));
   }
 }
 
@@ -144,6 +233,19 @@ const selectDueOccurrences = (
   return sorted.slice(0, schedule.maxCatchUpOccurrences ?? 100);
 };
 
+const isReclaimable = (occurrence: ScheduleOccurrence, now: Date): boolean =>
+  occurrence.claimExpiresAt !== undefined &&
+  occurrence.claimExpiresAt.getTime() <= now.getTime() &&
+  occurrence.scheduledAt.getTime() <= now.getTime();
+
+const compareOccurrenceAsc = (
+  left: Pick<ScheduleOccurrence, "scheduledAt" | "occurrenceId">,
+  right: Pick<ScheduleOccurrence, "scheduledAt" | "occurrenceId">
+): number => {
+  const diff = left.scheduledAt.getTime() - right.scheduledAt.getTime();
+  return diff === 0 ? left.occurrenceId.localeCompare(right.occurrenceId) : diff;
+};
+
 const assertOwnerId = (ownerId: string): void => {
   if (ownerId.trim().length === 0) {
     throw new TypeError("SchedulerLoop ownerId is required.");
@@ -153,6 +255,17 @@ const assertOwnerId = (ownerId: string): void => {
 const assertPollInterval = (pollIntervalMs: number): void => {
   if (!Number.isSafeInteger(pollIntervalMs) || pollIntervalMs < 0) {
     throw new TypeError("SchedulerLoop pollIntervalMs must be a non-negative safe integer.");
+  }
+};
+
+const assertUniqueScheduleNames = (schedules: readonly ScheduleDefinition[]): void => {
+  const names = new Set<string>();
+
+  for (const schedule of schedules) {
+    if (names.has(schedule.name)) {
+      throw new TypeError(`SchedulerLoop schedules must have unique names. Duplicate: ${schedule.name}.`);
+    }
+    names.add(schedule.name);
   }
 };
 

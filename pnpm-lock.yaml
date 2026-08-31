@@ -153,6 +153,12 @@ importers:
 
   packages/queue-core: {}
 
+  packages/scheduler-calendar:
+    dependencies:
+      '@nest-batch/scheduler-core':
+        specifier: workspace:*
+        version: link:../scheduler-core
+
   packages/scheduler-core:
     dependencies:
       '@nest-batch/core':

@@ -33,6 +33,9 @@ describe("scheduler core type exports / scheduler core type export를 검증한�
       async findLatestOccurrence() {
         return occurrence;
       },
+      async listOccurrences() {
+        return [occurrence];
+      },
       async claimOccurrence(candidate) {
         return { ...candidate, status: "claimed", ownerId: "scheduler-1" };
       },
@@ -48,6 +51,7 @@ describe("scheduler core type exports / scheduler core type export를 검증한�
     expect(schedulerCore).toBeDefined();
     expect(schedule.jobName).toBe("billing");
     expect(await store.findLatestOccurrence(schedule.name)).toBe(occurrence);
+    await expect(store.listOccurrences({ status: "claimed" })).resolves.toEqual([occurrence]);
     await expect(
       dispatcher({ schedule, occurrence, signal: new AbortController().signal })
     ).resolves.toBeUndefined();

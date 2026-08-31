@@ -116,6 +116,7 @@ const parseConnectionString = (connectionString: string, database: string): MySq
 };
 
 const createTableNames = (tablePrefix: string): readonly string[] => [
+  `${tablePrefix}_schedule_occurrences`,
   `${tablePrefix}_locks`,
   `${tablePrefix}_checkpoints`,
   `${tablePrefix}_partition_executions`,

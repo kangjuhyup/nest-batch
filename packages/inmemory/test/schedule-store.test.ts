@@ -83,4 +83,119 @@ describe("inmemory schedule store / inmemory schedule store를 검증한다", ()
       failureReason: "enqueue failed"
     });
   });
+
+  it("keeps occurrence ids scoped by schedule name / occurrence id를 schedule name별로 분리한다", async () => {
+    const store = new InMemoryScheduleStore();
+    const sharedOccurrenceId = "shared-occurrence";
+
+    const billing = await store.claimOccurrence(
+      {
+        scheduleName: "billing.daily",
+        occurrenceId: sharedOccurrenceId,
+        scheduledAt: new Date("2026-01-01T00:00:00.000Z")
+      },
+      {
+        ownerId: "billing-scheduler",
+        claimedAt: new Date("2026-01-01T00:00:01.000Z")
+      }
+    );
+    const settlement = await store.claimOccurrence(
+      {
+        scheduleName: "settlement.daily",
+        occurrenceId: sharedOccurrenceId,
+        scheduledAt: new Date("2026-01-01T00:00:00.000Z")
+      },
+      {
+        ownerId: "settlement-scheduler",
+        claimedAt: new Date("2026-01-01T00:00:01.000Z")
+      }
+    );
+
+    expect(billing).toMatchObject({ scheduleName: "billing.daily" });
+    expect(settlement).toMatchObject({ scheduleName: "settlement.daily" });
+    await expect(store.findLatestOccurrence("billing.daily")).resolves.toMatchObject({
+      ownerId: "billing-scheduler"
+    });
+    await expect(store.findLatestOccurrence("settlement.daily")).resolves.toMatchObject({
+      ownerId: "settlement-scheduler"
+    });
+  });
+
+  it("filters latest occurrences by status / status로 latest occurrence를 필터링한다", async () => {
+    const store = new InMemoryScheduleStore();
+    const claimed = await store.claimOccurrence(
+      {
+        scheduleName: "billing.daily",
+        occurrenceId: "occ-failed",
+        scheduledAt: new Date("2026-01-01T00:00:00.000Z")
+      },
+      {
+        ownerId: "scheduler-1",
+        claimedAt: new Date("2026-01-01T00:00:01.000Z")
+      }
+    );
+    await store.markFailed(claimed!, {
+      ownerId: "scheduler-1",
+      failedAt: new Date("2026-01-01T00:00:02.000Z"),
+      failureReason: "enqueue failed"
+    });
+    await store.claimOccurrence(
+      {
+        scheduleName: "billing.daily",
+        occurrenceId: "occ-claimed",
+        scheduledAt: new Date("2026-01-02T00:00:00.000Z")
+      },
+      {
+        ownerId: "scheduler-2",
+        claimedAt: new Date("2026-01-02T00:00:01.000Z")
+      }
+    );
+
+    await expect(
+      store.findLatestOccurrence("billing.daily", { statuses: ["failed"] })
+    ).resolves.toMatchObject({
+      occurrenceId: "occ-failed",
+      status: "failed"
+    });
+  });
+
+  it("lists occurrences by status and limit / status와 limit으로 occurrence 목록을 조회한다", async () => {
+    const store = new InMemoryScheduleStore();
+    const first = await store.claimOccurrence(
+      {
+        scheduleName: "billing.daily",
+        occurrenceId: "occ-1",
+        scheduledAt: new Date("2026-01-01T00:00:00.000Z")
+      },
+      {
+        ownerId: "scheduler-1",
+        claimedAt: new Date("2026-01-01T00:00:01.000Z")
+      }
+    );
+    const second = await store.claimOccurrence(
+      {
+        scheduleName: "billing.daily",
+        occurrenceId: "occ-2",
+        scheduledAt: new Date("2026-01-02T00:00:00.000Z")
+      },
+      {
+        ownerId: "scheduler-1",
+        claimedAt: new Date("2026-01-02T00:00:01.000Z")
+      }
+    );
+    await store.markFailed(first!, {
+      ownerId: "scheduler-1",
+      failedAt: new Date("2026-01-01T00:00:02.000Z"),
+      failureReason: "first"
+    });
+    await store.markFailed(second!, {
+      ownerId: "scheduler-1",
+      failedAt: new Date("2026-01-02T00:00:02.000Z"),
+      failureReason: "second"
+    });
+
+    await expect(store.listOccurrences({ status: "failed", limit: 1 })).resolves.toMatchObject([
+      { occurrenceId: "occ-2", failureReason: "second" }
+    ]);
+  });
 });

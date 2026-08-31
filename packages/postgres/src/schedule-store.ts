@@ -1,5 +1,7 @@
 import type {
   ScheduleClaimOptions,
+  ScheduleFindLatestOccurrenceOptions,
+  ScheduleListOccurrencesOptions,
   ScheduleMarkDispatchedOptions,
   ScheduleMarkFailedOptions,
   ScheduleOccurrence,
@@ -43,16 +45,61 @@ export class PostgresScheduleStore implements ScheduleStore {
     await ensurePostgresScheduleSchema(this.options);
   }
 
-  async findLatestOccurrence(scheduleName: string): Promise<ScheduleOccurrence | undefined> {
+  async findLatestOccurrence(
+    scheduleName: string,
+    options: ScheduleFindLatestOccurrenceOptions = {}
+  ): Promise<ScheduleOccurrence | undefined> {
+    const values: unknown[] = [scheduleName];
+    const statusFilter = createPostgresStatusFilter(options.statuses, values);
     const result = await this.pool.query<PostgresScheduleOccurrenceRow>(
       `SELECT * FROM ${this.tables.scheduleOccurrences}
-       WHERE schedule_name = $1
+       WHERE schedule_name = $1${statusFilter}
        ORDER BY scheduled_at DESC, occurrence_id DESC
        LIMIT 1`,
-      [scheduleName]
+      values
     );
     const [row] = rowsFromPostgresResult<PostgresScheduleOccurrenceRow>(result);
     return row ? mapPostgresScheduleOccurrence(row) : undefined;
+  }
+
+  async listOccurrences(
+    options: ScheduleListOccurrencesOptions = {}
+  ): Promise<readonly ScheduleOccurrence[]> {
+    const values: unknown[] = [];
+    const filters: string[] = [];
+
+    if (options.scheduleName !== undefined) {
+      values.push(options.scheduleName);
+      filters.push(`schedule_name = $${values.length}`);
+    }
+
+    if (options.status !== undefined) {
+      assertScheduleStatus(options.status, "Postgres schedule occurrence status filter");
+      values.push(options.status);
+      filters.push(`status = $${values.length}`);
+    }
+
+    const limit = normalizeLimit(options.limit);
+    const whereClause = filters.length === 0 ? "" : `WHERE ${filters.join(" AND ")}`;
+    const limitClause =
+      limit === undefined
+        ? ""
+        : (() => {
+            values.push(limit);
+            return `LIMIT $${values.length}`;
+          })();
+
+    const result = await this.pool.query<PostgresScheduleOccurrenceRow>(
+      `SELECT * FROM ${this.tables.scheduleOccurrences}
+       ${whereClause}
+       ORDER BY scheduled_at DESC, occurrence_id DESC
+       ${limitClause}`,
+      values
+    );
+
+    return rowsFromPostgresResult<PostgresScheduleOccurrenceRow>(result).map(
+      mapPostgresScheduleOccurrence
+    );
   }
 
   async claimOccurrence(
@@ -144,4 +191,37 @@ const parseScheduleStatus = (status: string): ScheduleOccurrence["status"] => {
   }
 
   throw new TypeError("Invalid Postgres schedule occurrence status.");
+};
+
+const createPostgresStatusFilter = (
+  statuses: readonly ScheduleOccurrence["status"][] | undefined,
+  values: unknown[]
+): string => {
+  if (statuses === undefined || statuses.length === 0) {
+    return "";
+  }
+
+  for (const status of statuses) {
+    assertScheduleStatus(status, "Postgres schedule occurrence status filter");
+    values.push(status);
+  }
+
+  const placeholders = statuses.map((_, index) => `$${values.length - statuses.length + index + 1}`);
+  return ` AND status IN (${placeholders.join(", ")})`;
+};
+
+const assertScheduleStatus = (status: string, context: string): void => {
+  if (status !== "claimed" && status !== "dispatched" && status !== "failed") {
+    throw new TypeError(`Invalid ${context}.`);
+  }
+};
+
+const normalizeLimit = (limit: number | undefined): number | undefined => {
+  if (limit === undefined) {
+    return undefined;
+  }
+  if (!Number.isSafeInteger(limit) || limit < 0) {
+    throw new TypeError("Postgres schedule occurrence list limit must be a non-negative safe integer.");
+  }
+  return limit;
 };

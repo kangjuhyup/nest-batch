@@ -10,13 +10,14 @@ job, step, checkpoint, retry, skip 의미는 기존 runtime이 계속 소유한�
 1차 구현은 다음을 제공한다.
 
 - `@nest-batch/scheduler-core` package
+- `@nest-batch/scheduler-calendar` package
 - code-defined schedule definition과 deterministic occurrence id
 - `SchedulerLoop`를 통한 tick 기반 scheduling
 - `ScheduleStore` contract와 `@nest-batch/inmemory` 구현
 - Postgres/MySQL/MariaDB `ScheduleStore` 구현
 - direct runner dispatch와 queue dispatch helper
-- CLI에서 scheduler를 한 번 tick하거나 loop로 실행하는 command
-- Nest module에서 scheduler 구성요소를 주입할 수 있는 provider 경계
+- CLI에서 scheduler를 한 번 tick하거나 loop로 실행하고 occurrence 상태를 조회하는 command
+- Nest module에서 scheduler 구성요소를 주입하고 lifecycle로 자동 시작할 수 있는 provider 경계
 
 ## 비목표
 
@@ -24,6 +25,7 @@ job, step, checkpoint, retry, skip 의미는 기존 runtime이 계속 소유한�
 
 - Spring Batch 또는 Quartz 수준의 모든 trigger 기능 복제
 - 외부 cron parser 의존성 추가
+- timezone/DST 보정이 포함된 full cron expression parser
 - runtime job 실패를 scheduler가 자동 restart하는 동작
 - UI, dashboard, schedule 편집 API
 - schedule definition을 database에 저장하고 동적으로 수정하는 기능
@@ -48,6 +50,12 @@ database driver, queue implementation에 의존하지 않는다.
 - `createIntervalTrigger`
 - `createRunnerScheduleDispatcher`
 - `createQueueScheduleDispatcher`
+
+### `@nest-batch/scheduler-calendar`
+
+`@nest-batch/scheduler-calendar`는 UTC daily, weekly, monthly rule을
+`ScheduleTrigger` contract로 제공한다. 이 package는 timezone/DST policy와 full
+cron expression parsing을 소유하지 않는다.
 
 ### SQL adapter packages
 
@@ -121,9 +129,12 @@ await loop.tick({ now: new Date(), signal });
 - `ScheduleOccurrence`: `scheduleName`, `occurrenceId`, `scheduledAt`, `status`,
   `ownerId`, `claimExpiresAt`, `dispatchedAt`, `failureReason`을 가진다.
 - `ScheduleStore`: occurrence claim, dispatch 완료 기록, dispatch 실패 기록,
-  최신 occurrence 조회를 담당한다.
+  최신 occurrence 조회와 occurrence 목록 조회를 담당한다.
 - `SchedulerLoop`: 여러 schedule을 순회하며 due occurrence를 claim하고 dispatcher를
   호출한다.
+- `ScheduleObserver`: lock skip, occurrence claim, dispatch success, dispatch
+  failure event를 관찰한다. observer 실패는 scheduler state transition을 바꾸지
+  않는다.
 - `ScheduleDispatcher`: occurrence를 실제 runtime dispatch로 바꾸는 함수다.
   runner dispatcher는 주입된 job registry에서 `jobName`을 찾고, queue dispatcher는
   기존 CLI worker payload와 호환되는 `WorkUnit`을 만든다.
@@ -132,8 +143,8 @@ await loop.tick({ now: new Date(), signal });
 
 1. application이 schedule definition 목록을 구성한다.
 2. `SchedulerLoop.tick()`이 각 schedule의 schedule-level lock을 획득한다.
-3. loop가 `ScheduleStore.findLatestOccurrence(scheduleName)`로 마지막 durable
-   occurrence를 읽는다.
+3. loop가 `ScheduleStore.findLatestOccurrence(scheduleName, { statuses:
+   ["dispatched", "failed"] })`로 마지막 terminal occurrence를 읽는다.
 4. `ScheduleTrigger.getDueOccurrences()`가 마지막 occurrence 이후부터 `now`까지
    due occurrence를 계산한다.
 5. `misfirePolicy`에 따라 dispatch할 occurrence를 고른다.
@@ -180,10 +191,14 @@ constraint를 사용해야 한다.
 
 ## Trigger
 
-1차 built-in trigger는 `createIntervalTrigger()`만 제공한다. interval trigger는
-`startAt`을 기준으로 `everyMs` 간격의 deterministic occurrence를 계산한다.
-calendar cron은 `ScheduleTrigger` contract를 통해 application이 직접 감쌀 수
-있고, 별도 cron helper package 또는 optional dependency는 이후 설계에서 추가한다.
+`@nest-batch/scheduler-core`의 built-in trigger는 `createIntervalTrigger()`만
+제공한다. interval trigger는 `startAt`을 기준으로 `everyMs` 간격의 deterministic
+occurrence를 계산한다.
+
+UTC calendar rule은 `@nest-batch/scheduler-calendar` package에서
+`createUtcDailyTrigger()`, `createUtcWeeklyTrigger()`,
+`createUtcMonthlyTrigger()`로 제공한다. 이 package는 `ScheduleTrigger` contract에만
+의존하며 timezone, DST, full cron expression parser는 포함하지 않는다.
 
 `ScheduleTrigger`는 `Date`와 순수 계산으로 동작해야 한다. timezone, DST, calendar
 rule 같은 해석은 trigger 구현의 책임이며 scheduler loop가 임의로 보정하지 않는다.
@@ -203,6 +218,9 @@ dispatch 실패는 scheduler 실패이고 job 실패가 아니다. queue enqueue
 `BatchRunner.run()` 호출 자체가 throw하면 occurrence는 `failed`가 된다. direct
 runner가 정상적으로 `JobExecution`을 만들고 그 execution이 `failed`로 끝나는 경우는
 dispatch 성공으로 기록한다. 이후 retry/restart는 기존 runtime과 CLI가 담당한다.
+shutdown `AbortSignal` 또는 `AbortError`로 dispatch가 중단된 경우에는 occurrence를
+`failed`로 확정하지 않고 `claimed` 상태로 남긴다. claim TTL이 지난 뒤 다른
+scheduler가 같은 occurrence를 다시 claim할 수 있다.
 
 ## CLI
 
@@ -211,6 +229,9 @@ CLI command는 기존 command와 같은 injection 방식으로 동작한다.
 ```bash
 nest-batch schedule --once
 nest-batch schedule --poll-interval-ms 1000 --scheduler-id scheduler-1
+nest-batch schedule --list
+nest-batch schedule --status --schedule billing.daily
+nest-batch schedule --failed --schedule billing.daily --limit 10
 ```
 
 `--once`는 `SchedulerLoop.tick()` 한 번만 실행한다. `--once`가 없으면
@@ -255,6 +276,8 @@ fake schedule store, fake dispatcher로 작성한다.
 
 - due occurrence를 claim하고 dispatcher를 호출한다.
 - schedule-level lock을 얻지 못하면 dispatch하지 않는다.
+- stale claimed occurrence가 trigger boundary를 밀어내지 않고 TTL 이후 회수된다.
+- dispatch 중 shutdown abort는 occurrence를 `failed`로 기록하지 않는다.
 - 같은 occurrence claim이 실패하면 dispatch하지 않는다.
 - `fire-once`는 밀린 occurrence 중 최신 하나만 dispatch한다.
 - `fire-all`은 오래된 occurrence부터 `maxCatchUpOccurrences`까지 dispatch한다.
@@ -265,6 +288,9 @@ fake schedule store, fake dispatcher로 작성한다.
 adapter test는 Postgres/MySQL/MariaDB fake driver test로 SQL 의미를 고정하고,
 e2e는 최소 Postgres와 Redis queue 조합으로 scheduler가 queue work를 enqueue하고
 worker가 job을 실행하는 흐름을 검증한다.
+SQL schedule store e2e는 Postgres, MySQL, MariaDB 실제 driver와 container로 fresh
+claim, duplicate claim skip, stale claim reclaim, owner guard, failure reason 보존을
+검증한다.
 
 ## Documentation
 

@@ -56,6 +56,16 @@ export interface ScheduleOccurrenceCandidate {
   readonly scheduledAt: Date;
 }
 
+export interface ScheduleFindLatestOccurrenceOptions {
+  readonly statuses?: readonly ScheduleOccurrenceStatus[];
+}
+
+export interface ScheduleListOccurrencesOptions {
+  readonly scheduleName?: string;
+  readonly status?: ScheduleOccurrenceStatus;
+  readonly limit?: number;
+}
+
 export interface ScheduleClaimOptions {
   readonly ownerId: string;
   readonly claimedAt: Date;
@@ -73,8 +83,53 @@ export interface ScheduleMarkFailedOptions {
   readonly failureReason: string;
 }
 
+export interface ScheduleEventBase {
+  readonly scheduleName: string;
+  readonly ownerId: string;
+  readonly observedAt: Date;
+}
+
+export interface ScheduleLockSkippedEvent extends ScheduleEventBase {
+  readonly type: "schedule.lock.skipped";
+}
+
+export interface ScheduleOccurrenceEventBase extends ScheduleEventBase {
+  readonly occurrenceId: string;
+  readonly scheduledAt: Date;
+}
+
+export interface ScheduleOccurrenceClaimedEvent extends ScheduleOccurrenceEventBase {
+  readonly type: "schedule.occurrence.claimed";
+  readonly claimExpiresAt?: Date;
+}
+
+export interface ScheduleOccurrenceDispatchedEvent extends ScheduleOccurrenceEventBase {
+  readonly type: "schedule.occurrence.dispatched";
+  readonly dispatchedAt: Date;
+}
+
+export interface ScheduleOccurrenceDispatchFailedEvent extends ScheduleOccurrenceEventBase {
+  readonly type: "schedule.occurrence.dispatch_failed";
+  readonly failedAt: Date;
+  readonly failureReason: string;
+}
+
+export type ScheduleEvent =
+  | ScheduleLockSkippedEvent
+  | ScheduleOccurrenceClaimedEvent
+  | ScheduleOccurrenceDispatchedEvent
+  | ScheduleOccurrenceDispatchFailedEvent;
+
+export interface ScheduleObserver {
+  onScheduleEvent(event: ScheduleEvent): Promise<void> | void;
+}
+
 export interface ScheduleStore {
-  findLatestOccurrence(scheduleName: string): Promise<ScheduleOccurrence | undefined>;
+  findLatestOccurrence(
+    scheduleName: string,
+    options?: ScheduleFindLatestOccurrenceOptions
+  ): Promise<ScheduleOccurrence | undefined>;
+  listOccurrences(options?: ScheduleListOccurrencesOptions): Promise<readonly ScheduleOccurrence[]>;
   claimOccurrence(
     occurrence: ScheduleOccurrenceCandidate,
     options: ScheduleClaimOptions
@@ -104,6 +159,7 @@ export interface SchedulerLoopOptions {
   readonly claimTtlMs?: number;
   readonly pollIntervalMs?: number;
   readonly now?: () => Date;
+  readonly observer?: ScheduleObserver;
 }
 
 export interface SchedulerTickOptions {

@@ -28,6 +28,7 @@ boundary, and a first production scheduling slice are available.
 - `@nest-batch/queue-core`: queue-neutral `WorkQueue` contract and worker loop.
 - `@nest-batch/queue-bullmq`: BullMQ-compatible `WorkQueue` adapter boundary.
 - `@nest-batch/scheduler-core`: framework-independent schedule definitions, trigger evaluation, occurrence claim orchestration, and dispatch helpers.
+- `@nest-batch/scheduler-calendar`: dependency-light UTC daily, weekly, and monthly trigger helpers.
 - `@nest-batch/cli`: operational CLI boundary.
 
 ## Distributed Workers
@@ -93,10 +94,28 @@ await scheduler.tick();
 Scheduler dispatch is at-least-once. A scheduler crash, queue redelivery, or
 worker crash can dispatch the same occurrence again, so writers and external
 side effects should use an idempotency key or a natural unique constraint.
+The scheduler uses the latest terminal occurrence (`dispatched` or `failed`) as
+the trigger boundary, so a stale `claimed` occurrence can be reclaimed after its
+claim TTL instead of being skipped forever.
+
+For UTC calendar schedules, keep calendar math outside `scheduler-core` and use
+the optional helper package:
+
+```ts
+import { createUtcDailyTrigger } from "@nest-batch/scheduler-calendar";
+
+const trigger = createUtcDailyTrigger({
+  startAt: new Date("2026-01-01T00:00:00.000Z"),
+  time: { hour: 9, minute: 30 }
+});
+```
 
 ```bash
 nest-batch schedule --once
 nest-batch schedule --poll-interval-ms 1000 --scheduler-id scheduler-1
+nest-batch schedule --list
+nest-batch schedule --status --schedule billing.daily
+nest-batch schedule --failed --schedule billing.daily --limit 10
 ```
 
 ## Development

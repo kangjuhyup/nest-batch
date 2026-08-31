@@ -17,6 +17,7 @@ import { BatchContextStorage } from "./batch-context.storage.js";
 import type { NestBatchModuleOptions } from "./module-options.js";
 import { NestBatchRegistry } from "./registry.js";
 import { NestBatchRunner } from "./runner.service.js";
+import { NestBatchSchedulerLifecycle } from "./scheduler-lifecycle.service.js";
 
 export const NEST_BATCH_RUNTIME_EXPORTS = [
   BATCH_RUNNER,
@@ -29,6 +30,7 @@ export const createRuntimeProviders = (options?: NestBatchModuleOptions): Provid
   BatchContextStorage,
   BatchContextAccessor,
   NestBatchRegistry,
+  NestBatchSchedulerLifecycle,
   ...createRuntimeOptionProviders(options),
   {
     provide: BATCH_RUNNER,

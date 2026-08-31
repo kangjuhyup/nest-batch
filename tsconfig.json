@@ -10,6 +10,7 @@
     { "path": "./packages/queue-core" },
     { "path": "./packages/queue-bullmq" },
     { "path": "./packages/scheduler-core" },
+    { "path": "./packages/scheduler-calendar" },
     { "path": "./packages/worker-local" },
     { "path": "./packages/worker-threads" },
     { "path": "./packages/cli" },

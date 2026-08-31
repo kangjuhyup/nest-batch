@@ -21,6 +21,7 @@
       "@nest-batch/mysql": ["packages/mysql/src/index.ts"],
       "@nest-batch/mariadb": ["packages/mariadb/src/index.ts"],
       "@nest-batch/scheduler-core": ["packages/scheduler-core/src/index.ts"],
+      "@nest-batch/scheduler-calendar": ["packages/scheduler-calendar/src/index.ts"],
       "@nest-batch/queue-core": ["packages/queue-core/src/index.ts"],
       "@nest-batch/queue-bullmq": ["packages/queue-bullmq/src/index.ts"],
       "@nest-batch/worker-local": ["packages/worker-local/src/index.ts"],
