@@ -6,5 +6,7 @@ export type { MariaDbBatchOptions, MariaDbPoolLike, MariaDbPoolOptions } from ".
 export { createMariaDbCursorReader } from "./reader.js";
 export type { MariaDbCursorReaderOptions } from "./reader.js";
 export { MariaDbJobRepository } from "./repository/repository.js";
+export { ensureMariaDbScheduleSchema } from "./schedule-schema.js";
+export { MariaDbScheduleStore } from "./schedule-store.js";
 export { ensureMariaDbSchema } from "./schema.js";
 export { MariaDbBatchStorage } from "./storage.js";

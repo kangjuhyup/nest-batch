@@ -18,6 +18,7 @@ export interface MariaDbTables {
   readonly checkpoints: string;
   readonly executionContexts: string;
   readonly locks: string;
+  readonly scheduleOccurrences: string;
 }
 
 export interface MariaDbJobInstanceRow {
@@ -91,7 +92,8 @@ export const createMariaDbTables = (
     partitionExecutions: qualify("partition_executions"),
     checkpoints: qualify("checkpoints"),
     executionContexts: qualify("execution_contexts"),
-    locks: qualify("locks")
+    locks: qualify("locks"),
+    scheduleOccurrences: qualify("schedule_occurrences")
   };
 };
 
