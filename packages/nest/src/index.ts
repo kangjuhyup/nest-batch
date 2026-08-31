@@ -7,6 +7,10 @@ export {
   BATCH_PROCESSOR_METADATA,
   BATCH_READER_METADATA,
   BATCH_RUNNER,
+  BATCH_SCHEDULE_STORE,
+  BATCH_SCHEDULES,
+  BATCH_SCHEDULER_DISPATCHER,
+  BATCH_SCHEDULER_LOOP,
   BATCH_STEP_METADATA,
   BATCH_WORKER_POOL,
   BATCH_WORK_QUEUE,
@@ -24,7 +28,11 @@ export type {
   BatchWriterOptions
 } from "./decorators.js";
 export { NestBatchModule } from "./module.js";
-export type { NestBatchModuleAsyncOptions, NestBatchModuleOptions } from "./module-options.js";
+export type {
+  NestBatchModuleAsyncOptions,
+  NestBatchModuleOptions,
+  NestBatchSchedulerOptions
+} from "./module-options.js";
 export { NestBatchRegistry } from "./registry.js";
 export type { NestBatchComponent, NestBatchDiscoveredJob } from "./registry.js";
 export { NestBatchRunner } from "./runner.service.js";

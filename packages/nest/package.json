@@ -19,7 +19,8 @@
   },
   "dependencies": {
     "@nest-batch/core": "workspace:*",
-    "@nest-batch/queue-core": "workspace:*"
+    "@nest-batch/queue-core": "workspace:*",
+    "@nest-batch/scheduler-core": "workspace:*"
   },
   "peerDependencies": {
     "@nestjs/common": "^10.0.0 || ^11.0.0",

@@ -4,6 +4,10 @@ import type { DynamicModule, Provider } from "@nestjs/common";
 import {
   BATCH_EXECUTION_ENGINE,
   BATCH_RUNNER,
+  BATCH_SCHEDULE_STORE,
+  BATCH_SCHEDULES,
+  BATCH_SCHEDULER_DISPATCHER,
+  BATCH_SCHEDULER_LOOP,
   BATCH_WORKER_POOL,
   BATCH_WORK_QUEUE,
   NEST_BATCH_OPTIONS
@@ -49,7 +53,11 @@ const createRuntimeOptionProviders = (options?: NestBatchModuleOptions): Provide
     return [
       createRuntimeOptionFactoryProvider(BATCH_EXECUTION_ENGINE, "executionEngine"),
       createRuntimeOptionFactoryProvider(BATCH_WORKER_POOL, "workerPool"),
-      createRuntimeOptionFactoryProvider(BATCH_WORK_QUEUE, "workQueue")
+      createRuntimeOptionFactoryProvider(BATCH_WORK_QUEUE, "workQueue"),
+      createRuntimeOptionFactoryProvider(BATCH_SCHEDULE_STORE, "scheduleStore"),
+      createRuntimeOptionFactoryProvider(BATCH_SCHEDULES, "schedules"),
+      createRuntimeOptionFactoryProvider(BATCH_SCHEDULER_DISPATCHER, "schedulerDispatcher"),
+      createRuntimeOptionFactoryProvider(BATCH_SCHEDULER_LOOP, "schedulerLoop")
     ];
   }
 
@@ -67,6 +75,22 @@ const createRuntimeOptionProviders = (options?: NestBatchModuleOptions): Provide
     providers.push({ provide: BATCH_WORK_QUEUE, useValue: options.workQueue });
   }
 
+  if (options.scheduleStore !== undefined) {
+    providers.push({ provide: BATCH_SCHEDULE_STORE, useValue: options.scheduleStore });
+  }
+
+  if (options.schedules !== undefined) {
+    providers.push({ provide: BATCH_SCHEDULES, useValue: options.schedules });
+  }
+
+  if (options.schedulerDispatcher !== undefined) {
+    providers.push({ provide: BATCH_SCHEDULER_DISPATCHER, useValue: options.schedulerDispatcher });
+  }
+
+  if (options.schedulerLoop !== undefined) {
+    providers.push({ provide: BATCH_SCHEDULER_LOOP, useValue: options.schedulerLoop });
+  }
+
   return providers;
 };
 
@@ -74,7 +98,15 @@ const createRuntimeOptionExports = (
   options?: NestBatchModuleOptions
 ): NonNullable<DynamicModule["exports"]> => {
   if (!options) {
-    return [BATCH_EXECUTION_ENGINE, BATCH_WORKER_POOL, BATCH_WORK_QUEUE];
+    return [
+      BATCH_EXECUTION_ENGINE,
+      BATCH_WORKER_POOL,
+      BATCH_WORK_QUEUE,
+      BATCH_SCHEDULE_STORE,
+      BATCH_SCHEDULES,
+      BATCH_SCHEDULER_DISPATCHER,
+      BATCH_SCHEDULER_LOOP
+    ];
   }
 
   const exports: NonNullable<DynamicModule["exports"]> = [];
@@ -91,12 +123,35 @@ const createRuntimeOptionExports = (
     exports.push(BATCH_WORK_QUEUE);
   }
 
+  if (options.scheduleStore !== undefined) {
+    exports.push(BATCH_SCHEDULE_STORE);
+  }
+
+  if (options.schedules !== undefined) {
+    exports.push(BATCH_SCHEDULES);
+  }
+
+  if (options.schedulerDispatcher !== undefined) {
+    exports.push(BATCH_SCHEDULER_DISPATCHER);
+  }
+
+  if (options.schedulerLoop !== undefined) {
+    exports.push(BATCH_SCHEDULER_LOOP);
+  }
+
   return exports;
 };
 
 const createRuntimeOptionFactoryProvider = (
   provide: symbol,
-  key: "executionEngine" | "workerPool" | "workQueue"
+  key:
+    | "executionEngine"
+    | "workerPool"
+    | "workQueue"
+    | "scheduleStore"
+    | "schedules"
+    | "schedulerDispatcher"
+    | "schedulerLoop"
 ): Provider => ({
   provide,
   useFactory: (options: NestBatchModuleOptions): unknown => options[key],

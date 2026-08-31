@@ -11,3 +11,7 @@ export const BATCH_RUNNER = Symbol("nest-batch:runner");
 export const BATCH_EXECUTION_ENGINE = Symbol("nest-batch:execution-engine");
 export const BATCH_WORKER_POOL = Symbol("nest-batch:worker-pool");
 export const BATCH_WORK_QUEUE = Symbol("nest-batch:work-queue");
+export const BATCH_SCHEDULE_STORE = Symbol("nest-batch:schedule-store");
+export const BATCH_SCHEDULES = Symbol("nest-batch:schedules");
+export const BATCH_SCHEDULER_DISPATCHER = Symbol("nest-batch:scheduler-dispatcher");
+export const BATCH_SCHEDULER_LOOP = Symbol("nest-batch:scheduler-loop");

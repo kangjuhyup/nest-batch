@@ -9,6 +9,10 @@ import {
   BATCH_JOB_REPOSITORY,
   BATCH_LOCK_MANAGER,
   BATCH_RUNNER,
+  BATCH_SCHEDULE_STORE,
+  BATCH_SCHEDULES,
+  BATCH_SCHEDULER_DISPATCHER,
+  BATCH_SCHEDULER_LOOP,
   BATCH_WORKER_POOL,
   BATCH_WORK_QUEUE,
   BatchContextAccessor,
@@ -114,6 +118,48 @@ describe("NestBatchModule / NestBatchModule", () => {
     expect(findValueProvider(providers, BATCH_WORK_QUEUE).useValue).toBe(workQueue);
     expect(dynamicModule.exports).toEqual(
       expect.arrayContaining([BATCH_EXECUTION_ENGINE, BATCH_WORKER_POOL, BATCH_WORK_QUEUE])
+    );
+  });
+
+  it("accepts scheduler providers / scheduler provider를 설정한다", () => {
+    const storage = new FakeDatabaseBatchStorage();
+    const scheduleStore = {
+      findLatestOccurrence: async () => undefined,
+      claimOccurrence: async () => undefined,
+      markDispatched: async () => true,
+      markFailed: async () => true
+    };
+    const schedules = [
+      { name: "billing.daily", jobName: "billing", trigger: { getDueOccurrences: () => [] } }
+    ];
+    const schedulerDispatcher = async () => undefined;
+    const schedulerLoop = {
+      tick: async () => ({
+        scannedSchedules: 0,
+        claimedOccurrences: 0,
+        dispatchedOccurrences: 0,
+        failedOccurrences: 0
+      })
+    };
+    const module = NestBatchModule.forRoot({
+      storage,
+      scheduleStore: scheduleStore as any,
+      schedules: schedules as any,
+      schedulerDispatcher,
+      schedulerLoop: schedulerLoop as any,
+      scheduler: { autoStart: false, pollIntervalMs: 1_000, ownerId: "scheduler-1" }
+    });
+
+    expect(module.providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ provide: BATCH_SCHEDULE_STORE, useValue: scheduleStore }),
+        expect.objectContaining({ provide: BATCH_SCHEDULES, useValue: schedules }),
+        expect.objectContaining({
+          provide: BATCH_SCHEDULER_DISPATCHER,
+          useValue: schedulerDispatcher
+        }),
+        expect.objectContaining({ provide: BATCH_SCHEDULER_LOOP, useValue: schedulerLoop })
+      ])
     );
   });
 

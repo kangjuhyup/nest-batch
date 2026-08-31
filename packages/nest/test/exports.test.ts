@@ -7,6 +7,10 @@ import {
   BATCH_PROCESSOR_METADATA,
   BATCH_READER_METADATA,
   BATCH_RUNNER,
+  BATCH_SCHEDULE_STORE,
+  BATCH_SCHEDULES,
+  BATCH_SCHEDULER_DISPATCHER,
+  BATCH_SCHEDULER_LOOP,
   BATCH_STEP_METADATA,
   BATCH_WRITER_METADATA,
   BatchJob,
@@ -33,6 +37,10 @@ describe("nest package exports / nest package export를 검증한다", () => {
     expect(typeof BATCH_CHECKPOINT_STORE).toBe("symbol");
     expect(typeof BATCH_LOCK_MANAGER).toBe("symbol");
     expect(typeof BATCH_RUNNER).toBe("symbol");
+    expect(typeof BATCH_SCHEDULE_STORE).toBe("symbol");
+    expect(typeof BATCH_SCHEDULES).toBe("symbol");
+    expect(typeof BATCH_SCHEDULER_DISPATCHER).toBe("symbol");
+    expect(typeof BATCH_SCHEDULER_LOOP).toBe("symbol");
     expect(typeof BatchJob).toBe("function");
     expect(typeof BatchStep).toBe("function");
     expect(typeof BatchReader).toBe("function");
