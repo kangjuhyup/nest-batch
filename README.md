@@ -14,8 +14,8 @@ processor skip policy, and `BatchObserver` lifecycle events. The CLI can run,
 retry, inspect, and list jobs when an application supplies storage and a job
 registry. `@nest-batch/nest` can discover decorated job and batch component
 providers, expose a `BATCH_RUNNER` provider, and run discovered jobs through
-`NestBatchRunner`. Distributed worker contracts and queue adapter boundaries are
-in progress; production scheduling is not implemented yet.
+`NestBatchRunner`. Distributed worker contracts, the BullMQ queue adapter
+boundary, and a first production scheduling slice are available.
 
 ## Packages
 
@@ -27,6 +27,7 @@ in progress; production scheduling is not implemented yet.
 - `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, and checkpoint storage.
 - `@nest-batch/queue-core`: queue-neutral `WorkQueue` contract and worker loop.
 - `@nest-batch/queue-bullmq`: BullMQ-compatible `WorkQueue` adapter boundary.
+- `@nest-batch/scheduler-core`: framework-independent schedule definitions, trigger evaluation, occurrence claim orchestration, and dispatch helpers.
 - `@nest-batch/cli`: operational CLI boundary.
 
 ## Distributed Workers
@@ -36,10 +37,67 @@ in progress; production scheduling is not implemented yet.
 of truth for job, step, checkpoint, and partition status. Distributed execution
 is at-least-once, so writers and external side effects should be idempotent.
 
-`@nest-batch/queue-bullmq` maps `WorkUnit.id` to the BullMQ job id and disables
-BullMQ retry by default (`attempts: 1`) so retry policy stays owned by the batch
-runtime. Applications can wrap real BullMQ `Queue`/worker instances and pass
-them into `BullMqWorkQueue`.
+`@nest-batch/queue-bullmq` maps each `WorkUnit.id` to a stable BullMQ job id and
+disables BullMQ retry by default (`attempts: 1`) so retry policy stays owned by
+the batch runtime. Applications can wrap real BullMQ `Queue`/worker instances
+and pass them into `BullMqWorkQueue`. When a work id contains `:`, the adapter
+encodes only the BullMQ custom job id; the `WorkUnit.id` stored in the payload
+remains unchanged.
+
+## Production Scheduling
+
+`@nest-batch/scheduler-core` evaluates code-defined schedules, claims durable
+occurrences through a `ScheduleStore`, and dispatches them to either
+`BatchRunner` or `WorkQueue`. Schedule definitions stay in application code; the
+database stores occurrence state for duplicate-dispatch reduction and catch-up
+decisions.
+
+```ts
+import { PostgresScheduleStore } from "@nest-batch/postgres";
+import {
+  SchedulerLoop,
+  createIntervalTrigger,
+  createQueueScheduleDispatcher,
+  defineSchedule
+} from "@nest-batch/scheduler-core";
+
+const scheduleStore = new PostgresScheduleStore({
+  connectionString: process.env.NEST_BATCH_POSTGRES_URL,
+  schema: "batch"
+});
+await scheduleStore.initialize();
+
+const schedule = defineSchedule({
+  name: "billing.daily",
+  jobName: "billing",
+  trigger: createIntervalTrigger({
+    everyMs: 86_400_000,
+    startAt: new Date("2026-01-01T00:00:00.000Z")
+  }),
+  parameters: ({ scheduledAt }) => ({
+    billingDate: scheduledAt.toISOString().slice(0, 10)
+  })
+});
+
+const scheduler = new SchedulerLoop({
+  schedules: [schedule],
+  store: scheduleStore,
+  lockManager: storage.lockManager,
+  dispatcher: createQueueScheduleDispatcher({ queue }),
+  ownerId: "scheduler-1"
+});
+
+await scheduler.tick();
+```
+
+Scheduler dispatch is at-least-once. A scheduler crash, queue redelivery, or
+worker crash can dispatch the same occurrence again, so writers and external
+side effects should use an idempotency key or a natural unique constraint.
+
+```bash
+nest-batch schedule --once
+nest-batch schedule --poll-interval-ms 1000 --scheduler-id scheduler-1
+```
 
 ## Development
 

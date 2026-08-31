@@ -145,8 +145,9 @@ await loop.tick({ now: new Date(), signal });
 
 worker가 queue work를 처리할 때는 기존 CLI worker payload와 같은 의미를 사용한다.
 queue dispatch의 work id는 deterministic occurrence id를 사용한다. BullMQ adapter는
-이 값을 BullMQ `jobId`로 매핑하므로 같은 occurrence enqueue는 queue layer에서도
-중복을 줄일 수 있다.
+BullMQ custom `jobId`가 `:` 문자를 허용하지 않는 제약 때문에 queue payload의
+`WorkUnit.id`는 그대로 유지하고, BullMQ `jobId`에만 안정적인 encoding을 적용한다.
+따라서 같은 occurrence enqueue는 queue layer에서도 중복을 줄일 수 있다.
 
 ## Occurrence Id와 Idempotency
 

@@ -20,6 +20,13 @@ Core owns:
 - step execution counters
 - runner-facing options
 
+## `@nest-batch/scheduler-core`
+
+Scheduler core owns code-defined schedule definitions, trigger evaluation,
+occurrence claim orchestration, and dispatch to `BatchRunner` or `WorkQueue`.
+It does not own job execution semantics, schedule discovery, database client
+construction, queue implementation details, or NestJS lifecycle policy.
+
 ## `@nest-batch/nest`
 
 Nest integration contains module APIs, decorators, discovery, and lifecycle
@@ -80,6 +87,9 @@ Runtime work should treat failure and restart as normal paths:
 - ORM-specific readers belong to ORM integration packages, not `@nest-batch/core`
 - chunk retry policy covers processor and writer failures; skip policy currently covers processor failures only
 - distributed execution assumes at-least-once delivery
+- scheduler dispatch is at-least-once and uses deterministic occurrence ids
+- scheduler failure records dispatch failure, not job failure
+- schedule definitions live in application code; durable stores persist occurrence state
 - SQL adapter locks store `ownerId`, `acquiredAt`, and optional `expiresAt`; stale lock recovery is TTL based
 - idempotency expectations are documented near job parameters and retry behavior
 - schedulers create or enqueue executions instead of bypassing the runtime

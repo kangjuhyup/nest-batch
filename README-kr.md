@@ -16,8 +16,7 @@ application이 storage와 job registry를 주입할 때 job 실행, 재시도, �
 목록 출력을 처리할 수 있습니다. `@nest-batch/nest`는 decorator가 붙은 job과
 batch component provider를 발견하고, `BATCH_RUNNER` provider와
 `NestBatchRunner`를 통해 발견한 job을 실행할 수 있습니다. distributed worker
-contract와 queue adapter 경계는 진행 중이며, production scheduling은 아직
-구현되지 않았습니다.
+contract, BullMQ queue adapter 경계, production scheduling 1차 구현을 제공합니다.
 
 ## Packages
 
@@ -29,6 +28,7 @@ contract와 queue adapter 경계는 진행 중이며, production scheduling은 �
 - `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, checkpoint storage.
 - `@nest-batch/queue-core`: queue-neutral `WorkQueue` contract와 worker loop.
 - `@nest-batch/queue-bullmq`: BullMQ-compatible `WorkQueue` adapter 경계.
+- `@nest-batch/scheduler-core`: framework-independent schedule definition, trigger evaluation, occurrence claim orchestration, dispatch helper.
 - `@nest-batch/cli`: 운영 CLI 경계.
 
 ## Distributed Workers
@@ -38,10 +38,67 @@ contract와 queue adapter 경계는 진행 중이며, production scheduling은 �
 상태의 source of truth는 repository입니다. distributed execution은
 at-least-once를 전제로 하므로 writer와 외부 side effect는 idempotent해야 합니다.
 
-`@nest-batch/queue-bullmq`는 `WorkUnit.id`를 BullMQ job id로 매핑하고,
-batch runtime이 retry policy를 소유하도록 BullMQ retry를 기본 비활성화합니다
-(`attempts: 1`). application은 실제 BullMQ `Queue`/worker instance를 감싼 뒤
-`BullMqWorkQueue`에 주입할 수 있습니다.
+`@nest-batch/queue-bullmq`는 각 `WorkUnit.id`를 안정적인 BullMQ job id로
+매핑하고, batch runtime이 retry policy를 소유하도록 BullMQ retry를 기본
+비활성화합니다(`attempts: 1`). application은 실제 BullMQ `Queue`/worker
+instance를 감싼 뒤 `BullMqWorkQueue`에 주입할 수 있습니다. work id에 `:`가 들어
+있으면 adapter는 BullMQ custom job id만 encode하고, payload 안의 `WorkUnit.id`는
+그대로 유지합니다.
+
+## Production Scheduling
+
+`@nest-batch/scheduler-core`는 code-defined schedule을 평가하고, `ScheduleStore`로
+durable occurrence를 claim한 뒤 `BatchRunner` 또는 `WorkQueue`로 dispatch합니다.
+schedule definition은 application code가 소유하고, database는 중복 dispatch를
+줄이고 catch-up 판단을 하기 위한 occurrence state만 저장합니다.
+
+```ts
+import { PostgresScheduleStore } from "@nest-batch/postgres";
+import {
+  SchedulerLoop,
+  createIntervalTrigger,
+  createQueueScheduleDispatcher,
+  defineSchedule
+} from "@nest-batch/scheduler-core";
+
+const scheduleStore = new PostgresScheduleStore({
+  connectionString: process.env.NEST_BATCH_POSTGRES_URL,
+  schema: "batch"
+});
+await scheduleStore.initialize();
+
+const schedule = defineSchedule({
+  name: "billing.daily",
+  jobName: "billing",
+  trigger: createIntervalTrigger({
+    everyMs: 86_400_000,
+    startAt: new Date("2026-01-01T00:00:00.000Z")
+  }),
+  parameters: ({ scheduledAt }) => ({
+    billingDate: scheduledAt.toISOString().slice(0, 10)
+  })
+});
+
+const scheduler = new SchedulerLoop({
+  schedules: [schedule],
+  store: scheduleStore,
+  lockManager: storage.lockManager,
+  dispatcher: createQueueScheduleDispatcher({ queue }),
+  ownerId: "scheduler-1"
+});
+
+await scheduler.tick();
+```
+
+scheduler dispatch는 at-least-once입니다. scheduler crash, queue redelivery,
+worker crash가 있으면 같은 occurrence가 다시 dispatch될 수 있으므로 writer와
+외부 side effect는 idempotency key 또는 natural unique constraint를 사용해야
+합니다.
+
+```bash
+nest-batch schedule --once
+nest-batch schedule --poll-interval-ms 1000 --scheduler-id scheduler-1
+```
 
 ## Development
 
