@@ -1,3 +1,4 @@
+export { createQueueScheduleDispatcher, createRunnerScheduleDispatcher } from "./dispatchers.js";
 export { defineSchedule, resolveScheduleParameters } from "./definition.js";
 export { createIntervalTrigger } from "./interval-trigger.js";
 export { createScheduleOccurrenceId } from "./occurrence-id.js";
