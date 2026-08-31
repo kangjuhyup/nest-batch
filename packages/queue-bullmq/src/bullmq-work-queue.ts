@@ -56,7 +56,7 @@ export class BullMqWorkQueue<TWork extends WorkUnit = WorkUnit> implements WorkQ
   async enqueue(work: TWork): Promise<void> {
     await this.queue.add(work.type ?? this.jobName, work, {
       ...this.jobOptions,
-      jobId: work.id,
+      jobId: createBullMqJobId(work.id),
       attempts: this.jobOptions.attempts ?? 1
     });
   }
@@ -101,6 +101,10 @@ export class BullMqWorkQueue<TWork extends WorkUnit = WorkUnit> implements WorkQ
 
 const defaultTokenFactory = (options: WorkClaimOptions): string => {
   return `${options.workerId}:${options.now.getTime()}`;
+};
+
+const createBullMqJobId = (workId: string): string => {
+  return workId.includes(":") ? encodeURIComponent(workId) : workId;
 };
 
 const toError = (error: unknown): Error => {
