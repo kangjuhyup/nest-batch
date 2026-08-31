@@ -34,7 +34,7 @@ describe("runCli / runCli 동작을 검증한다", () => {
   it("prints help for empty args / 빈 인자에 대해 help를 출력한다", async () => {
     await expect(runCli([])).resolves.toEqual({
       exitCode: 0,
-      output: "nest-batch commands: run, status, retry, list, worker"
+      output: "nest-batch commands: run, status, retry, list, worker, schedule"
     });
   });
 
@@ -250,6 +250,35 @@ describe("runCli / runCli 동작을 검증한다", () => {
     await expect(storage.repository.findById("queued-execution-1")).resolves.toMatchObject({
       id: "queued-execution-1",
       status: "completed"
+    });
+  });
+
+  it("runs scheduler once from CLI / CLI에서 scheduler를 한 번 실행한다", async () => {
+    const loop = {
+      async tick() {
+        return {
+          scannedSchedules: 1,
+          claimedOccurrences: 1,
+          dispatchedOccurrences: 1,
+          failedOccurrences: 0
+        };
+      }
+    };
+
+    const result = await runCli(["schedule", "--once", "--scheduler-id", "scheduler-1"], {
+      schedulerLoop: loop as any
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.output)).toEqual({
+      command: "schedule",
+      schedulerId: "scheduler-1",
+      result: {
+        scannedSchedules: 1,
+        claimedOccurrences: 1,
+        dispatchedOccurrences: 1,
+        failedOccurrences: 0
+      }
     });
   });
 });

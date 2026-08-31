@@ -9,6 +9,16 @@ import type {
 } from "@nest-batch/core";
 import { WorkerLoop } from "@nest-batch/queue-core";
 import type { WorkHandler, WorkQueue, WorkUnit } from "@nest-batch/queue-core";
+import {
+  SchedulerLoop,
+  createQueueScheduleDispatcher,
+  createRunnerScheduleDispatcher
+} from "@nest-batch/scheduler-core";
+import type {
+  ScheduleDefinition,
+  ScheduleDispatcher,
+  ScheduleStore
+} from "@nest-batch/scheduler-core";
 
 export interface CliResult {
   readonly exitCode: number;
@@ -22,10 +32,14 @@ export interface CliContext {
   readonly queue?: WorkQueue;
   readonly workerHandler?: WorkHandler;
   readonly workerLoop?: WorkerLoop;
+  readonly schedules?: readonly ScheduleDefinition[];
+  readonly scheduleStore?: ScheduleStore;
+  readonly schedulerDispatcher?: ScheduleDispatcher;
+  readonly schedulerLoop?: SchedulerLoop;
   readonly signal?: AbortSignal;
 }
 
-const commands = new Set(["run", "status", "retry", "list", "worker"]);
+const commands = new Set(["run", "status", "retry", "list", "worker", "schedule"]);
 
 export const runCli = async (
   args: readonly string[],
@@ -36,7 +50,7 @@ export const runCli = async (
   if (command === undefined || command === "--help" || command === "-h") {
     return {
       exitCode: 0,
-      output: "nest-batch commands: run, status, retry, list, worker"
+      output: "nest-batch commands: run, status, retry, list, worker, schedule"
     };
   }
 
@@ -60,6 +74,10 @@ export const runCli = async (
 
     if (command === "worker") {
       return await runWorker(options, context);
+    }
+
+    if (command === "schedule") {
+      return await runScheduler(options, context);
     }
 
     return await runJob(command, options, context);
@@ -97,6 +115,33 @@ const runWorker = async (options: ParsedFlags, context: CliContext): Promise<Cli
   return {
     exitCode: 0,
     output: stringifyWorkerResult(workerId, false)
+  };
+};
+
+const runScheduler = async (options: ParsedFlags, context: CliContext): Promise<CliResult> => {
+  const once = getBooleanFlag(options, "once");
+  const schedulerId = getStringOption(options, "scheduler-id") ?? "nest-batch-cli-scheduler";
+  const loop = context.schedulerLoop ?? createSchedulerLoop(options, context, schedulerId);
+
+  if (once) {
+    const result = await loop.tick({ signal: context.signal });
+
+    return {
+      exitCode: result.failedOccurrences === 0 ? 0 : 1,
+      output: stringifyScheduleResult(schedulerId, result)
+    };
+  }
+
+  await loop.runUntilStopped({ signal: context.signal });
+
+  return {
+    exitCode: 0,
+    output: stringifyScheduleResult(schedulerId, {
+      scannedSchedules: 0,
+      claimedOccurrences: 0,
+      dispatchedOccurrences: 0,
+      failedOccurrences: 0
+    })
   };
 };
 
@@ -217,6 +262,43 @@ const requireQueue = (context: CliContext): WorkQueue => {
   }
 
   return context.queue;
+};
+
+const requireScheduleStore = (context: CliContext): ScheduleStore => {
+  if (!context.scheduleStore) {
+    throw new Error("ScheduleStore is required for the schedule command.");
+  }
+
+  return context.scheduleStore;
+};
+
+const createSchedulerLoop = (
+  options: ParsedFlags,
+  context: CliContext,
+  ownerId: string
+): SchedulerLoop => {
+  const storage = requireStorage(context);
+  const store = requireScheduleStore(context);
+  const dispatcher =
+    context.schedulerDispatcher ??
+    (context.queue
+      ? createQueueScheduleDispatcher({ queue: context.queue })
+      : createRunnerScheduleDispatcher({
+          jobs: context.jobs ?? [],
+          runner: context.runner ?? new DefaultBatchRunner(storage),
+          ownerId
+        }));
+
+  return new SchedulerLoop({
+    schedules: context.schedules ?? [],
+    store,
+    lockManager: storage.lockManager,
+    dispatcher,
+    ownerId,
+    lockTtlMs: getNumberOption(options, "lock-ttl-ms"),
+    claimTtlMs: getNumberOption(options, "claim-ttl-ms"),
+    pollIntervalMs: getNumberOption(options, "poll-interval-ms")
+  });
 };
 
 const createDefaultWorkerHandler = (context: CliContext): WorkHandler => {
@@ -427,6 +509,26 @@ const stringifyWorkerResult = (workerId: string, handled: boolean): string => {
       command: "worker",
       workerId,
       handled
+    },
+    null,
+    2
+  );
+};
+
+const stringifyScheduleResult = (
+  schedulerId: string,
+  result: {
+    readonly scannedSchedules: number;
+    readonly claimedOccurrences: number;
+    readonly dispatchedOccurrences: number;
+    readonly failedOccurrences: number;
+  }
+): string => {
+  return JSON.stringify(
+    {
+      command: "schedule",
+      schedulerId,
+      result
     },
     null,
     2
