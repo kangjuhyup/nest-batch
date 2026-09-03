@@ -1,0 +1,23 @@
+{
+  "name": "@nest-batch/scheduler-calendar",
+  "version": "0.0.1",
+  "description": "UTC calendar schedule triggers for nest-batch.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --root ../.. --config vitest.config.ts packages/scheduler-calendar/test"
+  },
+  "dependencies": {
+    "@nest-batch/scheduler-core": "workspace:*"
+  }
+}

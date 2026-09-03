@@ -6,5 +6,7 @@ export type { MySqlBatchOptions, MySqlPoolLike, MySqlPoolOptions } from "./optio
 export { createMySqlCursorReader } from "./reader.js";
 export type { MySqlCursorReaderOptions } from "./reader.js";
 export { MySqlJobRepository } from "./repository/repository.js";
+export { ensureMySqlScheduleSchema } from "./schedule-schema.js";
+export { MySqlScheduleStore } from "./schedule-store.js";
 export { ensureMySqlSchema } from "./schema.js";
 export { MySqlBatchStorage } from "./storage.js";

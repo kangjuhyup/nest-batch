@@ -11,5 +11,7 @@ export type {
 export { createPostgresCursorReader } from "./reader.js";
 export type { PostgresCursorReaderOptions } from "./reader.js";
 export { PostgresJobRepository } from "./repository/repository.js";
+export { ensurePostgresScheduleSchema } from "./schedule-schema.js";
+export { PostgresScheduleStore } from "./schedule-store.js";
 export { ensurePostgresSchema } from "./schema.js";
 export { PostgresBatchStorage } from "./storage.js";

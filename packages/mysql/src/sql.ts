@@ -18,6 +18,7 @@ export interface MySqlTables {
   readonly checkpoints: string;
   readonly executionContexts: string;
   readonly locks: string;
+  readonly scheduleOccurrences: string;
 }
 
 export interface MySqlJobInstanceRow {
@@ -89,7 +90,8 @@ export const createMySqlTables = (options: Pick<MySqlBatchOptions, "database" | 
     partitionExecutions: qualify("partition_executions"),
     checkpoints: qualify("checkpoints"),
     executionContexts: qualify("execution_contexts"),
-    locks: qualify("locks")
+    locks: qualify("locks"),
+    scheduleOccurrences: qualify("schedule_occurrences")
   };
 };
 

@@ -1,14 +1,21 @@
 import "reflect-metadata";
 import {
+  DatabaseBatchStorage,
   getReaderCheckpoint,
   openReader
 } from "@nest-batch/core";
-import type { ChunkReader } from "@nest-batch/core";
+import type { ChunkReader, ChunkStepDefinition } from "@nest-batch/core";
 import { NestFactory } from "@nestjs/core";
 import { describe, expect, it } from "vitest";
 import { NestBatchRegistry, NestBatchRunner } from "@nest-batch/nest";
 import { AppModule } from "../src/app.module.js";
 import { writtenCharges } from "../src/jobs/billing/billing.step.js";
+import type {
+  BillingAccount,
+  BillingCharge,
+  BillingCheckpoint,
+  BillingJobParameters
+} from "../src/jobs/billing/billing.types.js";
 import {
   CursorReaderExample,
   FileReaderExample,
@@ -40,6 +47,46 @@ describe("nestjs example e2e / nestjs example e2e를 검증한다", () => {
         status: "completed"
       });
       expect(writtenCharges).toEqual([{ tenant: "acme", accountId: "acme-account-1", amount: 1200 }]);
+      await expect(
+        app.get(DatabaseBatchStorage).checkpointStore.read<BillingCheckpoint>(executionId, "charge-accounts")
+      ).resolves.toEqual({ nextIndex: 2 });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("resumes the billing reader from checkpoint / billing reader가 checkpoint부터 재개한다", async () => {
+    const app = await NestFactory.createApplicationContext(AppModule, { logger: false });
+
+    try {
+      const job = app.get(NestBatchRegistry).getJob<BillingJobParameters>("daily-billing");
+      const step = job?.steps[0] as
+        | ChunkStepDefinition<BillingAccount, BillingCharge, BillingCheckpoint, BillingJobParameters>
+        | undefined;
+
+      if (!step || step.kind !== "chunk") {
+        throw new Error("Billing chunk step was not discovered.");
+      }
+
+      const session = await openReader(step.reader, {
+        jobName: "daily-billing",
+        jobExecutionId: "billing-reader-resume-execution",
+        stepName: "charge-accounts",
+        stepExecutionId: "billing-reader-resume-step",
+        parameters: { tenant: "acme" },
+        signal: new AbortController().signal,
+        restart: true,
+        restartFromExecutionId: "billing-reader-previous-execution",
+        checkpoint: { nextIndex: 1 }
+      });
+      const accounts: BillingAccount[] = [];
+
+      for await (const account of session) {
+        accounts.push(account);
+      }
+
+      expect(accounts.map((account) => account.id)).toEqual(["acme-account-2"]);
+      await expect(getReaderCheckpoint(session)).resolves.toEqual({ nextIndex: 2 });
     } finally {
       await app.close();
     }

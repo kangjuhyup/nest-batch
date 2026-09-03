@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { defineJob, defineStep } from "@nest-batch/core";
 import { InMemoryBatchStorage } from "@nest-batch/inmemory";
 import type { WorkClaimOptions, WorkQueue, WorkUnit } from "@nest-batch/queue-core";
+import type { ScheduleDefinition, ScheduleOccurrence } from "@nest-batch/scheduler-core";
 import { runCli } from "../src/index.js";
 
 class InMemoryWorkQueue implements WorkQueue {
@@ -30,11 +31,48 @@ class InMemoryWorkQueue implements WorkQueue {
   }
 }
 
+class RecordingScheduleStore {
+  readonly latestCalls: Array<{ readonly scheduleName: string; readonly options: unknown }> = [];
+  readonly listCalls: unknown[] = [];
+
+  constructor(
+    private readonly latestOccurrence?: ScheduleOccurrence,
+    private readonly occurrences: readonly ScheduleOccurrence[] = []
+  ) {}
+
+  async findLatestOccurrence(
+    scheduleName: string,
+    options?: unknown
+  ): Promise<ScheduleOccurrence | undefined> {
+    this.latestCalls.push({ scheduleName, options });
+
+    return this.latestOccurrence;
+  }
+
+  async listOccurrences(options?: unknown): Promise<readonly ScheduleOccurrence[]> {
+    this.listCalls.push(options);
+
+    return this.occurrences;
+  }
+
+  async claimOccurrence(): Promise<ScheduleOccurrence | undefined> {
+    return undefined;
+  }
+
+  async markDispatched(): Promise<boolean> {
+    return false;
+  }
+
+  async markFailed(): Promise<boolean> {
+    return false;
+  }
+}
+
 describe("runCli / runCli 동작을 검증한다", () => {
   it("prints help for empty args / 빈 인자에 대해 help를 출력한다", async () => {
     await expect(runCli([])).resolves.toEqual({
       exitCode: 0,
-      output: "nest-batch commands: run, status, retry, list, worker"
+      output: "nest-batch commands: run, status, retry, list, worker, schedule"
     });
   });
 
@@ -252,6 +290,192 @@ describe("runCli / runCli 동작을 검증한다", () => {
       status: "completed"
     });
   });
+
+  it("runs scheduler once from CLI / CLI에서 scheduler를 한 번 실행한다", async () => {
+    const loop = {
+      async tick() {
+        return {
+          scannedSchedules: 1,
+          claimedOccurrences: 1,
+          dispatchedOccurrences: 1,
+          failedOccurrences: 0
+        };
+      }
+    };
+
+    const result = await runCli(["schedule", "--once", "--scheduler-id", "scheduler-1"], {
+      schedulerLoop: loop as any
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.output)).toEqual({
+      command: "schedule",
+      schedulerId: "scheduler-1",
+      result: {
+        scannedSchedules: 1,
+        claimedOccurrences: 1,
+        dispatchedOccurrences: 1,
+        failedOccurrences: 0
+      }
+    });
+  });
+
+  it("lists configured schedules / 설정된 schedule 목록을 출력한다", async () => {
+    const schedules = [
+      scheduleDefinition({
+        name: "reports.hourly",
+        jobName: "reports-job"
+      }),
+      scheduleDefinition({
+        name: "billing.daily",
+        jobName: "billing-job",
+        misfirePolicy: "fire-all",
+        maxCatchUpOccurrences: 3,
+        parameters: { tenant: "acme" },
+        runOptions: { ownerId: "billing-owner", lockTtlMs: 5_000 }
+      })
+    ];
+
+    const result = await runCli(["schedule", "--list"], { schedules });
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.output)).toEqual({
+      command: "schedule",
+      schedules: [
+        {
+          name: "billing.daily",
+          jobName: "billing-job",
+          misfirePolicy: "fire-all",
+          maxCatchUpOccurrences: 3,
+          hasParameters: true,
+          runOptions: { ownerId: "billing-owner", lockTtlMs: 5_000 }
+        },
+        {
+          name: "reports.hourly",
+          jobName: "reports-job",
+          hasParameters: false
+        }
+      ]
+    });
+  });
+
+  it("prints schedule status with latest occurrence / 최신 occurrence와 schedule 상태를 출력한다", async () => {
+    const latest = scheduleOccurrence({
+      scheduleName: "billing.daily",
+      occurrenceId: "schedule:billing.daily:2026-01-02T00:00:00.000Z",
+      scheduledAt: new Date("2026-01-02T00:00:00.000Z"),
+      status: "failed",
+      ownerId: "scheduler-1",
+      claimedAt: new Date("2026-01-02T00:00:01.000Z"),
+      failedAt: new Date("2026-01-02T00:00:05.000Z"),
+      failureReason: "queue unavailable"
+    });
+    const store = new RecordingScheduleStore(latest);
+
+    const result = await runCli(["schedule", "--status", "--schedule", "billing.daily"], {
+      schedules: [
+        scheduleDefinition({
+          name: "billing.daily",
+          jobName: "billing-job",
+          maxCatchUpOccurrences: 1
+        })
+      ],
+      scheduleStore: store
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(store.latestCalls).toEqual([{ scheduleName: "billing.daily", options: undefined }]);
+    expect(JSON.parse(result.output)).toEqual({
+      command: "schedule",
+      schedule: {
+        name: "billing.daily",
+        jobName: "billing-job",
+        maxCatchUpOccurrences: 1,
+        hasParameters: false
+      },
+      latestOccurrence: {
+        scheduleName: "billing.daily",
+        occurrenceId: "schedule:billing.daily:2026-01-02T00:00:00.000Z",
+        scheduledAt: "2026-01-02T00:00:00.000Z",
+        status: "failed",
+        ownerId: "scheduler-1",
+        claimedAt: "2026-01-02T00:00:01.000Z",
+        failedAt: "2026-01-02T00:00:05.000Z",
+        failureReason: "queue unavailable"
+      }
+    });
+  });
+
+  it("rejects schedule status without schedule name / schedule 이름 없는 status 조회를 거부한다", async () => {
+    const result = await runCli(["schedule", "--status"], {
+      scheduleStore: new RecordingScheduleStore()
+    });
+
+    expect(result).toEqual({
+      exitCode: 1,
+      output: "--schedule is required for schedule --status."
+    });
+  });
+
+  it("requires schedule store for schedule status / schedule status에 schedule store가 필요하다", async () => {
+    const result = await runCli(["schedule", "--status", "--schedule", "billing.daily"], {
+      schedules: [scheduleDefinition({ name: "billing.daily", jobName: "billing-job" })]
+    });
+
+    expect(result).toEqual({
+      exitCode: 1,
+      output: "ScheduleStore is required for the schedule command."
+    });
+  });
+
+  it("lists failed schedule occurrences / 실패한 schedule occurrence를 조회한다", async () => {
+    const failed = scheduleOccurrence({
+      scheduleName: "billing.daily",
+      occurrenceId: "schedule:billing.daily:2026-01-03T00:00:00.000Z",
+      scheduledAt: new Date("2026-01-03T00:00:00.000Z"),
+      status: "failed",
+      ownerId: "scheduler-1",
+      failedAt: new Date("2026-01-03T00:00:04.000Z"),
+      failureReason: "dispatch failed"
+    });
+    const store = new RecordingScheduleStore(undefined, [failed]);
+
+    const result = await runCli(
+      ["schedule", "--failed", "--schedule", "billing.daily", "--limit", "2"],
+      { scheduleStore: store }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(store.listCalls).toEqual([
+      { status: "failed", scheduleName: "billing.daily", limit: 2 }
+    ]);
+    expect(JSON.parse(result.output)).toEqual({
+      command: "schedule",
+      status: "failed",
+      scheduleName: "billing.daily",
+      limit: 2,
+      occurrences: [
+        {
+          scheduleName: "billing.daily",
+          occurrenceId: "schedule:billing.daily:2026-01-03T00:00:00.000Z",
+          scheduledAt: "2026-01-03T00:00:00.000Z",
+          status: "failed",
+          ownerId: "scheduler-1",
+          failedAt: "2026-01-03T00:00:04.000Z",
+          failureReason: "dispatch failed"
+        }
+      ]
+    });
+  });
+
+  it("rejects invalid failed occurrence limits / 유효하지 않은 failed occurrence limit을 거부한다", async () => {
+    for (const limit of ["0", "-1", "1.5", "abc"]) {
+      await expect(runCli(["schedule", "--failed", "--limit", limit])).resolves.toEqual({
+        exitCode: 1,
+        output: "--limit must be a positive integer."
+      });
+    }
+  });
 });
 
 const noopStep = (name: string) =>
@@ -261,3 +485,18 @@ const noopStep = (name: string) =>
       return undefined;
     }
   });
+
+const scheduleDefinition = (
+  definition: Omit<ScheduleDefinition, "trigger"> & {
+    readonly trigger?: ScheduleDefinition["trigger"];
+  }
+): ScheduleDefinition => ({
+  trigger: {
+    getDueOccurrences() {
+      return [];
+    }
+  },
+  ...definition
+});
+
+const scheduleOccurrence = (occurrence: ScheduleOccurrence): ScheduleOccurrence => occurrence;

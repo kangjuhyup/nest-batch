@@ -16,6 +16,8 @@ import type {
   BatchStepOptions,
   BatchWriterOptions
 } from "./decorators.js";
+import { BatchContextStorage } from "./batch-context.storage.js";
+import { bindStepDefinitionContext } from "./context-wrappers.js";
 
 export interface NestBatchComponent<T = unknown> {
   readonly name: string;
@@ -40,7 +42,10 @@ export class NestBatchRegistry implements OnApplicationBootstrap {
   private readonly processors = new Map<string, NestBatchComponent>();
   private readonly writers = new Map<string, NestBatchComponent>();
 
-  constructor(@Inject(DiscoveryService) private readonly discoveryService: DiscoveryService) {}
+  constructor(
+    @Inject(DiscoveryService) private readonly discoveryService: DiscoveryService,
+    @Inject(BatchContextStorage) private readonly batchContextStorage: BatchContextStorage
+  ) {}
 
   onApplicationBootstrap(): void {
     this.discover();
@@ -175,7 +180,8 @@ export class NestBatchRegistry implements OnApplicationBootstrap {
         continue;
       }
 
-      steps.push(normalizeStepDefinition(step.call(instance), metadata, propertyName));
+      const normalized = normalizeStepDefinition(step.call(instance), metadata, propertyName);
+      steps.push(bindStepDefinitionContext(normalized, this.batchContextStorage));
     }
 
     return steps;

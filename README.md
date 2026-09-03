@@ -14,8 +14,9 @@ processor skip policy, and `BatchObserver` lifecycle events. The CLI can run,
 retry, inspect, and list jobs when an application supplies storage and a job
 registry. `@nest-batch/nest` can discover decorated job and batch component
 providers, expose a `BATCH_RUNNER` provider, and run discovered jobs through
-`NestBatchRunner`. Distributed worker contracts and queue adapter boundaries are
-in progress; production scheduling is not implemented yet.
+`NestBatchRunner`. Distributed worker contracts, the BullMQ queue adapter
+boundary, continuous polling workers, and a first production scheduling slice
+are available.
 
 ## Packages
 
@@ -27,6 +28,9 @@ in progress; production scheduling is not implemented yet.
 - `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, and checkpoint storage.
 - `@nest-batch/queue-core`: queue-neutral `WorkQueue` contract and worker loop.
 - `@nest-batch/queue-bullmq`: BullMQ-compatible `WorkQueue` adapter boundary.
+- `@nest-batch/polling-core`: framework-independent continuous polling task loop.
+- `@nest-batch/scheduler-core`: framework-independent schedule definitions, trigger evaluation, occurrence claim orchestration, and dispatch helpers.
+- `@nest-batch/scheduler-calendar`: dependency-light UTC daily, weekly, and monthly trigger helpers.
 - `@nest-batch/cli`: operational CLI boundary.
 
 ## Distributed Workers
@@ -36,10 +40,168 @@ in progress; production scheduling is not implemented yet.
 of truth for job, step, checkpoint, and partition status. Distributed execution
 is at-least-once, so writers and external side effects should be idempotent.
 
-`@nest-batch/queue-bullmq` maps `WorkUnit.id` to the BullMQ job id and disables
-BullMQ retry by default (`attempts: 1`) so retry policy stays owned by the batch
-runtime. Applications can wrap real BullMQ `Queue`/worker instances and pass
-them into `BullMqWorkQueue`.
+`@nest-batch/queue-bullmq` maps each `WorkUnit.id` to a stable BullMQ job id and
+disables BullMQ retry by default (`attempts: 1`) so retry policy stays owned by
+the batch runtime. Applications can wrap real BullMQ `Queue`/worker instances
+and pass them into `BullMqWorkQueue`. When a work id contains `:`, the adapter
+encodes only the BullMQ custom job id; the `WorkUnit.id` stored in the payload
+remains unchanged.
+
+## Continuous Polling Workers
+
+`@nest-batch/polling-core` provides a framework-independent loop for long-lived
+polling tasks such as Transactional Outbox dispatchers. It does not create
+`JobExecution`, `StepExecution`, checkpoint rows, or scheduler occurrences per
+polling tick. The task owns store-specific claim, lease, retry, dead-letter, and
+ordering semantics; nest-batch owns only worker lifecycle, idle sleep, system
+error backoff, observer events, and graceful shutdown.
+
+```ts
+import { ContinuousPollingLoop } from "@nest-batch/polling-core";
+
+const loop = new ContinuousPollingLoop({
+  workerId: "vote-outbox-worker-1",
+  pollIntervalMs: 1_000,
+  task: async ({ workerId, signal }) => {
+    const { claimedCount } = await integrationEventOutboxDispatcher.dispatchBatch({
+      workerId,
+      signal
+    });
+
+    return claimedCount > 0;
+  }
+});
+
+await loop.runUntilStopped({ signal });
+```
+
+When `task` returns `true` or a positive processed count, the loop immediately
+starts the next iteration to drain busy outbox work. When it returns `false`,
+`0`, or `undefined`, the loop waits for `pollIntervalMs`. Unhandled task errors
+are treated as worker/system errors and retried with bounded exponential
+backoff and jitter; message-level failures and retry policy should stay inside
+the outbox repository/dispatcher.
+
+Nest polling integration can run without `DatabaseBatchStorage` through
+`NestBatchPollingModule`. `autoStart` is opt-in per worker, so API and worker
+process roles can share the same application module without starting polling in
+the API role:
+
+```ts
+import { Module } from "@nestjs/common";
+import { NestBatchPollingModule } from "@nest-batch/nest";
+
+@Module({
+  imports: [
+    NestBatchPollingModule.forRootAsync({
+      inject: [IntegrationEventOutboxDispatcher],
+      useFactory: (outboxDispatcher: IntegrationEventOutboxDispatcher) => ({
+        pollingWorkers: [
+          {
+            workerId: process.env.VOTE_OUTBOX_WORKER_ID ?? "vote-outbox-worker-1",
+            pollIntervalMs: 1_000,
+            autoStart: process.env.NEST_BATCH_PROCESS_ROLE === "vote-outbox-worker",
+            task: async ({ workerId, signal }) => {
+              const { claimedCount } = await outboxDispatcher.dispatchBatch({
+                workerId,
+                signal
+              });
+
+              return claimedCount > 0;
+            }
+          }
+        ]
+      })
+    })
+  ]
+})
+class AppModule {}
+```
+
+`NestBatchModule` still accepts `pollingWorkers` for compatibility when the same
+process already needs batch job storage and `NestBatchRunner`. Polling-only
+processes should import `NestBatchPollingModule` instead.
+
+The polling loop intentionally does not acquire a global singleton worker lock.
+For horizontally scaled outbox workers, use repository-level primitives such as
+`FOR UPDATE SKIP LOCKED`, DB-clock leases, and lease-token compare-and-swap in
+the task implementation. Pass the polling `AbortSignal` through dispatcher and
+publisher layers. If the external publish client cannot observe `AbortSignal`,
+wrap publish calls in a hard timeout owned by the task/dispatcher so shutdown
+cannot wait forever on in-flight I/O.
+
+## Production Scheduling
+
+`@nest-batch/scheduler-core` evaluates code-defined schedules, claims durable
+occurrences through a `ScheduleStore`, and dispatches them to either
+`BatchRunner` or `WorkQueue`. Schedule definitions stay in application code; the
+database stores occurrence state for duplicate-dispatch reduction and catch-up
+decisions.
+
+```ts
+import { PostgresScheduleStore } from "@nest-batch/postgres";
+import {
+  SchedulerLoop,
+  createIntervalTrigger,
+  createQueueScheduleDispatcher,
+  defineSchedule
+} from "@nest-batch/scheduler-core";
+
+const scheduleStore = new PostgresScheduleStore({
+  connectionString: process.env.NEST_BATCH_POSTGRES_URL,
+  schema: "batch"
+});
+await scheduleStore.initialize();
+
+const schedule = defineSchedule({
+  name: "billing.daily",
+  jobName: "billing",
+  trigger: createIntervalTrigger({
+    everyMs: 86_400_000,
+    startAt: new Date("2026-01-01T00:00:00.000Z")
+  }),
+  parameters: ({ scheduledAt }) => ({
+    billingDate: scheduledAt.toISOString().slice(0, 10)
+  })
+});
+
+const scheduler = new SchedulerLoop({
+  schedules: [schedule],
+  store: scheduleStore,
+  lockManager: storage.lockManager,
+  dispatcher: createQueueScheduleDispatcher({ queue }),
+  ownerId: "scheduler-1"
+});
+
+await scheduler.tick();
+```
+
+Scheduler dispatch is at-least-once. A scheduler crash, queue redelivery, or
+worker crash can dispatch the same occurrence again, so writers and external
+side effects should use an idempotency key or a natural unique constraint.
+The scheduler uses the latest terminal occurrence (`dispatched` or `failed`) as
+the trigger boundary, so a stale `claimed` occurrence can be reclaimed after its
+claim TTL instead of being skipped forever.
+
+For UTC calendar schedules, keep calendar math outside `scheduler-core` and use
+the optional helper package:
+
+```ts
+import { createUtcDailyTrigger } from "@nest-batch/scheduler-calendar";
+
+const trigger = createUtcDailyTrigger({
+  startAt: new Date("2026-01-01T00:00:00.000Z"),
+  time: { hour: 9, minute: 30 }
+});
+```
+
+```bash
+nest-batch schedule --once
+nest-batch schedule --poll-interval-ms 1000 --scheduler-id scheduler-1
+nest-batch schedule --list
+nest-batch schedule --status --schedule billing.daily
+nest-batch schedule --failed --schedule billing.daily --limit 10
+```
 
 ## Development
 
@@ -376,10 +538,10 @@ const job = defineJob({
 ## Nest Integration
 
 `NestBatchModule.forRoot()` wires `DatabaseBatchStorage`, repository,
-checkpoint, lock, the default `BATCH_RUNNER`, `NestBatchRegistry`, and
-`NestBatchRunner`. On application bootstrap, `NestBatchRegistry` discovers
-providers decorated with `@BatchJob`, `@BatchStep`, `@BatchReader`,
-`@BatchProcessor`, and `@BatchWriter`.
+checkpoint, lock, the default `BATCH_RUNNER`, `BatchContextAccessor`,
+`NestBatchRegistry`, and `NestBatchRunner`. On application bootstrap,
+`NestBatchRegistry` discovers providers decorated with `@BatchJob`,
+`@BatchStep`, `@BatchReader`, `@BatchProcessor`, and `@BatchWriter`.
 
 ```ts
 import { Module } from "@nestjs/common";
@@ -406,6 +568,30 @@ class BillingJob {
 class AppModule {}
 
 await app.get(NestBatchRunner).run("daily-billing", { tenant: "acme" });
+```
+
+Nest providers can also inject `BatchContextAccessor` instead of threading the
+runtime context through every method signature. The accessor is backed by
+`AsyncLocalStorage`, so `getRequiredParameters()`, `getCheckpoint()`, and
+`getRequiredSignal()` are available only while a batch callback is executing.
+
+```ts
+import { Injectable } from "@nestjs/common";
+import { BatchContextAccessor } from "@nest-batch/nest";
+
+@Injectable()
+class BillingService {
+  constructor(private readonly batchContext: BatchContextAccessor) {}
+
+  chargeAccount() {
+    const parameters = this.batchContext.getRequiredParameters();
+    const checkpoint = this.batchContext.getCheckpoint<{ nextIndex: number }>();
+    const signal = this.batchContext.getRequiredSignal();
+
+    signal.throwIfAborted();
+    return `charged ${String(parameters.tenant)} from ${checkpoint?.nextIndex ?? 0}`;
+  }
+}
 ```
 
 If you need a custom runner, pass `batchRunner` to `forRoot()` or
@@ -476,7 +662,7 @@ processor 실패 item을 건너뛰는 데만 적용됩니다. writer 실패 skip
 
 ```ts
 import { defineChunkStep, skipItem } from "@nest-batch/core";
-import type { ChunkStepExecutionContext, Processor, Reader, ReaderSession, Writer } from "@nest-batch/core";
+import type { ChunkReaderContext, Processor, Reader, ReaderSession, Writer } from "@nest-batch/core";
 
 interface SourceUser {
   readonly id: string;
@@ -488,7 +674,7 @@ interface ImportedUser {
 }
 
 class UserReader implements Reader<SourceUser> {
-  open({ signal }: ChunkStepExecutionContext): ReaderSession<SourceUser> {
+  open({ signal }: ChunkReaderContext): ReaderSession<SourceUser> {
     return {
       async *[Symbol.asyncIterator]() {
         signal.throwIfAborted();

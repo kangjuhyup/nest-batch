@@ -8,13 +8,20 @@ import {
   BATCH_EXECUTION_ENGINE,
   BATCH_JOB_REPOSITORY,
   BATCH_LOCK_MANAGER,
+  BATCH_POLLING_WORKERS,
   BATCH_RUNNER,
+  BATCH_SCHEDULE_STORE,
+  BATCH_SCHEDULES,
+  BATCH_SCHEDULER_DISPATCHER,
+  BATCH_SCHEDULER_LOOP,
   BATCH_WORKER_POOL,
   BATCH_WORK_QUEUE,
+  BatchContextAccessor,
   NestBatchRegistry,
   NestBatchModule,
   NestBatchRunner,
   type NestBatchModuleOptions,
+  type NestBatchPollingWorkerOptions,
   NEST_BATCH_OPTIONS
 } from "../src/index.js";
 import { FakeDatabaseBatchStorage, findFactoryProvider, findValueProvider } from "./support/providers.js";
@@ -26,6 +33,7 @@ describe("NestBatchModule / NestBatchModule", () => {
     const providers = dynamicModule.providers ?? [];
 
     expect(dynamicModule.module).toBe(NestBatchModule);
+    expect(dynamicModule.global).toBe(true);
     expect(dynamicModule.imports).toEqual([DiscoveryModule]);
     expect(findValueProvider(providers, NEST_BATCH_OPTIONS).useValue).toEqual({
       defaultTimeoutMs: 5000,
@@ -40,6 +48,7 @@ describe("NestBatchModule / NestBatchModule", () => {
         BATCH_CHECKPOINT_STORE,
         BATCH_LOCK_MANAGER,
         BATCH_RUNNER,
+        BatchContextAccessor,
         NestBatchRegistry,
         NestBatchRunner
       ])
@@ -114,6 +123,71 @@ describe("NestBatchModule / NestBatchModule", () => {
     );
   });
 
+  it("accepts scheduler providers / scheduler provider를 설정한다", () => {
+    const storage = new FakeDatabaseBatchStorage();
+    const scheduleStore = {
+      findLatestOccurrence: async () => undefined,
+      claimOccurrence: async () => undefined,
+      markDispatched: async () => true,
+      markFailed: async () => true
+    };
+    const schedules = [
+      { name: "billing.daily", jobName: "billing", trigger: { getDueOccurrences: () => [] } }
+    ];
+    const schedulerDispatcher = async () => undefined;
+    const schedulerLoop = {
+      tick: async () => ({
+        scannedSchedules: 0,
+        claimedOccurrences: 0,
+        dispatchedOccurrences: 0,
+        failedOccurrences: 0
+      })
+    };
+    const module = NestBatchModule.forRoot({
+      storage,
+      scheduleStore: scheduleStore as any,
+      schedules: schedules as any,
+      schedulerDispatcher,
+      schedulerLoop: schedulerLoop as any,
+      scheduler: { autoStart: false, pollIntervalMs: 1_000, ownerId: "scheduler-1" }
+    });
+
+    expect(module.providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ provide: BATCH_SCHEDULE_STORE, useValue: scheduleStore }),
+        expect.objectContaining({ provide: BATCH_SCHEDULES, useValue: schedules }),
+        expect.objectContaining({
+          provide: BATCH_SCHEDULER_DISPATCHER,
+          useValue: schedulerDispatcher
+        }),
+        expect.objectContaining({ provide: BATCH_SCHEDULER_LOOP, useValue: schedulerLoop })
+      ])
+    );
+  });
+
+  it("accepts polling worker providers / polling worker provider를 설정한다", () => {
+    const storage = new FakeDatabaseBatchStorage();
+    const pollingWorkers: readonly NestBatchPollingWorkerOptions[] = [
+      {
+        workerId: "vote-outbox-worker-1",
+        pollIntervalMs: 1_000,
+        autoStart: false,
+        task: () => 0
+      }
+    ];
+    const module = NestBatchModule.forRoot({
+      storage,
+      pollingWorkers
+    });
+
+    expect(module.providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ provide: BATCH_POLLING_WORKERS, useValue: pollingWorkers })
+      ])
+    );
+    expect(module.exports).toEqual(expect.arrayContaining([BATCH_POLLING_WORKERS]));
+  });
+
   it("creates async module providers from storage options / storage option으로 async module provider를 생성한다", () => {
     const storage = new FakeDatabaseBatchStorage();
     const dynamicModule = NestBatchModule.forRootAsync({
@@ -139,6 +213,7 @@ describe("NestBatchModule / NestBatchModule", () => {
         BATCH_CHECKPOINT_STORE,
         BATCH_LOCK_MANAGER,
         BATCH_RUNNER,
+        BatchContextAccessor,
         NestBatchRegistry,
         NestBatchRunner
       ])
@@ -153,6 +228,7 @@ describe("NestBatchModule / NestBatchModule", () => {
     });
     const optionsProvider = findFactoryProvider(dynamicModule.providers ?? [], NEST_BATCH_OPTIONS);
 
+    expect(dynamicModule.global).toBe(true);
     expect(dynamicModule.imports).toEqual([DiscoveryModule, importedModule]);
     expect(optionsProvider.inject).toEqual([]);
   });

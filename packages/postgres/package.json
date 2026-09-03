@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@nest-batch/core": "workspace:*",
+    "@nest-batch/scheduler-core": "workspace:*",
     "pg": "^8.22.0"
   },
   "devDependencies": {

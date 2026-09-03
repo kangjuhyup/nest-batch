@@ -64,6 +64,9 @@ importers:
       '@nest-batch/queue-core':
         specifier: workspace:*
         version: link:../queue-core
+      '@nest-batch/scheduler-core':
+        specifier: workspace:*
+        version: link:../scheduler-core
 
   packages/core: {}
 
@@ -72,12 +75,18 @@ importers:
       '@nest-batch/core':
         specifier: workspace:*
         version: link:../core
+      '@nest-batch/scheduler-core':
+        specifier: workspace:*
+        version: link:../scheduler-core
 
   packages/mariadb:
     dependencies:
       '@nest-batch/core':
         specifier: workspace:*
         version: link:../core
+      '@nest-batch/scheduler-core':
+        specifier: workspace:*
+        version: link:../scheduler-core
       mariadb:
         specifier: ^3.5.3
         version: 3.5.3
@@ -87,6 +96,9 @@ importers:
       '@nest-batch/core':
         specifier: workspace:*
         version: link:../core
+      '@nest-batch/scheduler-core':
+        specifier: workspace:*
+        version: link:../scheduler-core
       mysql2:
         specifier: ^3.23.0
         version: 3.23.0(@types/node@22.20.1)
@@ -96,9 +108,15 @@ importers:
       '@nest-batch/core':
         specifier: workspace:*
         version: link:../core
+      '@nest-batch/polling-core':
+        specifier: workspace:*
+        version: link:../polling-core
       '@nest-batch/queue-core':
         specifier: workspace:*
         version: link:../queue-core
+      '@nest-batch/scheduler-core':
+        specifier: workspace:*
+        version: link:../scheduler-core
     devDependencies:
       '@nestjs/common':
         specifier: ^11.0.0
@@ -110,11 +128,16 @@ importers:
         specifier: ^0.2.2
         version: 0.2.2
 
+  packages/polling-core: {}
+
   packages/postgres:
     dependencies:
       '@nest-batch/core':
         specifier: workspace:*
         version: link:../core
+      '@nest-batch/scheduler-core':
+        specifier: workspace:*
+        version: link:../scheduler-core
       pg:
         specifier: ^8.22.0
         version: 8.22.0
@@ -134,6 +157,21 @@ importers:
         version: 5.81.2
 
   packages/queue-core: {}
+
+  packages/scheduler-calendar:
+    dependencies:
+      '@nest-batch/scheduler-core':
+        specifier: workspace:*
+        version: link:../scheduler-core
+
+  packages/scheduler-core:
+    dependencies:
+      '@nest-batch/core':
+        specifier: workspace:*
+        version: link:../core
+      '@nest-batch/queue-core':
+        specifier: workspace:*
+        version: link:../queue-core
 
   packages/worker-local:
     dependencies:

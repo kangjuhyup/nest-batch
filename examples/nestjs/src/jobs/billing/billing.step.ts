@@ -1,36 +1,55 @@
+import { Inject } from "@nestjs/common";
 import { defineChunkStep, skipItem } from "@nest-batch/core";
+import type { Processor, Reader, ReaderSession, Writer } from "@nest-batch/core";
+import { BatchContextAccessor, BatchProcessor, BatchReader, BatchWriter } from "@nest-batch/nest";
 import type {
-  ChunkItemContext,
-  ChunkStepDefinition,
-  ChunkStepExecutionContext,
-  Processor,
-  Reader,
-  ReaderSession,
-  Writer
-} from "@nest-batch/core";
-import { BatchProcessor, BatchReader, BatchWriter } from "@nest-batch/nest";
-import type { BillingAccount, BillingCharge, BillingJobParameters } from "./billing.types.js";
+  BillingAccount,
+  BillingCharge,
+  BillingCheckpoint,
+  BillingJobParameters,
+  BillingStepDefinition
+} from "./billing.types.js";
 
 export const writtenCharges: BillingCharge[] = [];
 
 @BatchReader("charge-accounts-reader")
-export class ChargeAccountsReader implements Reader<BillingAccount, unknown, BillingJobParameters> {
-  open({ parameters, signal }: ChunkStepExecutionContext<unknown, BillingJobParameters>): ReaderSession<BillingAccount> {
+export class ChargeAccountsReader implements Reader<BillingAccount, BillingCheckpoint, BillingJobParameters> {
+  constructor(@Inject(BatchContextAccessor) private readonly batchContext: BatchContextAccessor) {}
+
+  open(): ReaderSession<BillingAccount, BillingCheckpoint> {
+    const parameters = this.batchContext.getRequiredParameters<BillingJobParameters>();
+    const checkpoint = this.batchContext.getCheckpoint<BillingCheckpoint>();
+    const signal = this.batchContext.getRequiredSignal();
     const { tenant } = parameters;
+    const accounts: readonly BillingAccount[] = [
+      { id: `${tenant}-account-1`, tenant, status: "active", amount: 1200 },
+      { id: `${tenant}-account-2`, tenant, status: "paused", amount: 9900 }
+    ];
+    let nextIndex = checkpoint?.nextIndex ?? 0;
 
     return {
       async *[Symbol.asyncIterator]() {
-        signal.throwIfAborted();
-        yield { id: `${tenant}-account-1`, tenant, status: "active", amount: 1200 };
-        yield { id: `${tenant}-account-2`, tenant, status: "paused", amount: 9900 };
+        for (let index = nextIndex; index < accounts.length; index += 1) {
+          signal.throwIfAborted();
+          nextIndex = index + 1;
+          yield accounts[index]!;
+        }
+      },
+      checkpoint() {
+        return { nextIndex };
       }
     };
   }
 }
 
 @BatchProcessor("charge-accounts-processor")
-export class ChargeAccountsProcessor implements Processor<BillingAccount, BillingCharge, unknown, BillingJobParameters> {
-  process(account: BillingAccount, { parameters }: ChunkItemContext<BillingAccount, unknown, BillingJobParameters>) {
+export class ChargeAccountsProcessor
+  implements Processor<BillingAccount, BillingCharge, BillingCheckpoint, BillingJobParameters> {
+  constructor(@Inject(BatchContextAccessor) private readonly batchContext: BatchContextAccessor) {}
+
+  process(account: BillingAccount) {
+    const parameters = this.batchContext.getRequiredParameters<BillingJobParameters>();
+
     if (account.status !== "active") {
       return skipItem("account is not chargeable");
     }
@@ -44,18 +63,18 @@ export class ChargeAccountsProcessor implements Processor<BillingAccount, Billin
 }
 
 @BatchWriter("billing-charge-writer")
-export class BillingChargeWriter implements Writer<BillingCharge, unknown, BillingJobParameters> {
+export class BillingChargeWriter implements Writer<BillingCharge, BillingCheckpoint, BillingJobParameters> {
   write(charges: readonly BillingCharge[]) {
     writtenCharges.push(...charges);
   }
 }
 
 export const createChargeAccountsStep = (
-  reader: Reader<BillingAccount, unknown, BillingJobParameters>,
-  processor: Processor<BillingAccount, BillingCharge, unknown, BillingJobParameters>,
-  writer: Writer<BillingCharge, unknown, BillingJobParameters>
-): ChunkStepDefinition<BillingAccount, BillingCharge, unknown, BillingJobParameters> =>
-  defineChunkStep<BillingAccount, BillingCharge, unknown, BillingJobParameters>({
+  reader: ChargeAccountsReader,
+  processor: ChargeAccountsProcessor,
+  writer: BillingChargeWriter
+): BillingStepDefinition =>
+  defineChunkStep<BillingAccount, BillingCharge, BillingCheckpoint, BillingJobParameters>({
     name: "charge-accounts",
     chunkSize: 50,
     reader,

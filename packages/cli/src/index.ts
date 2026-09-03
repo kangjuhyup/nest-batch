@@ -9,6 +9,17 @@ import type {
 } from "@nest-batch/core";
 import { WorkerLoop } from "@nest-batch/queue-core";
 import type { WorkHandler, WorkQueue, WorkUnit } from "@nest-batch/queue-core";
+import {
+  SchedulerLoop,
+  createQueueScheduleDispatcher,
+  createRunnerScheduleDispatcher
+} from "@nest-batch/scheduler-core";
+import type {
+  ScheduleDefinition,
+  ScheduleDispatcher,
+  ScheduleOccurrence,
+  ScheduleStore
+} from "@nest-batch/scheduler-core";
 
 export interface CliResult {
   readonly exitCode: number;
@@ -22,10 +33,14 @@ export interface CliContext {
   readonly queue?: WorkQueue;
   readonly workerHandler?: WorkHandler;
   readonly workerLoop?: WorkerLoop;
+  readonly schedules?: readonly ScheduleDefinition[];
+  readonly scheduleStore?: ScheduleStore;
+  readonly schedulerDispatcher?: ScheduleDispatcher;
+  readonly schedulerLoop?: SchedulerLoop;
   readonly signal?: AbortSignal;
 }
 
-const commands = new Set(["run", "status", "retry", "list", "worker"]);
+const commands = new Set(["run", "status", "retry", "list", "worker", "schedule"]);
 
 export const runCli = async (
   args: readonly string[],
@@ -36,7 +51,7 @@ export const runCli = async (
   if (command === undefined || command === "--help" || command === "-h") {
     return {
       exitCode: 0,
-      output: "nest-batch commands: run, status, retry, list, worker"
+      output: "nest-batch commands: run, status, retry, list, worker, schedule"
     };
   }
 
@@ -60,6 +75,10 @@ export const runCli = async (
 
     if (command === "worker") {
       return await runWorker(options, context);
+    }
+
+    if (command === "schedule") {
+      return await runScheduler(options, context);
     }
 
     return await runJob(command, options, context);
@@ -97,6 +116,45 @@ const runWorker = async (options: ParsedFlags, context: CliContext): Promise<Cli
   return {
     exitCode: 0,
     output: stringifyWorkerResult(workerId, false)
+  };
+};
+
+const runScheduler = async (options: ParsedFlags, context: CliContext): Promise<CliResult> => {
+  if (getBooleanFlag(options, "list")) {
+    return listSchedules(context);
+  }
+
+  if (getBooleanFlag(options, "status")) {
+    return await printScheduleStatus(options, context);
+  }
+
+  if (getBooleanFlag(options, "failed")) {
+    return await listFailedScheduleOccurrences(options, context);
+  }
+
+  const once = getBooleanFlag(options, "once");
+  const schedulerId = getStringOption(options, "scheduler-id") ?? "nest-batch-cli-scheduler";
+  const loop = context.schedulerLoop ?? createSchedulerLoop(options, context, schedulerId);
+
+  if (once) {
+    const result = await loop.tick({ signal: context.signal });
+
+    return {
+      exitCode: result.failedOccurrences === 0 ? 0 : 1,
+      output: stringifyScheduleResult(schedulerId, result)
+    };
+  }
+
+  await loop.runUntilStopped({ signal: context.signal });
+
+  return {
+    exitCode: 0,
+    output: stringifyScheduleResult(schedulerId, {
+      scannedSchedules: 0,
+      claimedOccurrences: 0,
+      dispatchedOccurrences: 0,
+      failedOccurrences: 0
+    })
   };
 };
 
@@ -147,6 +205,81 @@ const listJobs = (context: CliContext): CliResult => {
     output: JSON.stringify(
       {
         jobs: [...toJobRegistry(context.jobs).keys()].sort()
+      },
+      null,
+      2
+    )
+  };
+};
+
+const listSchedules = (context: CliContext): CliResult => {
+  return {
+    exitCode: 0,
+    output: JSON.stringify(
+      {
+        command: "schedule",
+        schedules: [...toScheduleRegistry(context.schedules).values()]
+          .map(serializeScheduleDefinition)
+          .sort((left, right) => String(left.name).localeCompare(String(right.name)))
+      },
+      null,
+      2
+    )
+  };
+};
+
+const printScheduleStatus = async (
+  options: ParsedFlags,
+  context: CliContext
+): Promise<CliResult> => {
+  const scheduleName = requireScheduleNameOption(options, "status");
+  const schedule = requireConfiguredSchedule(context, scheduleName);
+  const latestOccurrence = await requireScheduleStore(context).findLatestOccurrence(scheduleName);
+
+  return {
+    exitCode: 0,
+    output: JSON.stringify(
+      {
+        command: "schedule",
+        schedule: serializeScheduleDefinition(schedule),
+        latestOccurrence: latestOccurrence ? serializeScheduleOccurrence(latestOccurrence) : null
+      },
+      null,
+      2
+    )
+  };
+};
+
+const listFailedScheduleOccurrences = async (
+  options: ParsedFlags,
+  context: CliContext
+): Promise<CliResult> => {
+  const scheduleName = getStringOption(options, "schedule");
+  const limit = getPositiveIntegerOption(options, "limit");
+  const store = requireScheduleStore(context);
+  const query: {
+    scheduleName?: string;
+    status: ScheduleOccurrence["status"];
+    limit?: number;
+  } = { status: "failed" };
+
+  if (scheduleName !== undefined) {
+    query.scheduleName = scheduleName;
+  }
+
+  if (limit !== undefined) {
+    query.limit = limit;
+  }
+
+  const occurrences = await store.listOccurrences(query);
+
+  return {
+    exitCode: 0,
+    output: JSON.stringify(
+      {
+        command: "schedule",
+        ...query,
+        occurrences: occurrences.map(serializeScheduleOccurrence)
       },
       null,
       2
@@ -219,6 +352,43 @@ const requireQueue = (context: CliContext): WorkQueue => {
   return context.queue;
 };
 
+const requireScheduleStore = (context: CliContext): ScheduleStore => {
+  if (!context.scheduleStore) {
+    throw new Error("ScheduleStore is required for the schedule command.");
+  }
+
+  return context.scheduleStore;
+};
+
+const createSchedulerLoop = (
+  options: ParsedFlags,
+  context: CliContext,
+  ownerId: string
+): SchedulerLoop => {
+  const storage = requireStorage(context);
+  const store = requireScheduleStore(context);
+  const dispatcher =
+    context.schedulerDispatcher ??
+    (context.queue
+      ? createQueueScheduleDispatcher({ queue: context.queue })
+      : createRunnerScheduleDispatcher({
+          jobs: context.jobs ?? [],
+          runner: context.runner ?? new DefaultBatchRunner(storage),
+          ownerId
+        }));
+
+  return new SchedulerLoop({
+    schedules: context.schedules ?? [],
+    store,
+    lockManager: storage.lockManager,
+    dispatcher,
+    ownerId,
+    lockTtlMs: getNumberOption(options, "lock-ttl-ms"),
+    claimTtlMs: getNumberOption(options, "claim-ttl-ms"),
+    pollIntervalMs: getNumberOption(options, "poll-interval-ms")
+  });
+};
+
 const createDefaultWorkerHandler = (context: CliContext): WorkHandler => {
   const storage = requireStorage(context);
 
@@ -252,6 +422,31 @@ const toJobRegistry = (
   return registry;
 };
 
+const toScheduleRegistry = (
+  schedules: readonly ScheduleDefinition[] | undefined
+): ReadonlyMap<string, ScheduleDefinition> => {
+  const registry = new Map<string, ScheduleDefinition>();
+
+  for (const schedule of schedules ?? []) {
+    registry.set(schedule.name, schedule);
+  }
+
+  return registry;
+};
+
+const requireConfiguredSchedule = (
+  context: CliContext,
+  scheduleName: string
+): ScheduleDefinition => {
+  const schedule = toScheduleRegistry(context.schedules).get(scheduleName);
+
+  if (!schedule) {
+    throw new Error(`Schedule "${scheduleName}" is not configured.`);
+  }
+
+  return schedule;
+};
+
 const requireStringOption = (options: ParsedFlags, name: string): string => {
   const value = getStringOption(options, name);
 
@@ -272,6 +467,16 @@ const getStringOption = (options: ParsedFlags, name: string): string | undefined
   return value;
 };
 
+const requireScheduleNameOption = (options: ParsedFlags, command: string): string => {
+  const value = getStringOption(options, "schedule");
+
+  if (value === undefined || value.trim().length === 0) {
+    throw new Error(`--schedule is required for schedule --${command}.`);
+  }
+
+  return value;
+};
+
 const getNumberOption = (options: ParsedFlags, name: string): number | undefined => {
   const value = getStringOption(options, name);
 
@@ -283,6 +488,22 @@ const getNumberOption = (options: ParsedFlags, name: string): number | undefined
 
   if (!Number.isFinite(number)) {
     throw new Error(`--${name} must be a finite number.`);
+  }
+
+  return number;
+};
+
+const getPositiveIntegerOption = (options: ParsedFlags, name: string): number | undefined => {
+  const value = getStringOption(options, name);
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const number = Number(value);
+
+  if (!Number.isInteger(number) || number <= 0) {
+    throw new Error(`--${name} must be a positive integer.`);
   }
 
   return number;
@@ -432,6 +653,61 @@ const stringifyWorkerResult = (workerId: string, handled: boolean): string => {
     2
   );
 };
+
+const stringifyScheduleResult = (
+  schedulerId: string,
+  result: {
+    readonly scannedSchedules: number;
+    readonly claimedOccurrences: number;
+    readonly dispatchedOccurrences: number;
+    readonly failedOccurrences: number;
+  }
+): string => {
+  return JSON.stringify(
+    {
+      command: "schedule",
+      schedulerId,
+      result
+    },
+    null,
+    2
+  );
+};
+
+const serializeScheduleDefinition = (schedule: ScheduleDefinition): Record<string, unknown> => {
+  const serialized: Record<string, unknown> = {
+    name: schedule.name,
+    jobName: schedule.jobName,
+    hasParameters: schedule.parameters !== undefined
+  };
+
+  if (schedule.misfirePolicy !== undefined) {
+    serialized.misfirePolicy = schedule.misfirePolicy;
+  }
+
+  if (schedule.maxCatchUpOccurrences !== undefined) {
+    serialized.maxCatchUpOccurrences = schedule.maxCatchUpOccurrences;
+  }
+
+  if (schedule.runOptions !== undefined) {
+    serialized.runOptions = schedule.runOptions;
+  }
+
+  return serialized;
+};
+
+const serializeScheduleOccurrence = (occurrence: ScheduleOccurrence): Record<string, unknown> => ({
+  scheduleName: occurrence.scheduleName,
+  occurrenceId: occurrence.occurrenceId,
+  scheduledAt: occurrence.scheduledAt.toISOString(),
+  status: occurrence.status,
+  ownerId: occurrence.ownerId,
+  claimedAt: occurrence.claimedAt?.toISOString(),
+  claimExpiresAt: occurrence.claimExpiresAt?.toISOString(),
+  dispatchedAt: occurrence.dispatchedAt?.toISOString(),
+  failedAt: occurrence.failedAt?.toISOString(),
+  failureReason: occurrence.failureReason
+});
 
 const serializeJobExecution = (execution: JobExecution): Record<string, unknown> => ({
   id: execution.id,

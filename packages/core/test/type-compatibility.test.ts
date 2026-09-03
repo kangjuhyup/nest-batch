@@ -6,6 +6,12 @@ import {
   defineStep
 } from "../src/index.js";
 import type { JobParameters } from "../src/index.js";
+import type {
+  ChunkCheckpointCallbackContext,
+  ChunkProcessorContext,
+  ChunkReaderContext,
+  ChunkWriterContext
+} from "../src/index.js";
 
 type BillingParameters = JobParameters & {
   readonly tenantId: string;
@@ -94,5 +100,16 @@ describe("context type compatibility / context type 호환성", () => {
     });
 
     expect(job.steps[0]).toBe(step);
+  });
+
+  it("offers parameter-first chunk context aliases / parameter-first chunk context alias를 제공한다", () => {
+    expectTypeOf<ChunkReaderContext<BillingParameters>["parameters"]>().toEqualTypeOf<BillingParameters>();
+    expectTypeOf<
+      ChunkProcessorContext<BillingParameters, { readonly id: string }>["parameters"]
+    >().toEqualTypeOf<BillingParameters>();
+    expectTypeOf<ChunkWriterContext<BillingParameters>["parameters"]>().toEqualTypeOf<BillingParameters>();
+    expectTypeOf<
+      ChunkCheckpointCallbackContext<BillingParameters, { readonly cursor: number }>["checkpoint"]
+    >().toEqualTypeOf<{ readonly cursor: number } | undefined>();
   });
 });

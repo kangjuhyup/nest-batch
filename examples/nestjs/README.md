@@ -17,6 +17,8 @@ src/
     reader-examples/
       reader-examples.module.ts
       reader-examples.reader.ts
+    vote-outbox/
+      vote-outbox.module.ts
 ```
 
 `BillingModule`은 `@BatchReader`, `@BatchProcessor`, `@BatchWriter`가 붙은
@@ -28,14 +30,25 @@ provider에서 core `defineChunkStep`으로 chunk step을 조립합니다.
 Nest provider는 singleton으로 재사용될 수 있으므로 `Reader` instance field에
 cursor나 offset을 저장하지 않고, `open()`이 반환하는 `ReaderSession` 안에서
 실행 상태를 관리합니다.
-`billing.step.ts`의 reader와 processor는 core runtime context의
-`context.parameters.tenant`를 읽어 tenant별 account id와 charge payload를 만듭니다.
-Nest integration은 request-scoped provider처럼 보이는 별도 `BatchContext` injection
-API를 만들지 않고, core callback 인자로 전달되는 batch execution scoped context를
-그대로 사용합니다.
+`billing.step.ts`의 reader와 processor는 `BatchContextAccessor`를 주입받아
+현재 batch callback의 `parameters`와 `signal`을 읽고, tenant별 account id와
+charge payload를 만듭니다. accessor는 `AsyncLocalStorage` 기반이므로 batch
+callback 실행 중에만 context를 제공합니다. reader는 `getCheckpoint()`로 이전
+`nextIndex` checkpoint를 읽고, `ReaderSession.checkpoint()`로 다음에 읽을 index를
+저장합니다.
 `ReaderExamplesModule`은 `createIterableReader`, `createFunctionReader`,
 `createCursorReader`, `createPagingReader`를 Nest `@BatchReader` provider로 감싼
 예제를 제공합니다.
+
+`VoteOutboxModule`은 Transactional Outbox polling worker를 Nest에서 연결하는
+예제를 제공합니다. `NestBatchPollingModule.forRootAsync()`가
+`IntegrationEventOutboxDispatcher`를 주입받고, `pollingWorkers`에
+`autoStart: process.env.NEST_BATCH_PROCESS_ROLE === "vote-outbox-worker"`를
+설정합니다. task는 `dispatchBatch({ workerId, signal })`을 호출한 뒤
+`claimedCount > 0`을 반환하므로, 처리한 outbox message가 있을 때만 sleep 없이
+다음 polling iteration으로 이어집니다. dispatcher는 같은 `AbortSignal`을
+`IntegrationEventPublisher.publish()`까지 전달합니다. 실제 publish client가
+`AbortSignal`을 지원하지 않으면 dispatcher 계층에서 hard timeout을 둬야 합니다.
 
 checkpoint는 reader cursor나 chunk 안전 경계이고, durable execution context는
 `storage.executionContextStore`에 저장하는 별도 JSON metadata입니다. restart할 때

@@ -19,6 +19,7 @@ export class NestBatchModule {
 
     return {
       module: NestBatchModule,
+      global: true,
       imports: [DiscoveryModule],
       providers: [
         {
@@ -35,6 +36,7 @@ export class NestBatchModule {
   static forRootAsync(options: NestBatchModuleAsyncOptions): DynamicModule {
     return {
       module: NestBatchModule,
+      global: true,
       imports: [DiscoveryModule, ...(options.imports ?? [])],
       providers: [
         {

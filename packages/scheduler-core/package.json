@@ -1,0 +1,24 @@
+{
+  "name": "@nest-batch/scheduler-core",
+  "version": "0.0.1",
+  "description": "Framework-independent scheduler contracts and loop for nest-batch.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --root ../.. --config vitest.config.ts packages/scheduler-core/test"
+  },
+  "dependencies": {
+    "@nest-batch/core": "workspace:*",
+    "@nest-batch/queue-core": "workspace:*"
+  }
+}

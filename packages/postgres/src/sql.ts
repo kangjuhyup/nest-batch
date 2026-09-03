@@ -18,12 +18,14 @@ export interface PostgresTables {
   readonly checkpoints: string;
   readonly executionContexts: string;
   readonly locks: string;
+  readonly scheduleOccurrences: string;
   readonly jobInstanceParametersIndex: string;
   readonly jobStatusIndex: string;
   readonly jobExecutionInstanceStatusIndex: string;
   readonly stepStatusIndex: string;
   readonly partitionStatusIndex: string;
   readonly locksExpiresAtIndex: string;
+  readonly scheduleOccurrencesLatestIndex: string;
 }
 
 export interface PostgresJobInstanceRow {
@@ -99,12 +101,14 @@ export const createPostgresTables = (
     checkpoints: qualify("checkpoints"),
     executionContexts: qualify("execution_contexts"),
     locks: qualify("locks"),
+    scheduleOccurrences: qualify("schedule_occurrences"),
     jobInstanceParametersIndex: quotePostgresIdentifier(`idx_${tablePrefix}_job_instances_job_parameters`),
     jobStatusIndex: quotePostgresIdentifier(`idx_${tablePrefix}_job_executions_job_status`),
     jobExecutionInstanceStatusIndex: quotePostgresIdentifier(`idx_${tablePrefix}_job_executions_instance_status`),
     stepStatusIndex: quotePostgresIdentifier(`idx_${tablePrefix}_step_executions_job_step_status`),
     partitionStatusIndex: quotePostgresIdentifier(`idx_${tablePrefix}_partition_executions_step_status`),
-    locksExpiresAtIndex: quotePostgresIdentifier(`idx_${tablePrefix}_locks_expires_at`)
+    locksExpiresAtIndex: quotePostgresIdentifier(`idx_${tablePrefix}_locks_expires_at`),
+    scheduleOccurrencesLatestIndex: quotePostgresIdentifier(`idx_${tablePrefix}_schedule_occurrences_latest`)
   };
 };
 

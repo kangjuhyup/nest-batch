@@ -16,8 +16,8 @@ application이 storage와 job registry를 주입할 때 job 실행, 재시도, �
 목록 출력을 처리할 수 있습니다. `@nest-batch/nest`는 decorator가 붙은 job과
 batch component provider를 발견하고, `BATCH_RUNNER` provider와
 `NestBatchRunner`를 통해 발견한 job을 실행할 수 있습니다. distributed worker
-contract와 queue adapter 경계는 진행 중이며, production scheduling은 아직
-구현되지 않았습니다.
+contract, BullMQ queue adapter 경계, continuous polling worker, production
+scheduling 1차 구현을 제공합니다.
 
 ## Packages
 
@@ -29,6 +29,9 @@ contract와 queue adapter 경계는 진행 중이며, production scheduling은 �
 - `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, checkpoint storage.
 - `@nest-batch/queue-core`: queue-neutral `WorkQueue` contract와 worker loop.
 - `@nest-batch/queue-bullmq`: BullMQ-compatible `WorkQueue` adapter 경계.
+- `@nest-batch/polling-core`: framework-independent continuous polling task loop.
+- `@nest-batch/scheduler-core`: framework-independent schedule definition, trigger evaluation, occurrence claim orchestration, dispatch helper.
+- `@nest-batch/scheduler-calendar`: 의존성이 작은 UTC daily, weekly, monthly trigger helper.
 - `@nest-batch/cli`: 운영 CLI 경계.
 
 ## Distributed Workers
@@ -38,10 +41,158 @@ contract와 queue adapter 경계는 진행 중이며, production scheduling은 �
 상태의 source of truth는 repository입니다. distributed execution은
 at-least-once를 전제로 하므로 writer와 외부 side effect는 idempotent해야 합니다.
 
-`@nest-batch/queue-bullmq`는 `WorkUnit.id`를 BullMQ job id로 매핑하고,
-batch runtime이 retry policy를 소유하도록 BullMQ retry를 기본 비활성화합니다
-(`attempts: 1`). application은 실제 BullMQ `Queue`/worker instance를 감싼 뒤
-`BullMqWorkQueue`에 주입할 수 있습니다.
+`@nest-batch/queue-bullmq`는 각 `WorkUnit.id`를 안정적인 BullMQ job id로
+매핑하고, batch runtime이 retry policy를 소유하도록 BullMQ retry를 기본
+비활성화합니다(`attempts: 1`). application은 실제 BullMQ `Queue`/worker
+instance를 감싼 뒤 `BullMqWorkQueue`에 주입할 수 있습니다. work id에 `:`가 들어
+있으면 adapter는 BullMQ custom job id만 encode하고, payload 안의 `WorkUnit.id`는
+그대로 유지합니다.
+
+## Continuous Polling Workers
+
+`@nest-batch/polling-core`는 Transactional Outbox dispatcher처럼 polling tick마다
+batch metadata를 만들면 안 되는 long-lived task loop를 제공합니다. 이 loop는
+`JobExecution`, `StepExecution`, checkpoint row, scheduler occurrence를 생성하지
+않습니다. outbox message claim, lease, retry/backoff, DEAD 처리, aggregate ordering은
+task 저장소와 dispatcher가 소유하고, nest-batch는 worker lifecycle, idle sleep,
+worker/system error backoff, observer event, graceful shutdown만 담당합니다.
+
+```ts
+import { ContinuousPollingLoop } from "@nest-batch/polling-core";
+
+const loop = new ContinuousPollingLoop({
+  workerId: "vote-outbox-worker-1",
+  pollIntervalMs: 1_000,
+  task: async ({ workerId, signal }) => {
+    const { claimedCount } = await integrationEventOutboxDispatcher.dispatchBatch({
+      workerId,
+      signal
+    });
+
+    return claimedCount > 0;
+  }
+});
+
+await loop.runUntilStopped({ signal });
+```
+
+task가 `true` 또는 양수 처리 건수를 반환하면 loop는 sleep 없이 다음 iteration을
+실행해 밀린 outbox work를 drain합니다. `false`, `0`, `undefined`면
+`pollIntervalMs`만큼 idle sleep을 수행합니다. task 밖으로 전파된 오류는
+worker/system 오류로 보고 bounded exponential backoff와 jitter 후 재시도합니다.
+message별 실패와 retry 정책은 outbox repository/dispatcher 내부에 둬야 합니다.
+
+Nest polling integration은 `NestBatchPollingModule`을 통해
+`DatabaseBatchStorage` 없이 실행할 수 있습니다. `pollingWorkers[].autoStart`가
+true인 worker만 시작하므로, 같은 `AppModule`을 API process와 worker process에서
+공유할 수 있습니다.
+
+```ts
+NestBatchPollingModule.forRootAsync({
+  inject: [IntegrationEventOutboxDispatcher],
+  useFactory: (outboxDispatcher: IntegrationEventOutboxDispatcher) => ({
+    pollingWorkers: [
+      {
+        workerId: process.env.VOTE_OUTBOX_WORKER_ID ?? "vote-outbox-worker-1",
+        pollIntervalMs: 1_000,
+        autoStart: process.env.NEST_BATCH_PROCESS_ROLE === "vote-outbox-worker",
+        task: async ({ workerId, signal }) => {
+          const { claimedCount } = await outboxDispatcher.dispatchBatch({
+            workerId,
+            signal
+          });
+
+          return claimedCount > 0;
+        }
+      }
+    ]
+  })
+});
+```
+
+기존 `NestBatchModule`도 같은 process에서 batch job storage와
+`NestBatchRunner`가 이미 필요할 때를 위해 `pollingWorkers` option을 계속
+받습니다. polling-only process는 `NestBatchPollingModule`을 사용합니다.
+
+polling loop는 전역 singleton worker lock을 강제하지 않습니다. 수평 확장은
+`FOR UPDATE SKIP LOCKED`, DB clock lease, lease-token compare-and-swap 같은
+저장소 수준 제어로 처리합니다. polling task의 `AbortSignal`은 dispatcher와
+publisher 계층까지 전달해야 합니다. 외부 publish client가 `AbortSignal`을
+지원하지 않는다면 task/dispatcher가 hard timeout을 걸어 shutdown이 in-flight
+I/O를 영구히 기다리지 않게 해야 합니다.
+
+## Production Scheduling
+
+`@nest-batch/scheduler-core`는 code-defined schedule을 평가하고, `ScheduleStore`로
+durable occurrence를 claim한 뒤 `BatchRunner` 또는 `WorkQueue`로 dispatch합니다.
+schedule definition은 application code가 소유하고, database는 중복 dispatch를
+줄이고 catch-up 판단을 하기 위한 occurrence state만 저장합니다.
+
+```ts
+import { PostgresScheduleStore } from "@nest-batch/postgres";
+import {
+  SchedulerLoop,
+  createIntervalTrigger,
+  createQueueScheduleDispatcher,
+  defineSchedule
+} from "@nest-batch/scheduler-core";
+
+const scheduleStore = new PostgresScheduleStore({
+  connectionString: process.env.NEST_BATCH_POSTGRES_URL,
+  schema: "batch"
+});
+await scheduleStore.initialize();
+
+const schedule = defineSchedule({
+  name: "billing.daily",
+  jobName: "billing",
+  trigger: createIntervalTrigger({
+    everyMs: 86_400_000,
+    startAt: new Date("2026-01-01T00:00:00.000Z")
+  }),
+  parameters: ({ scheduledAt }) => ({
+    billingDate: scheduledAt.toISOString().slice(0, 10)
+  })
+});
+
+const scheduler = new SchedulerLoop({
+  schedules: [schedule],
+  store: scheduleStore,
+  lockManager: storage.lockManager,
+  dispatcher: createQueueScheduleDispatcher({ queue }),
+  ownerId: "scheduler-1"
+});
+
+await scheduler.tick();
+```
+
+scheduler dispatch는 at-least-once입니다. scheduler crash, queue redelivery,
+worker crash가 있으면 같은 occurrence가 다시 dispatch될 수 있으므로 writer와
+외부 side effect는 idempotency key 또는 natural unique constraint를 사용해야
+합니다.
+scheduler는 최신 terminal occurrence(`dispatched` 또는 `failed`)를 trigger
+기준으로 사용하므로 stale `claimed` occurrence는 claim TTL이 지난 뒤 다시
+회수될 수 있고, 영구히 건너뛰지 않습니다.
+
+UTC calendar schedule은 `scheduler-core` 밖에서 해석합니다. 기본 daily, weekly,
+monthly rule은 optional helper package를 사용할 수 있습니다.
+
+```ts
+import { createUtcDailyTrigger } from "@nest-batch/scheduler-calendar";
+
+const trigger = createUtcDailyTrigger({
+  startAt: new Date("2026-01-01T00:00:00.000Z"),
+  time: { hour: 9, minute: 30 }
+});
+```
+
+```bash
+nest-batch schedule --once
+nest-batch schedule --poll-interval-ms 1000 --scheduler-id scheduler-1
+nest-batch schedule --list
+nest-batch schedule --status --schedule billing.daily
+nest-batch schedule --failed --schedule billing.daily --limit 10
+```
 
 ## Development
 
@@ -383,10 +534,10 @@ const job = defineJob({
 ## Nest Integration
 
 `NestBatchModule.forRoot()`는 `DatabaseBatchStorage`, repository, checkpoint,
-lock, 기본 `BATCH_RUNNER`, `NestBatchRegistry`, `NestBatchRunner`를 연결합니다.
-application bootstrap 시점에 `NestBatchRegistry`는 `@BatchJob`,
-`@BatchStep`, `@BatchReader`, `@BatchProcessor`, `@BatchWriter`가 붙은 provider를
-발견합니다.
+lock, 기본 `BATCH_RUNNER`, `BatchContextAccessor`, `NestBatchRegistry`,
+`NestBatchRunner`를 연결합니다. application bootstrap 시점에 `NestBatchRegistry`는
+`@BatchJob`, `@BatchStep`, `@BatchReader`, `@BatchProcessor`, `@BatchWriter`가
+붙은 provider를 발견합니다.
 
 ```ts
 import { Module } from "@nestjs/common";
@@ -413,6 +564,30 @@ class BillingJob {
 class AppModule {}
 
 await app.get(NestBatchRunner).run("daily-billing", { tenant: "acme" });
+```
+
+Nest provider에서는 모든 method signature로 runtime context를 전달하지 않고
+`BatchContextAccessor`를 주입해 사용할 수도 있습니다. accessor는
+`AsyncLocalStorage` 기반이므로 `getRequiredParameters()`, `getCheckpoint()`,
+`getRequiredSignal()`은 batch callback 실행 중에만 사용할 수 있습니다.
+
+```ts
+import { Injectable } from "@nestjs/common";
+import { BatchContextAccessor } from "@nest-batch/nest";
+
+@Injectable()
+class BillingService {
+  constructor(private readonly batchContext: BatchContextAccessor) {}
+
+  chargeAccount() {
+    const parameters = this.batchContext.getRequiredParameters();
+    const checkpoint = this.batchContext.getCheckpoint<{ nextIndex: number }>();
+    const signal = this.batchContext.getRequiredSignal();
+
+    signal.throwIfAborted();
+    return `charged ${String(parameters.tenant)} from ${checkpoint?.nextIndex ?? 0}`;
+  }
+}
 ```
 
 custom runner가 필요하면 `forRoot()` 또는 `forRootAsync()`에 `batchRunner`를
@@ -483,7 +658,7 @@ processor 실패 item을 건너뛰는 데만 적용됩니다. writer 실패 skip
 
 ```ts
 import { defineChunkStep, skipItem } from "@nest-batch/core";
-import type { ChunkStepExecutionContext, Processor, Reader, ReaderSession, Writer } from "@nest-batch/core";
+import type { ChunkReaderContext, Processor, Reader, ReaderSession, Writer } from "@nest-batch/core";
 
 interface SourceUser {
   readonly id: string;
@@ -495,7 +670,7 @@ interface ImportedUser {
 }
 
 class UserReader implements Reader<SourceUser> {
-  open({ signal }: ChunkStepExecutionContext): ReaderSession<SourceUser> {
+  open({ signal }: ChunkReaderContext): ReaderSession<SourceUser> {
     return {
       async *[Symbol.asyncIterator]() {
         signal.throwIfAborted();

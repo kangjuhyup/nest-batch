@@ -76,6 +76,26 @@ describe("bullmq work queue / BullMQ work queue", () => {
     ]);
   });
 
+  it("encodes colon work ids for BullMQ job ids / colon이 포함된 work id를 BullMQ job id로 encode한다", async () => {
+    const queue = new FakeBullMqQueue<WorkUnit>();
+    const worker = new FakeBullMqWorker<WorkUnit>([]);
+    const workQueue = new BullMqWorkQueue({ queue, worker });
+    const work = createWork("schedule:billing.daily:2026-01-01T00:00:00.000Z");
+
+    await workQueue.enqueue(work);
+
+    expect(queue.added).toEqual([
+      {
+        name: "partition",
+        data: work,
+        options: {
+          jobId: encodeURIComponent(work.id),
+          attempts: 1
+        }
+      }
+    ]);
+  });
+
   it("claims and completes BullMQ jobs / BullMQ job을 claim하고 완료한다", async () => {
     const job = new FakeBullMqJob(createWork("work-1"));
     const queue = new FakeBullMqQueue<WorkUnit>();
