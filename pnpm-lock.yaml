@@ -108,6 +108,9 @@ importers:
       '@nest-batch/core':
         specifier: workspace:*
         version: link:../core
+      '@nest-batch/polling-core':
+        specifier: workspace:*
+        version: link:../polling-core
       '@nest-batch/queue-core':
         specifier: workspace:*
         version: link:../queue-core
@@ -124,6 +127,8 @@ importers:
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
+
+  packages/polling-core: {}
 
   packages/postgres:
     dependencies:

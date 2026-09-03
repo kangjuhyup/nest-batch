@@ -16,7 +16,8 @@ application이 storage와 job registry를 주입할 때 job 실행, 재시도, �
 목록 출력을 처리할 수 있습니다. `@nest-batch/nest`는 decorator가 붙은 job과
 batch component provider를 발견하고, `BATCH_RUNNER` provider와
 `NestBatchRunner`를 통해 발견한 job을 실행할 수 있습니다. distributed worker
-contract, BullMQ queue adapter 경계, production scheduling 1차 구현을 제공합니다.
+contract, BullMQ queue adapter 경계, continuous polling worker, production
+scheduling 1차 구현을 제공합니다.
 
 ## Packages
 
@@ -28,6 +29,7 @@ contract, BullMQ queue adapter 경계, production scheduling 1차 구현을 제�
 - `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, checkpoint storage.
 - `@nest-batch/queue-core`: queue-neutral `WorkQueue` contract와 worker loop.
 - `@nest-batch/queue-bullmq`: BullMQ-compatible `WorkQueue` adapter 경계.
+- `@nest-batch/polling-core`: framework-independent continuous polling task loop.
 - `@nest-batch/scheduler-core`: framework-independent schedule definition, trigger evaluation, occurrence claim orchestration, dispatch helper.
 - `@nest-batch/scheduler-calendar`: 의존성이 작은 UTC daily, weekly, monthly trigger helper.
 - `@nest-batch/cli`: 운영 CLI 경계.
@@ -45,6 +47,79 @@ at-least-once를 전제로 하므로 writer와 외부 side effect는 idempotent�
 instance를 감싼 뒤 `BullMqWorkQueue`에 주입할 수 있습니다. work id에 `:`가 들어
 있으면 adapter는 BullMQ custom job id만 encode하고, payload 안의 `WorkUnit.id`는
 그대로 유지합니다.
+
+## Continuous Polling Workers
+
+`@nest-batch/polling-core`는 Transactional Outbox dispatcher처럼 polling tick마다
+batch metadata를 만들면 안 되는 long-lived task loop를 제공합니다. 이 loop는
+`JobExecution`, `StepExecution`, checkpoint row, scheduler occurrence를 생성하지
+않습니다. outbox message claim, lease, retry/backoff, DEAD 처리, aggregate ordering은
+task 저장소와 dispatcher가 소유하고, nest-batch는 worker lifecycle, idle sleep,
+worker/system error backoff, observer event, graceful shutdown만 담당합니다.
+
+```ts
+import { ContinuousPollingLoop } from "@nest-batch/polling-core";
+
+const loop = new ContinuousPollingLoop({
+  workerId: "vote-outbox-worker-1",
+  pollIntervalMs: 1_000,
+  task: async ({ workerId, signal }) => {
+    const { claimedCount } = await integrationEventOutboxDispatcher.dispatchBatch({
+      workerId,
+      signal
+    });
+
+    return claimedCount > 0;
+  }
+});
+
+await loop.runUntilStopped({ signal });
+```
+
+task가 `true` 또는 양수 처리 건수를 반환하면 loop는 sleep 없이 다음 iteration을
+실행해 밀린 outbox work를 drain합니다. `false`, `0`, `undefined`면
+`pollIntervalMs`만큼 idle sleep을 수행합니다. task 밖으로 전파된 오류는
+worker/system 오류로 보고 bounded exponential backoff와 jitter 후 재시도합니다.
+message별 실패와 retry 정책은 outbox repository/dispatcher 내부에 둬야 합니다.
+
+Nest polling integration은 `NestBatchPollingModule`을 통해
+`DatabaseBatchStorage` 없이 실행할 수 있습니다. `pollingWorkers[].autoStart`가
+true인 worker만 시작하므로, 같은 `AppModule`을 API process와 worker process에서
+공유할 수 있습니다.
+
+```ts
+NestBatchPollingModule.forRootAsync({
+  inject: [IntegrationEventOutboxDispatcher],
+  useFactory: (outboxDispatcher: IntegrationEventOutboxDispatcher) => ({
+    pollingWorkers: [
+      {
+        workerId: process.env.VOTE_OUTBOX_WORKER_ID ?? "vote-outbox-worker-1",
+        pollIntervalMs: 1_000,
+        autoStart: process.env.NEST_BATCH_PROCESS_ROLE === "vote-outbox-worker",
+        task: async ({ workerId, signal }) => {
+          const { claimedCount } = await outboxDispatcher.dispatchBatch({
+            workerId,
+            signal
+          });
+
+          return claimedCount > 0;
+        }
+      }
+    ]
+  })
+});
+```
+
+기존 `NestBatchModule`도 같은 process에서 batch job storage와
+`NestBatchRunner`가 이미 필요할 때를 위해 `pollingWorkers` option을 계속
+받습니다. polling-only process는 `NestBatchPollingModule`을 사용합니다.
+
+polling loop는 전역 singleton worker lock을 강제하지 않습니다. 수평 확장은
+`FOR UPDATE SKIP LOCKED`, DB clock lease, lease-token compare-and-swap 같은
+저장소 수준 제어로 처리합니다. polling task의 `AbortSignal`은 dispatcher와
+publisher 계층까지 전달해야 합니다. 외부 publish client가 `AbortSignal`을
+지원하지 않는다면 task/dispatcher가 hard timeout을 걸어 shutdown이 in-flight
+I/O를 영구히 기다리지 않게 해야 합니다.
 
 ## Production Scheduling
 

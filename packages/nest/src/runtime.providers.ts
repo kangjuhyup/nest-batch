@@ -3,6 +3,7 @@ import type { BatchRunner } from "@nest-batch/core";
 import type { DynamicModule, Provider } from "@nestjs/common";
 import {
   BATCH_EXECUTION_ENGINE,
+  BATCH_POLLING_WORKERS,
   BATCH_RUNNER,
   BATCH_SCHEDULE_STORE,
   BATCH_SCHEDULES,
@@ -15,6 +16,7 @@ import {
 import { BatchContextAccessor } from "./batch-context-accessor.js";
 import { BatchContextStorage } from "./batch-context.storage.js";
 import type { NestBatchModuleOptions } from "./module-options.js";
+import { NestBatchPollingLifecycle } from "./polling-lifecycle.service.js";
 import { NestBatchRegistry } from "./registry.js";
 import { NestBatchRunner } from "./runner.service.js";
 import { NestBatchSchedulerLifecycle } from "./scheduler-lifecycle.service.js";
@@ -31,6 +33,7 @@ export const createRuntimeProviders = (options?: NestBatchModuleOptions): Provid
   BatchContextAccessor,
   NestBatchRegistry,
   NestBatchSchedulerLifecycle,
+  ...createNestBatchModulePollingLifecycleProviders(options),
   ...createRuntimeOptionProviders(options),
   {
     provide: BATCH_RUNNER,
@@ -42,6 +45,16 @@ export const createRuntimeProviders = (options?: NestBatchModuleOptions): Provid
   },
   NestBatchRunner
 ];
+
+const createNestBatchModulePollingLifecycleProviders = (
+  options?: NestBatchModuleOptions
+): Provider[] => {
+  if (!options || options.pollingWorkers !== undefined) {
+    return [NestBatchPollingLifecycle];
+  }
+
+  return [];
+};
 
 export const createRuntimeExports = (
   options?: NestBatchModuleOptions
@@ -59,7 +72,8 @@ const createRuntimeOptionProviders = (options?: NestBatchModuleOptions): Provide
       createRuntimeOptionFactoryProvider(BATCH_SCHEDULE_STORE, "scheduleStore"),
       createRuntimeOptionFactoryProvider(BATCH_SCHEDULES, "schedules"),
       createRuntimeOptionFactoryProvider(BATCH_SCHEDULER_DISPATCHER, "schedulerDispatcher"),
-      createRuntimeOptionFactoryProvider(BATCH_SCHEDULER_LOOP, "schedulerLoop")
+      createRuntimeOptionFactoryProvider(BATCH_SCHEDULER_LOOP, "schedulerLoop"),
+      createRuntimeOptionFactoryProvider(BATCH_POLLING_WORKERS, "pollingWorkers")
     ];
   }
 
@@ -93,6 +107,10 @@ const createRuntimeOptionProviders = (options?: NestBatchModuleOptions): Provide
     providers.push({ provide: BATCH_SCHEDULER_LOOP, useValue: options.schedulerLoop });
   }
 
+  if (options.pollingWorkers !== undefined) {
+    providers.push({ provide: BATCH_POLLING_WORKERS, useValue: options.pollingWorkers });
+  }
+
   return providers;
 };
 
@@ -107,7 +125,8 @@ const createRuntimeOptionExports = (
       BATCH_SCHEDULE_STORE,
       BATCH_SCHEDULES,
       BATCH_SCHEDULER_DISPATCHER,
-      BATCH_SCHEDULER_LOOP
+      BATCH_SCHEDULER_LOOP,
+      BATCH_POLLING_WORKERS
     ];
   }
 
@@ -141,6 +160,10 @@ const createRuntimeOptionExports = (
     exports.push(BATCH_SCHEDULER_LOOP);
   }
 
+  if (options.pollingWorkers !== undefined) {
+    exports.push(BATCH_POLLING_WORKERS);
+  }
+
   return exports;
 };
 
@@ -154,6 +177,7 @@ const createRuntimeOptionFactoryProvider = (
     | "schedules"
     | "schedulerDispatcher"
     | "schedulerLoop"
+    | "pollingWorkers"
 ): Provider => ({
   provide,
   useFactory: (options: NestBatchModuleOptions): unknown => options[key],

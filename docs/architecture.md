@@ -34,10 +34,29 @@ helpers. It depends on `@nest-batch/scheduler-core` only through the
 `ScheduleTrigger` contract; full cron expression parsing and timezone/DST
 policy stay outside `scheduler-core`.
 
+## `@nest-batch/polling-core`
+
+Polling core owns continuous polling task contracts and the long-lived worker
+loop for cases that should not create batch metadata per tick, such as
+Transactional Outbox dispatch. It is framework-independent and does not import
+NestJS, database clients, queue clients, scheduler contracts, or job/step
+execution types. The loop passes `workerId` and `AbortSignal` to a task
+`runOnce` callback, drains busy work without sleeping, waits only when idle,
+and retries worker/system errors with bounded exponential backoff and jitter.
+
+Polling core does not own outbox message state, retry/backoff policy, dead-letter
+policy, lease tokens, aggregate ordering, or horizontal scaling coordination.
+Those remain application or adapter responsibilities.
+
 ## `@nest-batch/nest`
 
 Nest integration contains module APIs, decorators, discovery, and lifecycle
 integration. It depends on `@nest-batch/core`; core does not depend on NestJS.
+`NestBatchPollingModule` is a polling-only integration path. It depends on
+`@nest-batch/polling-core`, does not require `DatabaseBatchStorage`, and does
+not create repository, checkpoint, lock, schedule, or `BatchRunner` providers.
+`NestBatchModule` can still accept `pollingWorkers` for compatibility when a
+process already needs normal batch job integration.
 
 ## `@nest-batch/inmemory`
 
@@ -100,6 +119,15 @@ Runtime work should treat failure and restart as normal paths:
   still-claimed occurrence state
 - scheduler lifecycle events can be observed without changing dispatch semantics
 - schedule definitions live in application code; durable stores persist occurrence state
+- continuous polling workers do not create `JobExecution`, `StepExecution`,
+  checkpoint, or schedule occurrence metadata per polling tick
+- polling worker lifecycle events can be observed without changing task execution semantics
+- polling worker shutdown uses `AbortSignal`; idle sleep aborts immediately and
+  in-flight task work is awaited for graceful shutdown
+- polling-only Nest applications use `NestBatchPollingModule` and do not need
+  batch storage, lock, checkpoint, schedule, or runner providers
+- polling tasks should pass `AbortSignal` to dispatcher and publisher layers;
+  publish clients without signal support need a task-owned hard timeout
 - SQL adapter locks store `ownerId`, `acquiredAt`, and optional `expiresAt`; stale lock recovery is TTL based
 - idempotency expectations are documented near job parameters and retry behavior
 - schedulers create or enqueue executions instead of bypassing the runtime

@@ -8,6 +8,7 @@ import {
   BATCH_EXECUTION_ENGINE,
   BATCH_JOB_REPOSITORY,
   BATCH_LOCK_MANAGER,
+  BATCH_POLLING_WORKERS,
   BATCH_RUNNER,
   BATCH_SCHEDULE_STORE,
   BATCH_SCHEDULES,
@@ -20,6 +21,7 @@ import {
   NestBatchModule,
   NestBatchRunner,
   type NestBatchModuleOptions,
+  type NestBatchPollingWorkerOptions,
   NEST_BATCH_OPTIONS
 } from "../src/index.js";
 import { FakeDatabaseBatchStorage, findFactoryProvider, findValueProvider } from "./support/providers.js";
@@ -161,6 +163,29 @@ describe("NestBatchModule / NestBatchModule", () => {
         expect.objectContaining({ provide: BATCH_SCHEDULER_LOOP, useValue: schedulerLoop })
       ])
     );
+  });
+
+  it("accepts polling worker providers / polling worker provider를 설정한다", () => {
+    const storage = new FakeDatabaseBatchStorage();
+    const pollingWorkers: readonly NestBatchPollingWorkerOptions[] = [
+      {
+        workerId: "vote-outbox-worker-1",
+        pollIntervalMs: 1_000,
+        autoStart: false,
+        task: () => 0
+      }
+    ];
+    const module = NestBatchModule.forRoot({
+      storage,
+      pollingWorkers
+    });
+
+    expect(module.providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ provide: BATCH_POLLING_WORKERS, useValue: pollingWorkers })
+      ])
+    );
+    expect(module.exports).toEqual(expect.arrayContaining([BATCH_POLLING_WORKERS]));
   });
 
   it("creates async module providers from storage options / storage option으로 async module provider를 생성한다", () => {

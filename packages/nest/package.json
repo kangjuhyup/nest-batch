@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@nest-batch/core": "workspace:*",
+    "@nest-batch/polling-core": "workspace:*",
     "@nest-batch/queue-core": "workspace:*",
     "@nest-batch/scheduler-core": "workspace:*"
   },

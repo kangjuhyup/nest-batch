@@ -17,6 +17,8 @@ src/
     reader-examples/
       reader-examples.module.ts
       reader-examples.reader.ts
+    vote-outbox/
+      vote-outbox.module.ts
 ```
 
 `BillingModule`은 `@BatchReader`, `@BatchProcessor`, `@BatchWriter`가 붙은
@@ -37,6 +39,16 @@ callback 실행 중에만 context를 제공합니다. reader는 `getCheckpoint()
 `ReaderExamplesModule`은 `createIterableReader`, `createFunctionReader`,
 `createCursorReader`, `createPagingReader`를 Nest `@BatchReader` provider로 감싼
 예제를 제공합니다.
+
+`VoteOutboxModule`은 Transactional Outbox polling worker를 Nest에서 연결하는
+예제를 제공합니다. `NestBatchPollingModule.forRootAsync()`가
+`IntegrationEventOutboxDispatcher`를 주입받고, `pollingWorkers`에
+`autoStart: process.env.NEST_BATCH_PROCESS_ROLE === "vote-outbox-worker"`를
+설정합니다. task는 `dispatchBatch({ workerId, signal })`을 호출한 뒤
+`claimedCount > 0`을 반환하므로, 처리한 outbox message가 있을 때만 sleep 없이
+다음 polling iteration으로 이어집니다. dispatcher는 같은 `AbortSignal`을
+`IntegrationEventPublisher.publish()`까지 전달합니다. 실제 publish client가
+`AbortSignal`을 지원하지 않으면 dispatcher 계층에서 hard timeout을 둬야 합니다.
 
 checkpoint는 reader cursor나 chunk 안전 경계이고, durable execution context는
 `storage.executionContextStore`에 저장하는 별도 JSON metadata입니다. restart할 때

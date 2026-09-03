@@ -15,3 +15,4 @@ export const BATCH_SCHEDULE_STORE = Symbol("nest-batch:schedule-store");
 export const BATCH_SCHEDULES = Symbol("nest-batch:schedules");
 export const BATCH_SCHEDULER_DISPATCHER = Symbol("nest-batch:scheduler-dispatcher");
 export const BATCH_SCHEDULER_LOOP = Symbol("nest-batch:scheduler-loop");
+export const BATCH_POLLING_WORKERS = Symbol("nest-batch:polling-workers");

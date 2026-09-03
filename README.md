@@ -15,7 +15,8 @@ retry, inspect, and list jobs when an application supplies storage and a job
 registry. `@nest-batch/nest` can discover decorated job and batch component
 providers, expose a `BATCH_RUNNER` provider, and run discovered jobs through
 `NestBatchRunner`. Distributed worker contracts, the BullMQ queue adapter
-boundary, and a first production scheduling slice are available.
+boundary, continuous polling workers, and a first production scheduling slice
+are available.
 
 ## Packages
 
@@ -27,6 +28,7 @@ boundary, and a first production scheduling slice are available.
 - `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, and checkpoint storage.
 - `@nest-batch/queue-core`: queue-neutral `WorkQueue` contract and worker loop.
 - `@nest-batch/queue-bullmq`: BullMQ-compatible `WorkQueue` adapter boundary.
+- `@nest-batch/polling-core`: framework-independent continuous polling task loop.
 - `@nest-batch/scheduler-core`: framework-independent schedule definitions, trigger evaluation, occurrence claim orchestration, and dispatch helpers.
 - `@nest-batch/scheduler-calendar`: dependency-light UTC daily, weekly, and monthly trigger helpers.
 - `@nest-batch/cli`: operational CLI boundary.
@@ -44,6 +46,89 @@ the batch runtime. Applications can wrap real BullMQ `Queue`/worker instances
 and pass them into `BullMqWorkQueue`. When a work id contains `:`, the adapter
 encodes only the BullMQ custom job id; the `WorkUnit.id` stored in the payload
 remains unchanged.
+
+## Continuous Polling Workers
+
+`@nest-batch/polling-core` provides a framework-independent loop for long-lived
+polling tasks such as Transactional Outbox dispatchers. It does not create
+`JobExecution`, `StepExecution`, checkpoint rows, or scheduler occurrences per
+polling tick. The task owns store-specific claim, lease, retry, dead-letter, and
+ordering semantics; nest-batch owns only worker lifecycle, idle sleep, system
+error backoff, observer events, and graceful shutdown.
+
+```ts
+import { ContinuousPollingLoop } from "@nest-batch/polling-core";
+
+const loop = new ContinuousPollingLoop({
+  workerId: "vote-outbox-worker-1",
+  pollIntervalMs: 1_000,
+  task: async ({ workerId, signal }) => {
+    const { claimedCount } = await integrationEventOutboxDispatcher.dispatchBatch({
+      workerId,
+      signal
+    });
+
+    return claimedCount > 0;
+  }
+});
+
+await loop.runUntilStopped({ signal });
+```
+
+When `task` returns `true` or a positive processed count, the loop immediately
+starts the next iteration to drain busy outbox work. When it returns `false`,
+`0`, or `undefined`, the loop waits for `pollIntervalMs`. Unhandled task errors
+are treated as worker/system errors and retried with bounded exponential
+backoff and jitter; message-level failures and retry policy should stay inside
+the outbox repository/dispatcher.
+
+Nest polling integration can run without `DatabaseBatchStorage` through
+`NestBatchPollingModule`. `autoStart` is opt-in per worker, so API and worker
+process roles can share the same application module without starting polling in
+the API role:
+
+```ts
+import { Module } from "@nestjs/common";
+import { NestBatchPollingModule } from "@nest-batch/nest";
+
+@Module({
+  imports: [
+    NestBatchPollingModule.forRootAsync({
+      inject: [IntegrationEventOutboxDispatcher],
+      useFactory: (outboxDispatcher: IntegrationEventOutboxDispatcher) => ({
+        pollingWorkers: [
+          {
+            workerId: process.env.VOTE_OUTBOX_WORKER_ID ?? "vote-outbox-worker-1",
+            pollIntervalMs: 1_000,
+            autoStart: process.env.NEST_BATCH_PROCESS_ROLE === "vote-outbox-worker",
+            task: async ({ workerId, signal }) => {
+              const { claimedCount } = await outboxDispatcher.dispatchBatch({
+                workerId,
+                signal
+              });
+
+              return claimedCount > 0;
+            }
+          }
+        ]
+      })
+    })
+  ]
+})
+class AppModule {}
+```
+
+`NestBatchModule` still accepts `pollingWorkers` for compatibility when the same
+process already needs batch job storage and `NestBatchRunner`. Polling-only
+processes should import `NestBatchPollingModule` instead.
+
+The polling loop intentionally does not acquire a global singleton worker lock.
+For horizontally scaled outbox workers, use repository-level primitives such as
+`FOR UPDATE SKIP LOCKED`, DB-clock leases, and lease-token compare-and-swap in
+the task implementation. Pass the polling `AbortSignal` through dispatcher and
+publisher layers. If the external publish client cannot observe `AbortSignal`,
+wrap publish calls in a hard timeout owned by the task/dispatcher so shutdown
+cannot wait forever on in-flight I/O.
 
 ## Production Scheduling
 

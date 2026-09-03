@@ -4,6 +4,7 @@ export {
   BATCH_JOB_REPOSITORY,
   BATCH_EXECUTION_ENGINE,
   BATCH_LOCK_MANAGER,
+  BATCH_POLLING_WORKERS,
   BATCH_PROCESSOR_METADATA,
   BATCH_READER_METADATA,
   BATCH_RUNNER,
@@ -31,8 +32,12 @@ export { NestBatchModule } from "./module.js";
 export type {
   NestBatchModuleAsyncOptions,
   NestBatchModuleOptions,
+  NestBatchPollingModuleAsyncOptions,
+  NestBatchPollingModuleOptions,
+  NestBatchPollingWorkerOptions,
   NestBatchSchedulerOptions
 } from "./module-options.js";
+export { NestBatchPollingModule } from "./polling.module.js";
 export { NestBatchRegistry } from "./registry.js";
 export type { NestBatchComponent, NestBatchDiscoveredJob } from "./registry.js";
 export { NestBatchRunner } from "./runner.service.js";
