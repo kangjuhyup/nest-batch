@@ -4,7 +4,7 @@
   "description": "Node-native durable batch framework packages for NestJS applications.",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@9.15.9",
+  "packageManager": "pnpm@10.34.5",
   "license": "MIT",
   "author": "kangjuhyup",
   "repository": {
@@ -34,7 +34,7 @@
     "test:perf:postgres": "vitest run --config vitest.perf.config.ts packages/postgres/test/postgres.perf.test.ts",
     "typecheck": "tsc -b",
     "changeset": "changeset",
-    "release:version": "changeset version && node scripts/release/sync-root-version.mjs",
+    "release:version": "node scripts/release/version-packages.mjs",
     "release:verify": "node scripts/release/verify-release.mjs",
     "release:smoke": "node scripts/release/smoke-packages.mjs",
     "release:check": "node scripts/release/release-check.mjs"

@@ -6,7 +6,7 @@
 
 **Architecture:** 하나의 package catalog를 release 검사의 source of truth로 사용하고 metadata, tarball, consumer install, version/tag를 자동 검증한다. Changesets는 고정 버전과 package별 changelog를 관리하고, `vX.Y.Z` tag workflow는 npm publish와 GitHub Release를 분리된 최소 권한 job으로 실행한다.
 
-**Tech Stack:** Node.js ESM scripts, TypeScript 5.7, pnpm 9, Vitest, Changesets 3, GitHub Actions, npm Trusted Publishing OIDC
+**Tech Stack:** Node.js ESM scripts, TypeScript 5.7, pnpm 10.34.5, Vitest, Changesets 3, GitHub Actions, npm Trusted Publishing OIDC
 
 **Spec:** `docs/superpowers/specs/2026-09-03-package-release-readiness-design.md`
 
@@ -32,6 +32,7 @@
 - `scripts/release/pack-packages.mjs`: 재사용 가능한 deterministic pack orchestration
 - `scripts/release/smoke-packages.mjs`: tarball contents와 clean consumer 설치/compile 검사
 - `scripts/release/sync-root-version.mjs`: Changesets version 이후 private root version 동기화
+- `scripts/release/version-packages.mjs`: pending Changesets version과 idempotent root version 동기화
 - `scripts/release/publish-packages.mjs`: tag 검증, registry 조회, integrity 비교, idempotent publish
 - `scripts/release/*.test.ts`: pure validation/publish decision unit test
 - `.changeset/config.json`: 8개 package fixed group과 `develop` base branch
@@ -443,6 +444,8 @@ git commit -m "chore : package tarball smoke test 추가" -m "- 배포 파일 al
 - Create: `.changeset/README.md`
 - Create: `scripts/release/sync-root-version.mjs`
 - Test: `scripts/release/sync-root-version.test.ts`
+- Create: `scripts/release/version-packages.mjs`
+- Test: `scripts/release/version-packages.test.ts`
 - Create: `packages/{core,nest,inmemory,postgres,mysql,mariadb,bullmq,cli}/CHANGELOG.md`
 - Modify: `package.json`
 - Modify: `pnpm-lock.yaml`
@@ -450,6 +453,7 @@ git commit -m "chore : package tarball smoke test 추가" -m "- 배포 파일 al
 **Interfaces:**
 - Consumes: 8개 package version과 `PUBLIC_PACKAGES`
 - Produces: `syncRootVersion(root): Promise<string>`
+- Produces: `versionPackages(root): Promise<string>`
 - Produces: `pnpm changeset`, `pnpm release:version`
 
 - [ ] **Step 1: root version sync failing test 작성**
@@ -552,7 +556,7 @@ version만 같은 값으로 갱신한다. JSON은 기존 2-space formatting과 t
 ```json
 {
   "changeset": "changeset",
-  "release:version": "changeset version && node scripts/release/sync-root-version.mjs"
+  "release:version": "node scripts/release/version-packages.mjs"
 }
 ```
 
