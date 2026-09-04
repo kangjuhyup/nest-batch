@@ -13,6 +13,9 @@
     }
   },
   "files": ["dist"],
+  "dependencies": {
+    "@nest-batch/core": "workspace:*"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run --root ../.. --config vitest.config.ts packages/polling-core/test"

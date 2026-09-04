@@ -128,7 +128,11 @@ importers:
         specifier: ^0.2.2
         version: 0.2.2
 
-  packages/polling-core: {}
+  packages/polling-core:
+    dependencies:
+      '@nest-batch/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/postgres:
     dependencies:

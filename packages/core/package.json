@@ -18,6 +18,10 @@
     "./scheduler": {
       "types": "./dist/scheduler/index.d.ts",
       "import": "./dist/scheduler/index.js"
+    },
+    "./polling": {
+      "types": "./dist/polling/index.d.ts",
+      "import": "./dist/polling/index.js"
     }
   },
   "files": ["dist"],
