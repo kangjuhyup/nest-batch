@@ -194,16 +194,16 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout tag
+        uses: actions/checkout@${ACTION_PINS.checkout}
+      - name: Setup Node.js
+        uses: actions/setup-node@${ACTION_PINS.setupNode}
+        with:
+          node-version: "24"
       - name: Create GitHub Release
         env:
           GH_TOKEN: \${{ github.token }}
-        run: |
-          if release_tag="$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null)"; then
-            test "$release_tag" = "$GITHUB_REF_NAME"
-            echo "GitHub Release already exists; skipping."
-          else
-            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
-          fi
+        run: node scripts/release/create-github-release.mjs
 `,
   ".github/release.yml": `changelog:
   exclude:
@@ -277,9 +277,9 @@ describe("release workflow validation / 릴리즈 workflow 검증", () => {
     }],
     ["runs GitHub release after failure", "실패 뒤 GitHub release를 실행한다", (sources: WorkflowSources) => replace(sources, ".github/workflows/publish.yml", "    runs-on: ubuntu-latest\n    permissions:\n      contents: write", "    runs-on: ubuntu-latest\n    if: always()\n    permissions:\n      contents: write")],
     ["allows release verification failure", "release 검증 실패를 허용한다", (sources: WorkflowSources) => replace(sources, ".github/workflows/publish.yml", "      - name: Verify release candidate\n        run: pnpm release:check", "      - name: Verify release candidate\n        continue-on-error: true\n        run: pnpm release:check")],
-    ["removes explicit GitHub repository target", "명시 GitHub repository target을 제거한다", (sources: WorkflowSources) => replace(sources, ".github/workflows/publish.yml", " --repo \"$GITHUB_REPOSITORY\"", "")],
-    ["removes the idempotent GitHub release lookup", "멱등 GitHub release 조회를 제거한다", (sources: WorkflowSources) => replace(sources, ".github/workflows/publish.yml", "gh release view", "gh release inspect")],
-    ["removes the existing release tag check", "기존 release tag 검사를 제거한다", (sources: WorkflowSources) => replace(sources, ".github/workflows/publish.yml", "test \"$release_tag\" = \"$GITHUB_REF_NAME\"", "true")],
+    ["removes the GitHub release tag checkout", "GitHub release tag checkout을 제거한다", (sources: WorkflowSources) => replace(sources, ".github/workflows/publish.yml", `  github-release:\n    needs: publish\n    runs-on: ubuntu-latest\n    permissions:\n      contents: write\n    steps:\n      - name: Checkout tag\n        uses: actions/checkout@${ACTION_PINS.checkout}\n`, "  github-release:\n    needs: publish\n    runs-on: ubuntu-latest\n    permissions:\n      contents: write\n    steps:\n")],
+    ["changes the idempotent GitHub release command", "멱등 GitHub release 명령을 바꾼다", (sources: WorkflowSources) => replace(sources, ".github/workflows/publish.yml", "node scripts/release/create-github-release.mjs", "gh release create \"$GITHUB_REF_NAME\"")],
+    ["changes GitHub release Node version", "GitHub release Node 버전을 바꾼다", (sources: WorkflowSources) => replace(sources, ".github/workflows/publish.yml", "          node-version: \"24\"\n      - name: Create GitHub Release", "          node-version: \"20\"\n      - name: Create GitHub Release")],
     ["changes the reviewed action owner", "검토한 action owner를 바꾼다", (sources: WorkflowSources) => replace(sources, ".github/workflows/ci.yml", `actions/checkout@${ACTION_PINS.checkout}`, `unreviewed/checkout@${ACTION_PINS.checkout}`)],
     ["uses a movable action tag", "이동 가능한 action tag를 사용한다", (sources: WorkflowSources) => replace(sources, ".github/workflows/ci.yml", `actions/checkout@${ACTION_PINS.checkout}`, "actions/checkout@v6")],
     ["uses a wrong reviewed action SHA", "검토한 action의 잘못된 SHA를 사용한다", (sources: WorkflowSources) => replace(sources, ".github/workflows/ci.yml", ACTION_PINS.checkout, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")],

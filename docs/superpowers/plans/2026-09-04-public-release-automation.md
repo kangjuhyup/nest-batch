@@ -650,11 +650,13 @@ remote integrity가 없으면 publish, local과 같으면 skip, 다르면 error�
 기본 adapter가 실행할 명령:
 
 ```text
-npm view <name>@<version> dist.integrity --json --registry https://registry.npmjs.org/
-npm publish <tarball> --access public --registry https://registry.npmjs.org/
+npm view <name>@<version> dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm publish <tarball> --access public --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
 ```
 
 `npm view`의 404만 unpublished로 처리하고 network/auth 오류는 실패시킨다.
+generic registry와 `@nest-batch` scope registry를 모두 CLI에서 고정하여 ambient
+`.npmrc`의 hostile scope mapping이 lookup/publish destination을 바꾸지 못하게 한다.
 `publishRelease`는 catalog 순서로 publish/skip하고, 완료 후 최대 6회·5초 간격으로 8개
 remote integrity를 재조회한다. test에서는 lookup/publish/sleep을 주입해 실제 registry를
 호출하지 않고 `missing -> publish`, `same -> skip`, `different -> fail`, partial retry를
@@ -821,8 +823,13 @@ publish job은 cache 없이 Node 24를 설정하고 `npm install --global npm@12
 pnpm install, `pnpm release:check`, `pnpm run release:publish --tag "$GITHUB_REF_NAME"`을
 실행한다. `NODE_AUTH_TOKEN`이나 npm secret을 설정하지 않는다.
 
-GitHub Release job은 source checkout 없이 같은 tag의 release를 먼저 조회한다. 기존
-release가 있으면 tag를 검증하고 건너뛰며, 없을 때만 아래 create 명령을 실행한다.
+GitHub Release job은 tag source를 checkout하고 `HEAD`와 tag ref가 모두
+`GITHUB_SHA`로 resolve되는지 검사한 뒤 explicit repository의 release-by-tag API를
+`gh api --include`로 조회한다. HTTP 404가 확인된 경우에만 아래 create 명령을 실행한다.
+기존 release는 exact tag, non-draft, non-prerelease를 검증하고 건너뛴다.
+`target_commitish`가 40자리 SHA이면 workflow SHA와 일치해야 하며, branch 이름이면
+검증된 tag ref를 authoritative source로 삼는다. 인증/network/기타 조회 실패는 그대로
+실패시켜 create를 실행하지 않는다.
 
 ```bash
 gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
@@ -872,11 +879,12 @@ github-release permission: contents write, id-token 없음
 금지 설정: secrets.*, NPM_TOKEN, NODE_AUTH_TOKEN, registry auth/.npmrc
 모든 uses 값: 검토한 owner/action의 exact 40자리 commit SHA
 필수 command: release:check, pnpm run release:publish --tag "$GITHUB_REF_NAME",
-  gh release create ... --repo "$GITHUB_REPOSITORY" --generate-notes
+  node scripts/release/create-github-release.mjs
 ```
 
 `verify-workflows.test.ts`는 exact valid workflow가 통과하고 trigger, permission, root action
-input, cache, command 순서, service, release category, secret/registry auth, YAML type/duplicate/
+input, cache, command 순서, GitHub Release tag checkout, service, release category,
+secret/registry auth, YAML type/duplicate/
 anchor/alias 및 shell-significant Unicode whitespace/마지막 줄바꿈 변이가 각각 실패하는
 `English / 한국어` mutation test를 작성한다.
 `verify-release.mjs`의 repository runner가 `verifyWorkflowFiles`를 호출하게 한다.
@@ -1002,7 +1010,7 @@ Task 7에서 의도한 문서와 validator 변경만 나타난다.
 
 - [ ] **Step 5: npm registry read-only availability audit**
 
-각 catalog name에 `npm view <name> version --json --registry https://registry.npmjs.org/`을 실행한다. 404는 최초 bootstrap
+각 catalog name에 `npm view <name> version --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/`을 실행한다. 404는 최초 bootstrap
 대상으로 checklist에 기록하고, 이미 존재하면 owner/version을 확인하되 publish나 access
 변경은 하지 않는다.
 

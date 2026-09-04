@@ -179,10 +179,16 @@ const EXPECTED_FILES = {
         "runs-on": "ubuntu-latest",
         permissions: { contents: "write" },
         steps: [
+          { name: "Checkout tag", uses: `actions/checkout@${ACTION_PINS["actions/checkout"]}` },
+          {
+            name: "Setup Node.js",
+            uses: `actions/setup-node@${ACTION_PINS["actions/setup-node"]}`,
+            with: { "node-version": "24" }
+          },
           {
             name: "Create GitHub Release",
             env: { GH_TOKEN: "${{ github.token }}" },
-            run: "if release_tag=\"$(gh release view \"$GITHUB_REF_NAME\" --repo \"$GITHUB_REPOSITORY\" --json tagName --jq .tagName 2>/dev/null)\"; then\n  test \"$release_tag\" = \"$GITHUB_REF_NAME\"\n  echo \"GitHub Release already exists; skipping.\"\nelse\n  gh release create \"$GITHUB_REF_NAME\" --repo \"$GITHUB_REPOSITORY\" --verify-tag --generate-notes --title \"$GITHUB_REF_NAME\"\nfi\n"
+            run: "node scripts/release/create-github-release.mjs"
           }
         ]
       }

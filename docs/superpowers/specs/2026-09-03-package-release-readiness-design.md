@@ -122,6 +122,12 @@ Version PR이 병합되어 package version이 확정된 뒤 maintainer가 같은
 publish job과 GitHub Release job을 분리한다. publish job만 `id-token: write`를
 가지고, GitHub Release job만 `contents: write`를 가진다. GitHub-hosted runner와
 Node 24를 사용하고 npm CLI가 Trusted Publishing 최소 버전을 충족하는지 검사한다.
+GitHub Release job은 tag commit을 checkout하고 `HEAD`와 tag ref가 모두 workflow
+`GITHUB_SHA`로 resolve되는지 확인한다. explicit repository의 release-by-tag API가
+HTTP 404를 반환한 경우에만 generated release를 생성한다. 기존 release는 정확한 tag,
+non-draft, non-prerelease여야 한다. `target_commitish`가 immutable 40자리 SHA이면 workflow
+SHA와도 일치해야 하며, branch 이름이면 검증된 tag ref를 authoritative source로 삼는다.
+인증, 권한, network 또는 기타 조회 오류에서는 release를 만들지 않고 실패한다.
 
 ### 최초 `0.1.0` bootstrap
 
@@ -248,7 +254,8 @@ publish workflow는 재현성을 위해 cache를 사용하지 않고 tag commit�
 `.github/release.yml`에서 feature, fix, documentation, dependency, maintenance
 category를 label로 분류한다. Version PR은 `release` label을 붙여 generated notes에서
 제외한다. GitHub Release는 npm의 8개 package 확인이 끝난 뒤에만 생성한다. 같은 tag의
-release가 이미 있으면 검증 후 건너뛰고, 없을 때만 생성한다.
+release가 이미 있으면 위 state와 tag checkout을 검증 후 건너뛰고, release-by-tag API의
+HTTP 404가 확인됐을 때만 생성한다. 다른 조회 실패는 존재하지 않음으로 간주하지 않는다.
 
 ## 실패와 재실행
 

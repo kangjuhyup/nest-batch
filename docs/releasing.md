@@ -31,20 +31,20 @@ pnpm install --frozen-lockfile
   - scope 권한을 확인한 뒤 아래의 read-only identity audit를 8개 catalog package 모두에 실행합니다.
 
 ```bash
-npm view @nest-batch/core name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/
-npm view @nest-batch/nest name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/
-npm view @nest-batch/inmemory name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/
-npm view @nest-batch/postgres name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/
-npm view @nest-batch/mysql name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/
-npm view @nest-batch/mariadb name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/
-npm view @nest-batch/bullmq name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/
-npm view @nest-batch/cli name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/
+npm view @nest-batch/core name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @nest-batch/nest name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @nest-batch/inmemory name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @nest-batch/postgres name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @nest-batch/mysql name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @nest-batch/mariadb name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @nest-batch/bullmq name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @nest-batch/cli name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
 ```
 
   - 기존 package는 승인된 repository identity와 ownership이 일치하거나 명시적인 transfer/rename 결정이 있어야 합니다. 그렇지 않으면 **STOP**합니다.
   - `E404`는 scope publish 권한을 확인한 뒤에만 bootstrap 후보입니다.
 - [ ] `npm whoami`와 2FA 상태 확인
-  - `npm whoami --registry https://registry.npmjs.org/`가 의도한 maintainer를 출력하고, `npm profile get --registry https://registry.npmjs.org/`의 2FA 값이 publish를 보호하는 설정인지 확인합니다.
+  - `npm whoami --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/`가 의도한 maintainer를 출력하고, `npm profile get --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/`의 2FA 값이 publish를 보호하는 설정인지 확인합니다.
 - [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행
   - **Manual gate — 실제 npm publish:** 이 명령은 인증된 maintainer가 모든 이전 checkbox를 확인한 뒤 직접 실행합니다. 이 문서 작성·검증 작업에서는 실행하지 않습니다.
   - 실행 명령: `pnpm run release:publish --tag v0.1.0`
@@ -54,14 +54,14 @@ npm view @nest-batch/cli name version maintainers repository dist-tags --json --
   - 아래 각 명령의 `version`이 `0.1.0`이고 `dist.integrity`가 publish script가 확인한 tarball integrity와 일치해야 합니다.
 
 ```bash
-npm view @nest-batch/core@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/
-npm view @nest-batch/nest@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/
-npm view @nest-batch/inmemory@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/
-npm view @nest-batch/postgres@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/
-npm view @nest-batch/mysql@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/
-npm view @nest-batch/mariadb@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/
-npm view @nest-batch/bullmq@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/
-npm view @nest-batch/cli@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/
+npm view @nest-batch/core@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @nest-batch/nest@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @nest-batch/inmemory@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @nest-batch/postgres@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @nest-batch/mysql@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @nest-batch/mariadb@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @nest-batch/bullmq@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @nest-batch/cli@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
 ```
 
 ## 3. Trusted Publisher 등록
@@ -87,12 +87,14 @@ npm view @nest-batch/cli@0.1.0 version dist.integrity --json --registry https://
 - [ ] npm provenance와 GitHub generated release notes 확인
   - 처음으로 OIDC publish되는 후속 version부터 provenance를 필수로 확인합니다. 각 npm package version 페이지의 **Provenance**가 GitHub Actions `kangjuhyup/nest-batch`를 가리키는지 확인합니다. 로컬 bootstrap `0.1.0`에는 이 검사를 적용하지 않습니다.
   - GitHub **Releases → vX.Y.Z**에 generated release notes가 생성됐는지 확인합니다. 기존 GitHub Release가 있으면 검증 후 건너뛰고, 없을 때만 생성합니다.
+  - 기존 release는 tag 이름이 정확하고 draft/prerelease가 아니어야 합니다. workflow checkout의 tag와 `HEAD`가 모두 `GITHUB_SHA`로 resolve되어야 하며, `target_commitish`가 40자리 commit SHA이면 그 값도 일치해야 합니다. branch 이름처럼 가변 target이면 검증된 tag ref를 기준으로 삼습니다.
+  - `gh api --include` 조회에서 HTTP 404가 확인된 경우에만 새 release를 생성합니다. 인증, 권한, network 또는 그 밖의 조회 오류는 생성으로 전환하지 않고 workflow를 실패시킵니다.
 
 ## 5. 실패 복구
 
 - [ ] 같은 tag workflow 재실행으로 동일 integrity package를 skip
   - GitHub **Actions → Publish packages → Re-run failed jobs**에서 같은 `vX.Y.Z` tag workflow를 재실행합니다. `release:publish`는 registry의 같은 version과 integrity가 일치하는 package를 skip하고 남은 package만 처리합니다.
 - [ ] integrity가 다르면 즉시 중단하고 원인 조사
-  - `npm view <package>@X.Y.Z version dist.integrity --json --registry https://registry.npmjs.org/`과 release artifact 결과가 다르면 재실행이나 강제 publish를 하지 말고 중단합니다. package manifest, tag commit, tarball hash를 조사합니다.
+  - `npm view <package>@X.Y.Z version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/`과 release artifact 결과가 다르면 재실행이나 강제 publish를 하지 말고 중단합니다. package manifest, tag commit, tarball hash를 조사합니다.
 - [ ] publish된 version은 덮어쓰지 않고 필요 시 다음 patch version 준비
   - npm의 publish된 version은 덮어쓸 수 없습니다. recovery가 불가능하면 Changeset을 추가하고 Version PR로 다음 patch version을 만든 뒤 1번부터 다시 확인합니다.

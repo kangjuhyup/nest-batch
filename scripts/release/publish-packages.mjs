@@ -4,7 +4,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { commandForPlatform, runCommand, runCommandInherited } from "./command-runner.mjs";
 import { packPackages } from "./pack-packages.mjs";
-import { NPM_REGISTRY_URL, PUBLIC_PACKAGES } from "./package-catalog.mjs";
+import { NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT, PUBLIC_PACKAGES } from "./package-catalog.mjs";
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
@@ -204,7 +204,8 @@ export const createNpmRegistryAdapter = ({
         "dist.integrity",
         "--json",
         "--registry",
-        NPM_REGISTRY_URL
+        NPM_REGISTRY_URL,
+        NPM_SCOPE_REGISTRY_ARGUMENT
       ], {
         cwd,
         maxBuffer: 10 * 1024 * 1024
@@ -227,6 +228,7 @@ export const createNpmRegistryAdapter = ({
       "public",
       "--registry",
       NPM_REGISTRY_URL,
+      NPM_SCOPE_REGISTRY_ARGUMENT,
       "--",
       artifact.tarball
     ], { cwd });

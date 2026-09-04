@@ -38,13 +38,13 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout tag
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: "24"
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          if release_tag="$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null)"; then
-            test "$release_tag" = "$GITHUB_REF_NAME"
-            echo "GitHub Release already exists; skipping."
-          else
-            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
-          fi
+        run: node scripts/release/create-github-release.mjs

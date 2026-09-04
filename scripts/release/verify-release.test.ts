@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { CORE_SUBPATHS, NPM_REGISTRY_URL, PUBLIC_PACKAGES } from "./package-catalog.mjs";
+import { CORE_SUBPATHS, NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT, PUBLIC_PACKAGES } from "./package-catalog.mjs";
 import { validateManifest, verifyPackageDocuments } from "./verify-release.mjs";
 import * as release from "./verify-release.mjs";
 
@@ -56,16 +56,20 @@ pnpm install --frozen-lockfile
   - 모든 catalog package의 identity를 먼저 read-only로 확인합니다.
 
 \`\`\`bash
-${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} name version maintainers repository dist-tags --json --registry ${NPM_REGISTRY_URL}`).join("\n")}
+${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} name version maintainers repository dist-tags --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}`).join("\n")}
 \`\`\`
 
   - 기존 package는 승인된 repository identity와 ownership이 일치하거나 명시적인 transfer/rename 결정이 있어야 합니다. 그렇지 않으면 **STOP**합니다.
   - \`E404\`는 scope publish 권한을 확인한 뒤에만 bootstrap 후보입니다.
 - [ ] \`npm whoami\`와 2FA 상태 확인
-  - \`npm whoami --registry ${NPM_REGISTRY_URL}\`
+  - \`npm whoami --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\`와 \`npm profile get --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\`
 - [ ] \`pnpm run release:publish --tag v0.1.0\`을 maintainer가 직접 실행
 - 로컬에서 publish한 \`0.1.0\`은 provenance 예외입니다.
 - [ ] 8개 package의 \`0.1.0\`과 integrity 확인
+
+\`\`\`bash
+${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name}@0.1.0 version dist.integrity --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}`).join("\n")}
+\`\`\`
 
 \`@nest-batch/core\`
 \`@nest-batch/nest\`
@@ -93,6 +97,8 @@ ${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} name version maintainers r
 - [ ] npm provenance와 GitHub generated release notes 확인
   - 처음으로 OIDC publish되는 후속 version부터 provenance를 필수로 확인합니다.
   - 기존 GitHub Release가 있으면 검증 후 건너뛰고, 없을 때만 생성합니다.
+  - 기존 release는 tag 이름이 정확하고 draft/prerelease가 아니어야 합니다. workflow checkout의 tag와 \`HEAD\`가 모두 \`GITHUB_SHA\`로 resolve되어야 하며, \`target_commitish\`가 40자리 commit SHA이면 그 값도 일치해야 합니다. branch 이름처럼 가변 target이면 검증된 tag ref를 기준으로 삼습니다.
+  - \`gh api --include\` 조회에서 HTTP 404가 확인된 경우에만 새 release를 생성합니다. 인증, 권한, network 또는 그 밖의 조회 오류는 생성으로 전환하지 않고 workflow를 실패시킵니다.
 
 ## 5. 실패 복구
 
@@ -216,6 +222,7 @@ describe("release metadata validation / release metadata 검증", () => {
     ]);
     expect(CORE_SUBPATHS).toEqual(["queue", "scheduler", "polling", "worker"]);
     expect(NPM_REGISTRY_URL).toBe("https://registry.npmjs.org/");
+    expect(NPM_SCOPE_REGISTRY_ARGUMENT).toBe("--@nest-batch:registry=https://registry.npmjs.org/");
   });
 
   it("rejects missing public access / public access 누락을 거부한다", () => {
@@ -328,6 +335,32 @@ describe("release metadata validation / release metadata 검증", () => {
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/removed workspace package directory/u);
   });
 
+  it("rejects a removed import in root e2e tests / root e2e test의 제거된 import를 거부한다", async () => {
+    const root = createRepository();
+    const removedName = ["@nest-batch", "scheduler-core"].join("/");
+    mkdirSync(join(root, "e2e"), { recursive: true });
+    writeFileSync(join(root, "e2e/legacy.e2e.test.ts"), `import "${removedName}";\n`);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/e2e.*removed package name/u);
+  });
+
+  it("rejects a removed package name in a root document / root 문서의 제거된 package 이름을 거부한다", async () => {
+    const root = createRepository();
+    const removedName = ["@nest-batch", "polling-core"].join("/");
+    writeFileSync(join(root, "DATABASE.md"), `Do not install ${removedName}.\n`);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/DATABASE\.md.*removed package name/u);
+  });
+
+  it("allows removed package history only under docs superpowers / docs superpowers 아래의 과거 package 기록만 허용한다", async () => {
+    const root = createRepository();
+    const removedName = ["@nest-batch", "worker-threads"].join("/");
+    mkdirSync(join(root, "docs/superpowers/specs"), { recursive: true });
+    writeFileSync(join(root, "docs/superpowers/specs/history.md"), `Historical package: ${removedName}.\n`);
+
+    await expect(release.verifyReleaseRepository(root)).resolves.toBeUndefined();
+  });
+
   it("rejects a package LICENSE that differs from root / root와 다른 package LICENSE를 거부한다", async () => {
     const root = createRepository(undefined, (packageInfo) =>
       packageInfo.name === "@nest-batch/core" ? "Different license\n" : LICENSE_TEXT
@@ -394,7 +427,7 @@ describe("release metadata validation / release metadata 검증", () => {
     writeFileSync(
       releasingGuide,
       readFileSync(releasingGuide, "utf8").replace(
-        `npm view @nest-batch/cli name version maintainers repository dist-tags --json --registry ${NPM_REGISTRY_URL}\n`,
+        `npm view @nest-batch/cli name version maintainers repository dist-tags --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\n`,
         ""
       )
     );
@@ -411,6 +444,45 @@ describe("release metadata validation / release metadata 검증", () => {
     );
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/registry\.npmjs\.org/u);
+  });
+
+  it("rejects a release checklist without the scoped registry override / scoped registry override가 없는 릴리즈 checklist를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      readFileSync(releasingGuide, "utf8").replace(` ${NPM_SCOPE_REGISTRY_ARGUMENT}`, "")
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/@nest-batch:registry/u);
+  });
+
+  it("rejects a release checklist without an explicit profile registry / 명시적인 profile registry가 없는 릴리즈 checklist를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      readFileSync(releasingGuide, "utf8").replace(
+        `npm profile get --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}`,
+        "npm profile get"
+      )
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/npm profile get/u);
+  });
+
+  it("rejects a release checklist without every explicit integrity confirmation / 모든 명시적인 integrity 확인이 없는 릴리즈 checklist를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      readFileSync(releasingGuide, "utf8").replace(
+        `npm view @nest-batch/cli@0.1.0 version dist.integrity --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\n`,
+        ""
+      )
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/npm view @nest-batch\/cli@0\.1\.0/u);
   });
 
   it("rejects a release checklist without the bootstrap provenance exception / bootstrap provenance 예외가 없는 릴리즈 checklist를 거부한다", async () => {
@@ -444,6 +516,22 @@ describe("release metadata validation / release metadata 검증", () => {
     );
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/GitHub Release/u);
+  });
+
+  it.each([
+    ["existing release state", "기존 release 상태", "기존 release는 tag 이름이 정확하고 draft/prerelease가 아니어야 합니다.", "기존 release는 그대로 사용합니다."],
+    ["tag checkout SHA", "tag checkout SHA", "workflow checkout의 tag와 `HEAD`가 모두 `GITHUB_SHA`로 resolve되어야 하며, `target_commitish`가 40자리 commit SHA이면 그 값도 일치해야 합니다.", "workflow checkout은 생략합니다."],
+    ["confirmed HTTP 404", "확인된 HTTP 404", "`gh api --include` 조회에서 HTTP 404가 확인된 경우에만 새 release를 생성합니다.", "조회 실패 시 새 release를 생성합니다."],
+    ["lookup failure", "조회 실패", "인증, 권한, network 또는 그 밖의 조회 오류는 생성으로 전환하지 않고 workflow를 실패시킵니다.", "조회 오류를 무시합니다."]
+  ])("rejects a release checklist without GitHub release contract: %s / GitHub release 계약이 없는 checklist를 거부한다: %s", async (_english, _korean, current, replacement) => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      readFileSync(releasingGuide, "utf8").replace(current, replacement)
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*missing required/u);
   });
 
   it("rejects a release checklist that weakens the identity stop rule / identity 중단 규칙을 약화한 릴리즈 checklist를 거부한다", async () => {

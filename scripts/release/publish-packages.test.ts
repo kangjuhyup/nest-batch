@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseDocument } from "yaml";
-import { NPM_REGISTRY_URL, PUBLIC_PACKAGES } from "./package-catalog.mjs";
+import { commandForPlatform, runCommand } from "./command-runner.mjs";
+import { NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT, PUBLIC_PACKAGES } from "./package-catalog.mjs";
 import {
   createNpmRegistryAdapter,
   decidePublication,
@@ -528,7 +529,7 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     });
 
     await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).resolves.toBeUndefined();
-    expect(commandCalls).toEqual([["npm", ["view", "@nest-batch/core@0.1.0", "dist.integrity", "--json", "--registry", NPM_REGISTRY_URL], expect.any(Object)]]);
+    expect(commandCalls).toEqual([["npm", ["view", "@nest-batch/core@0.1.0", "dist.integrity", "--json", "--registry", NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT], expect.any(Object)]]);
   });
 
   it("classifies npm E404 stderr as missing / npm E404 stderr를 미배포로 처리한다", async () => {
@@ -580,8 +581,27 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
 
     await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).resolves.toBe(fixture.artifacts[0].integrity);
     await adapter.publish(fixture.artifacts[0]);
-    expect(lookupCalls).toEqual([["npm", ["view", "@nest-batch/core@0.1.0", "dist.integrity", "--json", "--registry", NPM_REGISTRY_URL], expect.objectContaining({ maxBuffer: expect.any(Number) })]]);
-    expect(publishCalls).toEqual([["npm", ["publish", "--access", "public", "--registry", NPM_REGISTRY_URL, "--", fixture.artifacts[0].tarball], expect.not.objectContaining({ maxBuffer: expect.anything() })]]);
+    expect(lookupCalls).toEqual([["npm", ["view", "@nest-batch/core@0.1.0", "dist.integrity", "--json", "--registry", NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT], expect.objectContaining({ maxBuffer: expect.any(Number) })]]);
+    expect(publishCalls).toEqual([["npm", ["publish", "--access", "public", "--registry", NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT, "--", fixture.artifacts[0].tarball], expect.not.objectContaining({ maxBuffer: expect.anything() })]]);
+  });
+
+  it("overrides a hostile ambient scoped registry through real npm resolution / 실제 npm 해석에서 hostile ambient scoped registry를 덮어쓴다", async () => {
+    const { stdout } = await runCommand(commandForPlatform("npm"), [
+      "config",
+      "get",
+      "@nest-batch:registry",
+      "--registry",
+      NPM_REGISTRY_URL,
+      NPM_SCOPE_REGISTRY_ARGUMENT
+    ], {
+      cwd: REPOSITORY_ROOT,
+      env: {
+        ...process.env,
+        "npm_config_@nest-batch:registry": "http://127.0.0.1:9/"
+      }
+    });
+
+    expect(stdout.trim()).toBe(NPM_REGISTRY_URL);
   });
 
   it("rejects an option-like tarball in the npm adapter before command execution / npm adapter에서 option 형태 tarball을 명령 실행 전에 거부한다", async () => {
