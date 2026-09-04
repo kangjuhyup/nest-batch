@@ -128,8 +128,9 @@ export const REPOSITORY_URL = "https://github.com/kangjuhyup/nest-batch.git";
 
 - [ ] **Step 4: pure manifest validation과 repository runner 구현**
 
-`validateManifest(manifest, directory)`는 name/version/type/license/author/repository,
-homepage, bugs, engines, files, publishConfig를 검사한다. version은 strict SemVer인지
+`validateManifest(manifest, packageInfo)`는 name/version/type/license/author/repository,
+homepage, bugs, engines, files, publishConfig와 exact package entrypoint 계약을 검사한다.
+version은 strict SemVer인지
 검사하되 `0.1.0`을 상수로 고정하지 않는다. `verifyReleaseRepository(root)`는 root와
 catalog의 manifest 및 LICENSE를 읽고 모든 package가 현재 root version과 같은지,
 license text가 같은지 검사한다. direct execution은 오류를 stderr에 출력하고 exit
@@ -166,6 +167,13 @@ code 1을 설정한다.
 각 package의 `description`과 `keywords`는 역할에 맞게 유지/보강하고
 `repository.directory`만 실제 directory로 바꾼다. root package도 version `0.1.0`,
 author/repository/homepage/bugs/engines를 가지되 `private: true`를 유지한다.
+
+모든 public package는 exact `main: ./dist/index.js`, `types: ./dist/index.d.ts`와 root
+`exports`의 `{ types: "./dist/index.d.ts", import: "./dist/index.js" }`를 가진다. `core`는
+`CORE_SUBPATHS`의 네 subpath pair만 추가하고 CLI는 exact
+`bin: { "nest-batch": "./dist/bin.js" }`만 추가한다. non-CLI package의 `bin`은 금지한다.
+각 target은 canonical package-relative `./dist/...` 경로인지 확인하고 source build 및
+packed file list에서 실제 존재 여부를 검사한다.
 
 - [ ] **Step 5: MIT LICENSE와 build metadata 위치 변경**
 
@@ -378,8 +386,9 @@ package.json
 ```
 
 `.tsbuildinfo`, `test/`, `.env`, npmrc, key/certificate 확장자는 prefix와 무관하게
-거부한다. core artifact는 root entrypoint와 네 subpath의 `.js`/`.d.ts`를 검사하고 CLI
-artifact는 `dist/bin.js`를 검사한다.
+거부한다. packed manifest의 `main`, top-level `types`, root/subpath `exports`, CLI `bin`이
+source와 같은 exact shape인지 검사한다. manifest가 참조하는 모든 canonical
+package-relative target이 packed file list에 실제 존재해야 한다.
 
 - [ ] **Step 4: clean consumer smoke script 구현**
 
@@ -798,6 +807,13 @@ with:
 
 action output `pr-number`가 있으면 `gh label create release --force` 후 해당 PR에
 `release` label을 붙인다. step은 repository `GITHUB_TOKEN`만 사용한다.
+
+이 token topology에서는 Changesets Version PR이 생성되거나 갱신될 때 write 권한
+maintainer가 PR merge box에서 **Approve workflows to run**을 눌러야 한다. 매 갱신마다
+**Quality (Node 20.18.3)**, **Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한
+뒤에만 Version PR을 merge한다. merge commit을 release candidate로 정하고 local
+`release:check`와 E2E를 통과한 뒤에만 release tag를 생성한다. PAT나 장기 credential은
+추가하지 않는다.
 
 - [ ] **Step 3: tag-gated publish workflow 작성**
 

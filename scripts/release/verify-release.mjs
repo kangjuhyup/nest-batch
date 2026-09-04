@@ -1,7 +1,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CORE_SUBPATHS, NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT, PUBLIC_PACKAGES, REPOSITORY_URL } from "./package-catalog.mjs";
+import { NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT, PUBLIC_PACKAGES, REPOSITORY_URL } from "./package-catalog.mjs";
+import { getPackageEntrypointTargets, validatePackageEntrypoints } from "./package-entrypoints.mjs";
 import { verifyWorkflowFiles } from "./verify-workflows.mjs";
 
 const EXPECTED_HOMEPAGE = "https://github.com/kangjuhyup/nest-batch#readme";
@@ -25,6 +26,10 @@ const PORTABLE_NVM_COMMAND = "nvm use";
 const COREPACK_VERSION_CHECK = "corepack pnpm --version # 10.34.5";
 const BOOTSTRAP_PROVENANCE_EXCEPTION = "로컬에서 publish한 `0.1.0`은 provenance 예외입니다.";
 const LATER_PROVENANCE_REQUIREMENT = "처음으로 OIDC publish되는 후속 version부터 provenance를 필수로 확인합니다.";
+const VERSION_PR_CHECKLIST_ITEM = "- [ ] Changesets Version PR workflow 승인과 CI 성공 확인 후 merge";
+const VERSION_PR_APPROVAL_RULE = "각 Changesets Version PR이 생성되거나 갱신될 때마다 write 권한 maintainer가 PR merge box에서 **Approve workflows to run**을 클릭합니다.";
+const VERSION_PR_CHECKS_RULE = "**Quality (Node 20.18.3)**, **Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한 뒤에만 Version PR을 merge합니다.";
+const VERSION_PR_SEQUENCE_RULE = "Version PR merge commit을 release candidate로 정하고 아래 local 검증을 마친 뒤에만 release tag를 생성합니다.";
 const GITHUB_RELEASE_RERUN_RULE = "기존 GitHub Release가 있으면 검증 후 건너뛰고, 없을 때만 생성합니다.";
 const GITHUB_RELEASE_EXISTING_RULE = "기존 release는 tag 이름이 정확하고 draft/prerelease가 아니어야 합니다.";
 const GITHUB_RELEASE_CHECKOUT_RULE = "workflow checkout의 tag와 `HEAD`가 모두 `GITHUB_SHA`로 resolve되어야 하며, `target_commitish`가 40자리 commit SHA이면 그 값도 일치해야 합니다.";
@@ -97,6 +102,7 @@ const validateReleasingGuide = (root) => {
   }
 
   const expectedChecklistLines = [
+    VERSION_PR_CHECKLIST_ITEM,
     "- [ ] `pnpm release:check` 성공",
     `- [ ] owner \`kangjuhyup\`, repository \`nest-batch\`, workflow \`${PUBLISH_WORKFLOW_FILENAME}\`, environment \`${PUBLISH_ENVIRONMENT}\` 등록`,
     `- [ ] \`${BOOTSTRAP_PUBLISH_COMMAND}\`을 maintainer가 직접 실행`
@@ -115,6 +121,9 @@ const validateReleasingGuide = (root) => {
     TOKEN_PUBLISHING_ACCESS_SAVE,
     PORTABLE_NVM_COMMAND,
     COREPACK_VERSION_CHECK,
+    VERSION_PR_APPROVAL_RULE,
+    VERSION_PR_CHECKS_RULE,
+    VERSION_PR_SEQUENCE_RULE,
     `npm whoami --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}`,
     `npm profile get --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}`,
     BOOTSTRAP_PROVENANCE_EXCEPTION,
@@ -187,18 +196,8 @@ const validatePackageDocuments = (root, packageInfo) => {
   }
 };
 
-const validateBuildArtifacts = (root, packageInfo) => {
-  const requiredFiles = ["dist/index.js", "dist/index.d.ts"];
-
-  if (packageInfo.name === "@nest-batch/core") {
-    for (const subpath of CORE_SUBPATHS) {
-      requiredFiles.push(`dist/${subpath}/index.js`, `dist/${subpath}/index.d.ts`);
-    }
-  }
-
-  if (packageInfo.name === "@nest-batch/cli") {
-    requiredFiles.push("dist/bin.js");
-  }
+const validateBuildArtifacts = (root, packageInfo, manifest) => {
+  const requiredFiles = getPackageEntrypointTargets(manifest, packageInfo);
 
   const missing = requiredFiles.filter((path) => !existsSync(join(root, packageInfo.directory, path)));
 
@@ -215,8 +214,9 @@ export function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
-export function validateManifest(manifest, directory) {
+export function validateManifest(manifest, packageInfo) {
   const errors = [];
+  const directory = packageInfo.directory;
 
   if (!isRecord(manifest)) {
     throw new Error(`${directory}: package manifest must be an object`);
@@ -280,6 +280,12 @@ export function validateManifest(manifest, directory) {
 
   if (!Array.isArray(manifest.keywords) || manifest.keywords.length === 0 || manifest.keywords.some((keyword) => typeof keyword !== "string" || keyword.trim().length === 0)) {
     errors.push("keywords must be a non-empty string array");
+  }
+
+  try {
+    validatePackageEntrypoints(manifest, packageInfo);
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
   }
 
   if (errors.length > 0) {
@@ -478,7 +484,7 @@ export async function verifyReleaseRepository(root) {
 
     try {
       manifest = readJson(manifestPath);
-      validateManifest(manifest, packageInfo.directory);
+      validateManifest(manifest, packageInfo);
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
       continue;
@@ -510,7 +516,7 @@ export async function verifyReleaseRepository(root) {
     }
 
     try {
-      validateBuildArtifacts(repositoryRoot, packageInfo);
+      validateBuildArtifacts(repositoryRoot, packageInfo, manifest);
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
     }

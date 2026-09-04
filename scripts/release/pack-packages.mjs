@@ -4,7 +4,8 @@ import { isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import { commandForPlatform, runCommand } from "./command-runner.mjs";
-import { CORE_SUBPATHS, NPM_REGISTRY_URL, PUBLIC_PACKAGES, REPOSITORY_URL } from "./package-catalog.mjs";
+import { NPM_REGISTRY_URL, PUBLIC_PACKAGES, REPOSITORY_URL } from "./package-catalog.mjs";
+import { getPackageEntrypointTargets, validatePackageEntrypoints } from "./package-entrypoints.mjs";
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const ALLOWED_ROOT_FILES = new Set(["README.md", "LICENSE", "package.json"]);
@@ -78,7 +79,7 @@ const isForbiddenPath = (path) => {
   return undefined;
 };
 
-export function validatePackedFiles(artifact) {
+export function validatePackedFiles(artifact, manifest, packageInfo) {
   const paths = getFilePaths(artifact);
 
   for (const path of paths) {
@@ -101,6 +102,12 @@ export function validatePackedFiles(artifact) {
 
   if (missingRootFiles.length > 0) {
     throw new Error(`${artifact.name}: packed artifact is missing required root files ${missingRootFiles.join(", ")}.`);
+  }
+
+  const missingEntrypoints = getPackageEntrypointTargets(manifest, packageInfo).filter((path) => !pathSet.has(path));
+
+  if (missingEntrypoints.length > 0) {
+    throw new Error(`${artifact.name}: packed artifact is missing referenced entrypoints ${missingEntrypoints.join(", ")}.`);
   }
 }
 
@@ -132,6 +139,12 @@ export function validatePackedManifest(manifest, packageInfo, expectedVersion, s
 
   if (!isRecord(manifest.publishConfig) || manifest.publishConfig.access !== "public" || manifest.publishConfig.registry !== NPM_REGISTRY_URL) {
     errors.push(`publishConfig must target ${NPM_REGISTRY_URL} with public access`);
+  }
+
+  try {
+    validatePackageEntrypoints(manifest, packageInfo);
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
   }
 
   for (const field of DEPENDENCY_FIELDS) {
@@ -236,27 +249,6 @@ export const readPackedManifest = async (tarball) => {
   }
 };
 
-const validateRequiredEntrypoints = (artifact) => {
-  const requiredFiles = ["dist/index.js", "dist/index.d.ts"];
-
-  if (artifact.name === "@nest-batch/core") {
-    for (const subpath of CORE_SUBPATHS) {
-      requiredFiles.push(`dist/${subpath}/index.js`, `dist/${subpath}/index.d.ts`);
-    }
-  }
-
-  if (artifact.name === "@nest-batch/cli") {
-    requiredFiles.push("dist/bin.js");
-  }
-
-  const packedFiles = new Set(getFilePaths(artifact));
-  const missing = requiredFiles.filter((path) => !packedFiles.has(path));
-
-  if (missing.length > 0) {
-    throw new Error(`${artifact.name}: packed artifact is missing ${missing.join(", ")}.`);
-  }
-};
-
 const parsePackResult = (stdout, packageInfo) => {
   let results;
 
@@ -321,11 +313,10 @@ export async function packPackages(destination) {
       integrity: `sha512-${createHash("sha512").update(await readFile(tarball)).digest("base64")}`
     };
 
-    validatePackedFiles(artifact);
-    validateRequiredEntrypoints(artifact);
     const packedManifest = await readPackedManifest(tarball);
     const sourceManifest = JSON.parse(await readFile(join(REPOSITORY_ROOT, packageInfo.directory, "package.json"), "utf8"));
     validatePackedManifest(packedManifest, packageInfo, packed.version, sourceManifest);
+    validatePackedFiles(artifact, packedManifest, packageInfo);
     artifact.manifest = packedManifest;
     artifacts.push(artifact);
   }

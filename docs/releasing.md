@@ -15,6 +15,10 @@ pnpm install --frozen-lockfile
 
 ## 1. Release candidate 준비
 
+- [ ] Changesets Version PR workflow 승인과 CI 성공 확인 후 merge
+  - 각 Changesets Version PR이 생성되거나 갱신될 때마다 write 권한 maintainer가 PR merge box에서 **Approve workflows to run**을 클릭합니다.
+  - **Quality (Node 20.18.3)**, **Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한 뒤에만 Version PR을 merge합니다.
+  - Version PR merge commit을 release candidate로 정하고 아래 local 검증을 마친 뒤에만 release tag를 생성합니다.
 - [ ] worktree가 clean이고 release commit이 `develop`에 포함됨
   - `git status --short`의 출력이 없어야 하며, `git fetch origin develop` 후 `git merge-base --is-ancestor <release-commit> origin/develop`가 성공해야 합니다.
 - [ ] 8개 package와 root version이 동일함

@@ -115,6 +115,7 @@ const createIsolatedPublishRepository = async (version: string) => {
     "command-runner.mjs",
     "pack-packages.mjs",
     "package-catalog.mjs",
+    "package-entrypoints.mjs",
     "publish-packages.mjs"
   ].map((file) => copyFile(join(REPOSITORY_ROOT, "scripts/release", file), join(root, "scripts/release", file))));
 

@@ -15,6 +15,28 @@ const LICENSE_TEXT = "MIT License\n";
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const temporaryRoots: string[] = [];
 
+const entrypointsFor = (packageInfo: (typeof PUBLIC_PACKAGES)[number]) => {
+  const exports: Record<string, { types: string; import: string }> = {
+    ".": { types: "./dist/index.d.ts", import: "./dist/index.js" }
+  };
+
+  if (packageInfo.name === "@nest-batch/core") {
+    for (const subpath of CORE_SUBPATHS) {
+      exports[`./${subpath}`] = {
+        types: `./dist/${subpath}/index.d.ts`,
+        import: `./dist/${subpath}/index.js`
+      };
+    }
+  }
+
+  return {
+    main: "./dist/index.js",
+    types: "./dist/index.d.ts",
+    exports,
+    ...(packageInfo.name === "@nest-batch/cli" ? { bin: { "nest-batch": "./dist/bin.js" } } : {})
+  };
+};
+
 const createPackageReadme = (packageInfo: (typeof PUBLIC_PACKAGES)[number]) => `# ${packageInfo.name}
 
 \`\`\`bash
@@ -45,6 +67,10 @@ pnpm install --frozen-lockfile
 
 ## 1. Release candidate 준비
 
+- [ ] Changesets Version PR workflow 승인과 CI 성공 확인 후 merge
+  - 각 Changesets Version PR이 생성되거나 갱신될 때마다 write 권한 maintainer가 PR merge box에서 **Approve workflows to run**을 클릭합니다.
+  - **Quality (Node 20.18.3)**, **Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한 뒤에만 Version PR을 merge합니다.
+  - Version PR merge commit을 release candidate로 정하고 아래 local 검증을 마친 뒤에만 release tag를 생성합니다.
 - [ ] worktree가 clean이고 release commit이 \`develop\`에 포함됨
 - [ ] 8개 package와 root version이 동일함
 - [ ] \`pnpm release:check\` 성공
@@ -167,7 +193,8 @@ function createRepository(
       bugs: { url: BUGS_URL },
       engines: { node: ">=20.18.0" },
       files: ["dist", "src", "README.md", "LICENSE"],
-      publishConfig: { access: "public", registry: NPM_REGISTRY_URL }
+      publishConfig: { access: "public", registry: NPM_REGISTRY_URL },
+      ...entrypointsFor(packageInfo)
     };
     mutatePackage?.(manifest, packageInfo);
     const packageDirectory = join(root, packageInfo.directory);
@@ -229,7 +256,7 @@ describe("release metadata validation / release metadata 검증", () => {
   });
 
   it("rejects missing public access / public access 누락을 거부한다", () => {
-    expect(() => validateManifest({ name: "@nest-batch/core", version: "0.1.0" }, "packages/core"))
+    expect(() => validateManifest({ name: "@nest-batch/core", version: "0.1.0" }, PUBLIC_PACKAGES[0]))
       .toThrow(/publishConfig\.access/);
   });
 
@@ -289,6 +316,95 @@ describe("release metadata validation / release metadata 검증", () => {
     });
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/publishConfig\.registry/u);
+  });
+
+  it.each([
+    ["missing main", "main 누락", (manifest: Record<string, unknown>) => { delete manifest.main; }],
+    ["wrong main", "잘못된 main", (manifest: Record<string, unknown>) => { manifest.main = "./dist/other.js"; }],
+    ["traversing main", "상위 경로를 가리키는 main", (manifest: Record<string, unknown>) => { manifest.main = "./dist/../outside.js"; }],
+    ["absolute main", "절대 경로 main", (manifest: Record<string, unknown>) => { manifest.main = "/dist/index.js"; }],
+    ["backslash main", "backslash main", (manifest: Record<string, unknown>) => { manifest.main = ".\\dist\\index.js"; }],
+    ["missing top-level types", "top-level types 누락", (manifest: Record<string, unknown>) => { delete manifest.types; }],
+    ["wrong top-level types", "잘못된 top-level types", (manifest: Record<string, unknown>) => { manifest.types = "./dist/other.d.ts"; }],
+    ["traversing top-level types", "상위 경로를 가리키는 top-level types", (manifest: Record<string, unknown>) => { manifest.types = "./dist/../outside.d.ts"; }],
+    ["missing root export types", "root export types 누락", (manifest: Record<string, unknown>) => { delete (manifest.exports as Record<string, Record<string, unknown>>)["."].types; }],
+    ["wrong root export types", "잘못된 root export types", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["."].types = "./dist/other.d.ts"; }],
+    ["traversing root export types", "상위 경로를 가리키는 root export types", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["."].types = "./dist/../outside.d.ts"; }],
+    ["missing root export import", "root export import 누락", (manifest: Record<string, unknown>) => { delete (manifest.exports as Record<string, Record<string, unknown>>)["."].import; }],
+    ["wrong root export import", "잘못된 root export import", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["."].import = "./dist/other.js"; }],
+    ["traversing root export import", "상위 경로를 가리키는 root export import", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["."].import = "./dist/../outside.js"; }]
+  ])("rejects a source manifest with %s / %s source manifest를 거부한다", async (_english, _korean, mutate) => {
+    const root = createRepository((manifest, packageInfo) => {
+      if (packageInfo.name === "@nest-batch/nest") {
+        mutate(manifest);
+      }
+    });
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/main|types|exports|canonical/u);
+  });
+
+  it.each([
+    ["missing subpath export types", "subpath export types 누락", (manifest: Record<string, unknown>) => { delete (manifest.exports as Record<string, Record<string, unknown>>)["./worker"].types; }],
+    ["wrong subpath export types", "잘못된 subpath export types", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["./worker"].types = "./dist/worker/other.d.ts"; }],
+    ["traversing subpath export types", "상위 경로를 가리키는 subpath export types", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["./worker"].types = "./dist/worker/../../outside.d.ts"; }],
+    ["missing subpath export import", "subpath export import 누락", (manifest: Record<string, unknown>) => { delete (manifest.exports as Record<string, Record<string, unknown>>)["./worker"].import; }],
+    ["wrong subpath export import", "잘못된 subpath export import", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["./worker"].import = "./dist/worker/other.js"; }],
+    ["traversing subpath export import", "상위 경로를 가리키는 subpath export import", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["./worker"].import = "./dist/worker/../../outside.js"; }]
+  ])("rejects core with %s / %s core manifest를 거부한다", async (_english, _korean, mutate) => {
+    const root = createRepository((manifest, packageInfo) => {
+      if (packageInfo.name === "@nest-batch/core") {
+        mutate(manifest);
+      }
+    });
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/exports|canonical/u);
+  });
+
+  it.each([
+    ["missing CLI bin", "CLI bin 누락", (manifest: Record<string, unknown>) => { delete manifest.bin; }],
+    ["wrong CLI bin", "잘못된 CLI bin", (manifest: Record<string, unknown>) => { manifest.bin = { "nest-batch": "./dist/other.js" }; }],
+    ["traversing CLI bin", "상위 경로를 가리키는 CLI bin", (manifest: Record<string, unknown>) => { manifest.bin = { "nest-batch": "./dist/../outside.js" }; }]
+  ])("rejects CLI with %s / %s CLI manifest를 거부한다", async (_english, _korean, mutate) => {
+    const root = createRepository((manifest, packageInfo) => {
+      if (packageInfo.name === "@nest-batch/cli") {
+        mutate(manifest);
+      }
+    });
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/bin|canonical/u);
+  });
+
+  it("rejects bin metadata on a non-CLI package / CLI가 아닌 package의 bin metadata를 거부한다", async () => {
+    const root = createRepository((manifest, packageInfo) => {
+      if (packageInfo.name === "@nest-batch/nest") {
+        manifest.bin = { unexpected: "./dist/index.js" };
+      }
+    });
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/bin/u);
+  });
+
+  it.each([
+    ["an extra export subpath", "추가 export subpath", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, unknown>)["./extra"] = { types: "./dist/index.d.ts", import: "./dist/index.js" }; }],
+    ["an extra export condition", "추가 export condition", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["."].default = "./dist/index.js"; }]
+  ])("rejects a source manifest with %s / %s이 있는 source manifest를 거부한다", async (_english, _korean, mutate) => {
+    const root = createRepository((manifest, packageInfo) => {
+      if (packageInfo.name === "@nest-batch/nest") {
+        mutate(manifest);
+      }
+    });
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/exports/u);
+  });
+
+  it("rejects an extra CLI bin command / 추가 CLI bin command를 거부한다", async () => {
+    const root = createRepository((manifest, packageInfo) => {
+      if (packageInfo.name === "@nest-batch/cli") {
+        manifest.bin = { "nest-batch": "./dist/bin.js", unexpected: "./dist/bin.js" };
+      }
+    });
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/bin/u);
   });
 
   it("rejects a Changesets fixed group drift / Changesets fixed group 변경을 거부한다", async () => {
@@ -408,6 +524,40 @@ describe("release metadata validation / release metadata 검증", () => {
     writeFileSync(releasingGuide, readFileSync(releasingGuide, "utf8").replace("environment `npm`", "environment `release`"));
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*environment.*npm/);
+  });
+
+  it("rejects a release checklist without Version PR workflow approval / Version PR workflow 승인이 없는 릴리즈 checklist를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(releasingGuide, readFileSync(releasingGuide, "utf8").replace("**Approve workflows to run**", "workflow 실행 승인"));
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/Approve workflows to run/u);
+  });
+
+  it.each([
+    ["Node 20 quality", "Node 20 quality", "**Quality (Node 20.18.3)**"],
+    ["Node 24 quality", "Node 24 quality", "**Quality (Node 24)**"],
+    ["E2E", "E2E", "**E2E (Node 24)**"]
+  ])("rejects a release checklist without the %s check / %s check가 없는 릴리즈 checklist를 거부한다", async (_english, _korean, checkName) => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(releasingGuide, readFileSync(releasingGuide, "utf8").replace(checkName, "**Skipped check**"));
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*Quality|E2E/u);
+  });
+
+  it("rejects a release checklist that tags before Version PR merge and local verification / Version PR merge와 local 검증 전에 tag하는 checklist를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      readFileSync(releasingGuide, "utf8").replace(
+        "Version PR merge commit을 release candidate로 정하고 아래 local 검증을 마친 뒤에만 release tag를 생성합니다.",
+        "Version PR이 열리면 release tag를 먼저 생성합니다."
+      )
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/release candidate|release tag/u);
   });
 
   it("rejects the obsolete bootstrap command / 이전 bootstrap 명령을 거부한다", async () => {

@@ -102,6 +102,12 @@ root package는 private이므로 Changesets의 release 대상이 아니다. Vers
 실행하는 repository script가 Changesets 계산 후 root version을 공개 package의 고정
 version과 동기화한다. tag/version 검사는 이 root version도 확인한다.
 
+Version PR은 repository `github.token`으로 생성·갱신하므로 장기 credential은 추가하지
+않는다. 대신 매 생성·갱신 때 write 권한 maintainer가 PR merge box의
+**Approve workflows to run**을 눌러 CI를 시작하고, **Quality (Node 20.18.3)**,
+**Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한 뒤에만 merge한다. Version PR
+merge commit을 release candidate로 삼아 local release 검증을 마친 뒤에만 tag를 생성한다.
+
 문서나 CI처럼 package 산출물에 영향을 주지 않는 변경은 empty Changeset을 허용한다.
 
 ### tag-gated publish
@@ -196,7 +202,11 @@ git에서 제외한다. runtime source map과 declaration map이 가리키는 �
 수 있도록 package tarball에는 `dist/`, `src/`, `README.md`, `LICENSE`,
 `package.json`만 포함한다. test와 local cache는 포함하지 않는다.
 
-`exports`, `main`, `types`, CLI `bin`은 실제 tarball 안의 파일과 일치해야 한다.
+모든 package는 `main: ./dist/index.js`, `types: ./dist/index.d.ts`와 root `exports`의 exact
+`types`/`import` pair를 가진다. `core`만 `./queue`, `./scheduler`, `./polling`, `./worker`
+subpath의 exact pair를 추가하고, CLI만 `bin.nest-batch: ./dist/bin.js`를 가진다. 다른
+package에는 `bin`이 없어야 한다. 모든 target은 traversal, backslash, absolute path가 없는
+canonical package-relative `./dist/...` 경로여야 하며 실제 tarball 파일과 일치해야 한다.
 package 간 `workspace:*`는 pack 결과에서 현재 고정 version으로 치환되어야 한다.
 
 ## 자동 검증
@@ -213,7 +223,8 @@ repository script는 다음 조건을 검사하고 하나라도 어기면 실패
 - source manifest의 내부 dependency는 `workspace:*`이고 pack된 manifest에서는 현재
   고정 version으로 치환된다.
 - README/LICENSE가 존재하고 LICENSE 내용이 root와 같다.
-- public entrypoint, types entrypoint, CLI bin이 build 결과에 존재한다.
+- source와 packed manifest의 `main`, top-level `types`, root/subpath `exports`, CLI `bin`
+  shape가 위 exact 계약과 일치하고 모든 referenced target이 build와 tarball에 존재한다.
 - `core/queue`, `core/scheduler`, `core/polling`, `core/worker` subpath의 JavaScript와
   declaration entrypoint가 build 및 pack 결과에 존재한다.
 - tarball에 허용된 파일만 들어 있고 `.tsbuildinfo`, test, local secret이 없다.
