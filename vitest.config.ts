@@ -6,6 +6,7 @@ const fromRoot = (path: string) => fileURLToPath(new URL(path, import.meta.url))
 export default defineConfig({
   resolve: {
     alias: {
+      "@nest-batch/core/queue": fromRoot("./packages/core/src/queue/index.ts"),
       "@nest-batch/core": fromRoot("./packages/core/src/index.ts"),
       "@nest-batch/nest": fromRoot("./packages/nest/src/index.ts"),
       "@nest-batch/inmemory": fromRoot("./packages/inmemory/src/index.ts"),

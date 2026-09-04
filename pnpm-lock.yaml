@@ -156,7 +156,11 @@ importers:
         specifier: ^5
         version: 5.81.2
 
-  packages/queue-core: {}
+  packages/queue-core:
+    dependencies:
+      '@nest-batch/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/scheduler-calendar:
     dependencies:

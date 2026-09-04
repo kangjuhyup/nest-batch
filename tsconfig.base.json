@@ -14,6 +14,7 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      "@nest-batch/core/queue": ["packages/core/src/queue/index.ts"],
       "@nest-batch/core": ["packages/core/src/index.ts"],
       "@nest-batch/nest": ["packages/nest/src/index.ts"],
       "@nest-batch/inmemory": ["packages/inmemory/src/index.ts"],
