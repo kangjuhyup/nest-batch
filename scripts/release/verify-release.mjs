@@ -28,9 +28,10 @@ const LATER_PROVENANCE_REQUIREMENT = "처음으로 OIDC publish되는 후속 ver
 const GITHUB_RELEASE_RERUN_RULE = "기존 GitHub Release가 있으면 검증 후 건너뛰고, 없을 때만 생성합니다.";
 const GITHUB_RELEASE_EXISTING_RULE = "기존 release는 tag 이름이 정확하고 draft/prerelease가 아니어야 합니다.";
 const GITHUB_RELEASE_CHECKOUT_RULE = "workflow checkout의 tag와 `HEAD`가 모두 `GITHUB_SHA`로 resolve되어야 하며, `target_commitish`가 40자리 commit SHA이면 그 값도 일치해야 합니다.";
-const GITHUB_RELEASE_NOT_FOUND_RULE = "`gh api graphql` 조회는 published와 draft release를 모두 확인하며, `data.repository.release`가 `null`인 경우에만 새 release를 생성합니다.";
-const GITHUB_RELEASE_LOOKUP_FAILURE_RULE = "GraphQL `errors`, 인증, 권한, network 또는 malformed 응답은 생성으로 전환하지 않고 workflow를 실패시킵니다.";
-const GITHUB_RELEASE_CREATE_RACE_RULE = "create가 실패하면 정확히 한 번 재조회합니다. 그 사이 생성된 release가 계약과 정확히 일치할 때만 성공으로 복구하고, 여전히 없거나 조회가 실패하면 원래 create 오류를 보존하며, 충돌 release면 충돌 오류로 실패합니다.";
+const GITHUB_RELEASE_NOT_FOUND_RULE = "`gh api graphql` 조회로 published와 draft release의 양의 `databaseId`를 찾으며, `data.repository.release`가 `null`인 경우에만 새 release를 생성합니다.";
+const GITHUB_RELEASE_REST_RULE = "GraphQL object가 있으면 REST `GET repos/{owner}/{repo}/releases/{databaseId}`로 tag, target, draft, prerelease를 검증합니다.";
+const GITHUB_RELEASE_LOOKUP_FAILURE_RULE = "GraphQL `errors`, REST 인증·권한·network 오류 또는 malformed 응답은 생성으로 전환하지 않고 workflow를 실패시킵니다.";
+const GITHUB_RELEASE_CREATE_RACE_RULE = "create가 실패하면 같은 GraphQL ID → REST by ID 경로로 정확히 한 번 재조회합니다. 그 사이 생성된 release가 계약과 정확히 일치할 때만 성공으로 복구하고, 여전히 없거나 조회가 실패하면 원래 create 오류를 보존하며, 충돌 release면 충돌 오류로 실패합니다.";
 const PERSONAL_NVM_BOOTSTRAP_PATH = "source /Users/kangjuhyup/.nvm/nvm.sh";
 const RELEASE_CHECKLIST_HEADINGS = [
   "## 1. Release candidate 준비",
@@ -122,6 +123,7 @@ const validateReleasingGuide = (root) => {
     GITHUB_RELEASE_EXISTING_RULE,
     GITHUB_RELEASE_CHECKOUT_RULE,
     GITHUB_RELEASE_NOT_FOUND_RULE,
+    GITHUB_RELEASE_REST_RULE,
     GITHUB_RELEASE_LOOKUP_FAILURE_RULE,
     GITHUB_RELEASE_CREATE_RACE_RULE
   ];

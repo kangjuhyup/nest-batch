@@ -827,14 +827,18 @@ pnpm install, `pnpm release:check`, `pnpm run release:publish --tag "$GITHUB_REF
 
 GitHub Release job은 tag source를 checkout하고 `HEAD`와 tag ref가 모두
 `GITHUB_SHA`로 resolve되는지 검사한 뒤 explicit repository를 `gh api graphql`의
-`repository.release(tagName:)`로 조회하여 published와 draft를 함께 발견한다.
-`data.repository.release`가 `null`인 경우에만 아래 create 명령을 실행한다. 기존 release는
-exact tag, non-draft, non-prerelease를 검증하고 건너뛴다.
+`repository.release(tagName:)`로 조회한다. GraphQL selection은 schema-valid
+`databaseId`만 요청하고 positive safe integer를 검증하여 published와 draft를 함께 찾는다.
+`data.repository.release`가 `null`인 경우에만 아래 create 명령을 실행한다. object가 있으면
+REST `GET repos/{owner}/{repo}/releases/{databaseId}`로 full metadata를 조회하고, response
+`id`가 있으면 GraphQL ID와 일치하는지 확인한다. 기존 release는 exact tag, non-draft,
+non-prerelease를 검증하고 건너뛴다.
 `target_commitish`가 40자리 SHA이면 workflow SHA와 일치해야 하며, branch 이름이면
-검증된 tag ref를 authoritative source로 삼는다. GraphQL `errors`, 인증/network/malformed
-응답은 그대로 실패시켜 create를 실행하지 않는다. create가 실패하면 정확히 한 번
-재조회하여 exact release가 생성된 경합만 성공으로 복구한다. 여전히 absent이거나 재조회가
-실패하면 원래 create 오류를 보존하고, conflicting release이면 충돌 오류로 실패한다.
+검증된 tag ref를 authoritative source로 삼는다. GraphQL `errors`, GraphQL/REST
+인증/network/malformed 응답은 그대로 실패시켜 create를 실행하지 않는다. create가
+실패하면 같은 GraphQL-ID → REST-by-ID 경로로 정확히 한 번 재조회하여 exact release가
+생성된 경합만 성공으로 복구한다. 여전히 absent이거나 재조회가 실패하면 원래 create
+오류를 보존하고, conflicting release이면 충돌 오류로 실패한다.
 
 ```bash
 gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"

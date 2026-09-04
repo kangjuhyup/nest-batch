@@ -6,7 +6,7 @@ const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const STABLE_TAG = /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
 const FULL_SHA = /^[0-9a-f]{40}$/u;
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
-const RELEASE_QUERY = "query ReleaseByTag($owner: String!, $name: String!, $tagName: String!) { repository(owner: $owner, name: $name) { release(tagName: $tagName) { tagName targetCommitish isDraft isPrerelease } } }";
+const RELEASE_QUERY = "query ReleaseByTag($owner: String!, $name: String!, $tagName: String!) { repository(owner: $owner, name: $name) { release(tagName: $tagName) { databaseId } } }";
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -55,21 +55,55 @@ export const parseGitHubGraphQLResponse = (source) => {
     return undefined;
   }
 
+  if (!isRecord(release) || !Number.isSafeInteger(release.databaseId) || release.databaseId <= 0) {
+    throw new Error("GitHub GraphQL release databaseId must be a positive safe integer.");
+  }
+
+  return release.databaseId;
+};
+
+export const parseGitHubRestResponse = (source, expectedId) => {
+  if (typeof source !== "string") {
+    throw new Error("GitHub REST response must be text.");
+  }
+
+  if (!Number.isSafeInteger(expectedId) || expectedId <= 0) {
+    throw new Error("Expected GitHub release ID must be a positive safe integer.");
+  }
+
+  let release;
+
+  try {
+    release = JSON.parse(source);
+  } catch (error) {
+    throw new Error(`GitHub REST response was not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
   if (
     !isRecord(release) ||
-    typeof release.tagName !== "string" ||
-    typeof release.targetCommitish !== "string" ||
-    typeof release.isDraft !== "boolean" ||
-    typeof release.isPrerelease !== "boolean"
+    typeof release.tag_name !== "string" ||
+    release.tag_name.length === 0 ||
+    typeof release.target_commitish !== "string" ||
+    release.target_commitish.length === 0 ||
+    typeof release.draft !== "boolean" ||
+    typeof release.prerelease !== "boolean"
   ) {
-    throw new Error("GitHub GraphQL response contained a malformed release.");
+    throw new Error("GitHub REST response contained malformed release metadata.");
+  }
+
+  if (Object.hasOwn(release, "id") && (
+    !Number.isSafeInteger(release.id) ||
+    release.id <= 0 ||
+    release.id !== expectedId
+  )) {
+    throw new Error(`GitHub REST release ID must match GraphQL databaseId ${expectedId}.`);
   }
 
   return {
-    tag_name: release.tagName,
-    target_commitish: release.targetCommitish,
-    draft: release.isDraft,
-    prerelease: release.isPrerelease
+    tag_name: release.tag_name,
+    target_commitish: release.target_commitish,
+    draft: release.draft,
+    prerelease: release.prerelease
   };
 };
 
@@ -94,7 +128,20 @@ export const createGitHubAdapter = ({
       `tagName=${tag}`
     ], { cwd, maxBuffer: 10 * 1024 * 1024 });
 
-    return parseGitHubGraphQLResponse(result.stdout);
+    const releaseId = parseGitHubGraphQLResponse(result.stdout);
+
+    if (releaseId === undefined) {
+      return undefined;
+    }
+
+    const releaseResult = await runLookup(command, [
+      "api",
+      "--method",
+      "GET",
+      `repos/${repository}/releases/${releaseId}`
+    ], { cwd, maxBuffer: 10 * 1024 * 1024 });
+
+    return parseGitHubRestResponse(releaseResult.stdout, releaseId);
   },
   createRelease: async (repository, tag) => runCreate(command, [
     "release",
