@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LocalWorkerPool } from "../src/index.js";
+import { LocalWorkerPool } from "@nest-batch/core/worker";
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 

@@ -22,6 +22,10 @@
     "./polling": {
       "types": "./dist/polling/index.d.ts",
       "import": "./dist/polling/index.js"
+    },
+    "./worker": {
+      "types": "./dist/worker/index.d.ts",
+      "import": "./dist/worker/index.js"
     }
   },
   "files": ["dist"],

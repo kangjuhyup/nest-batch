@@ -9,6 +9,7 @@ export default defineConfig({
       "@nest-batch/core/queue": fromRoot("./packages/core/src/queue/index.ts"),
       "@nest-batch/core/scheduler": fromRoot("./packages/core/src/scheduler/index.ts"),
       "@nest-batch/core/polling": fromRoot("./packages/core/src/polling/index.ts"),
+      "@nest-batch/core/worker": fromRoot("./packages/core/src/worker/index.ts"),
       "@nest-batch/core": fromRoot("./packages/core/src/index.ts"),
       "@nest-batch/nest": fromRoot("./packages/nest/src/index.ts"),
       "@nest-batch/inmemory": fromRoot("./packages/inmemory/src/index.ts"),

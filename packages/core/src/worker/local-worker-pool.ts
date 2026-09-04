@@ -1,4 +1,4 @@
-import type { WorkerPool, WorkerTask } from "@nest-batch/core";
+import type { WorkerPool, WorkerTask } from "../types/index.js";
 
 export interface LocalWorkerPoolOptions {
   readonly capacity: number;

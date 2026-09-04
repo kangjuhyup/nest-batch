@@ -1,2 +1,2 @@
-export { LocalWorkerPool } from "./local-worker-pool.js";
-export type { LocalWorkerPoolOptions } from "./local-worker-pool.js";
+export { LocalWorkerPool } from "@nest-batch/core/worker";
+export type { LocalWorkerPoolOptions } from "@nest-batch/core/worker";

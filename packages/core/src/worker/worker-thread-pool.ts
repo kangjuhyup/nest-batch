@@ -1,6 +1,6 @@
 import { availableParallelism } from "node:os";
 import { Worker } from "node:worker_threads";
-import type { WorkerPool, WorkerTask } from "@nest-batch/core";
+import type { WorkerPool, WorkerTask } from "../types/index.js";
 import { workerEntrySource } from "./worker-entry.js";
 
 export interface WorkerThreadPoolOptions {

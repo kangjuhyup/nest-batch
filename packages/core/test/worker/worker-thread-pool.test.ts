@@ -1,6 +1,6 @@
 import { availableParallelism } from "node:os";
 import { describe, expect, it } from "vitest";
-import { WorkerThreadPool } from "../src/index.js";
+import { WorkerThreadPool } from "@nest-batch/core/worker";
 
 const fixtureUrl = (name: string): string => new URL(`./fixtures/${name}`, import.meta.url).href;
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
