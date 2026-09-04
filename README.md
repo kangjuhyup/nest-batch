@@ -20,27 +20,55 @@ are available.
 
 ## Packages
 
-- `@nest-batch/core`: framework-independent job and step contracts.
+- `@nest-batch/core`: framework-independent job and step contracts, plus the `queue`, `scheduler`, `polling`, and `worker` subpath APIs.
 - `@nest-batch/nest`: NestJS module and decorator integration.
 - `@nest-batch/inmemory`: non-durable in-memory repository, lock, and checkpoint storage for tests and examples.
 - `@nest-batch/postgres`: Postgres driver-backed repository, lock, and checkpoint storage.
 - `@nest-batch/mysql`: MySQL driver-backed repository, lock, and checkpoint storage.
 - `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, and checkpoint storage.
-- `@nest-batch/queue-core`: queue-neutral `WorkQueue` contract and worker loop.
-- `@nest-batch/queue-bullmq`: BullMQ-compatible `WorkQueue` adapter boundary.
-- `@nest-batch/polling-core`: framework-independent continuous polling task loop.
-- `@nest-batch/scheduler-core`: framework-independent schedule definitions, trigger evaluation, occurrence claim orchestration, and dispatch helpers.
-- `@nest-batch/scheduler-calendar`: dependency-light UTC daily, weekly, and monthly trigger helpers.
+- `@nest-batch/bullmq`: BullMQ-compatible `WorkQueue` adapter boundary.
 - `@nest-batch/cli`: operational CLI boundary.
+
+`@nest-batch/core/queue`, `@nest-batch/core/scheduler`,
+`@nest-batch/core/polling`, and `@nest-batch/core/worker` are explicit core
+subpath APIs, not separate npm packages. The root `@nest-batch/core` entrypoint
+does not re-export their symbols.
+
+## Install and Quickstart
+
+`nest-batch` is ESM-only and supports Node.js `>=20.18.0`. Install the runtime
+and the storage adapter that matches the environment:
+
+```bash
+npm install @nest-batch/core @nest-batch/inmemory
+```
+
+```ts
+import { DefaultBatchRunner, defineJob, defineStep } from "@nest-batch/core";
+import { InMemoryBatchStorage } from "@nest-batch/inmemory";
+
+const storage = new InMemoryBatchStorage();
+const runner = new DefaultBatchRunner(storage);
+const job = defineJob({
+  name: "hello",
+  steps: [defineStep({ name: "log", execute: async () => undefined })]
+});
+
+await runner.run(job, {});
+```
+
+Use `@nest-batch/nest` for NestJS integration, an SQL adapter for durable
+storage, and `@nest-batch/bullmq` only when a BullMQ-backed work queue is
+needed. The public API is pre-1.0; update compatible `0.x` versions together.
 
 ## Distributed Workers
 
-`@nest-batch/queue-core` defines a pull-based `WorkQueue` contract and
+`@nest-batch/core/queue` defines a pull-based `WorkQueue` contract and
 `WorkerLoop`. Queue adapters deliver work; repository state remains the source
 of truth for job, step, checkpoint, and partition status. Distributed execution
 is at-least-once, so writers and external side effects should be idempotent.
 
-`@nest-batch/queue-bullmq` maps each `WorkUnit.id` to a stable BullMQ job id and
+`@nest-batch/bullmq` maps each `WorkUnit.id` to a stable BullMQ job id and
 disables BullMQ retry by default (`attempts: 1`) so retry policy stays owned by
 the batch runtime. Applications can wrap real BullMQ `Queue`/worker instances
 and pass them into `BullMqWorkQueue`. When a work id contains `:`, the adapter
@@ -49,7 +77,7 @@ remains unchanged.
 
 ## Continuous Polling Workers
 
-`@nest-batch/polling-core` provides a framework-independent loop for long-lived
+`@nest-batch/core/polling` provides a framework-independent loop for long-lived
 polling tasks such as Transactional Outbox dispatchers. It does not create
 `JobExecution`, `StepExecution`, checkpoint rows, or scheduler occurrences per
 polling tick. The task owns store-specific claim, lease, retry, dead-letter, and
@@ -57,7 +85,7 @@ ordering semantics; nest-batch owns only worker lifecycle, idle sleep, system
 error backoff, observer events, and graceful shutdown.
 
 ```ts
-import { ContinuousPollingLoop } from "@nest-batch/polling-core";
+import { ContinuousPollingLoop } from "@nest-batch/core/polling";
 
 const loop = new ContinuousPollingLoop({
   workerId: "vote-outbox-worker-1",
@@ -132,7 +160,7 @@ cannot wait forever on in-flight I/O.
 
 ## Production Scheduling
 
-`@nest-batch/scheduler-core` evaluates code-defined schedules, claims durable
+`@nest-batch/core/scheduler` evaluates code-defined schedules, claims durable
 occurrences through a `ScheduleStore`, and dispatches them to either
 `BatchRunner` or `WorkQueue`. Schedule definitions stay in application code; the
 database stores occurrence state for duplicate-dispatch reduction and catch-up
@@ -145,7 +173,7 @@ import {
   createIntervalTrigger,
   createQueueScheduleDispatcher,
   defineSchedule
-} from "@nest-batch/scheduler-core";
+} from "@nest-batch/core/scheduler";
 
 const scheduleStore = new PostgresScheduleStore({
   connectionString: process.env.NEST_BATCH_POSTGRES_URL,
@@ -183,11 +211,11 @@ The scheduler uses the latest terminal occurrence (`dispatched` or `failed`) as
 the trigger boundary, so a stale `claimed` occurrence can be reclaimed after its
 claim TTL instead of being skipped forever.
 
-For UTC calendar schedules, keep calendar math outside `scheduler-core` and use
-the optional helper package:
+For UTC calendar schedules, use the calendar helpers exported by
+`@nest-batch/core/scheduler`:
 
 ```ts
-import { createUtcDailyTrigger } from "@nest-batch/scheduler-calendar";
+import { createUtcDailyTrigger } from "@nest-batch/core/scheduler";
 
 const trigger = createUtcDailyTrigger({
   startAt: new Date("2026-01-01T00:00:00.000Z"),

@@ -1,6 +1,10 @@
 # Architecture
 
-`nest-batch` is split by runtime responsibility.
+`nest-batch` is split by runtime responsibility. Source module boundaries and
+npm distribution boundaries are intentionally different: queue, scheduler,
+polling, and worker source modules live inside `@nest-batch/core` and are
+published as explicit subpath APIs. This keeps their framework-independent
+boundaries visible without requiring consumers to install separate packages.
 
 ## `@nest-batch/core`
 
@@ -20,40 +24,30 @@ Core owns:
 - step execution counters
 - runner-facing options
 
-## `@nest-batch/scheduler-core`
+Core subpaths own the following source-module boundaries:
 
-Scheduler core owns code-defined schedule definitions, trigger evaluation,
-occurrence claim orchestration, and dispatch to `BatchRunner` or `WorkQueue`.
-It does not own job execution semantics, schedule discovery, database client
-construction, queue implementation details, or NestJS lifecycle policy.
-
-## `@nest-batch/scheduler-calendar`
-
-Scheduler calendar contains optional UTC daily, weekly, and monthly trigger
-helpers. It depends on `@nest-batch/scheduler-core` only through the
-`ScheduleTrigger` contract; full cron expression parsing and timezone/DST
-policy stay outside `scheduler-core`.
-
-## `@nest-batch/polling-core`
-
-Polling core owns continuous polling task contracts and the long-lived worker
-loop for cases that should not create batch metadata per tick, such as
-Transactional Outbox dispatch. It is framework-independent and does not import
-NestJS, database clients, queue clients, scheduler contracts, or job/step
-execution types. The loop passes `workerId` and `AbortSignal` to a task
-`runOnce` callback, drains busy work without sleeping, waits only when idle,
-and retries worker/system errors with bounded exponential backoff and jitter.
-
-Polling core does not own outbox message state, retry/backoff policy, dead-letter
-policy, lease tokens, aggregate ordering, or horizontal scaling coordination.
-Those remain application or adapter responsibilities.
+- `@nest-batch/core/queue`: the queue-neutral `WorkQueue` contract and `WorkerLoop`.
+- `@nest-batch/core/scheduler`: code-defined schedules, UTC calendar triggers,
+  trigger evaluation, occurrence claims, and dispatch to `BatchRunner` or
+  `WorkQueue`. It does not own job execution semantics, database client
+  construction, queue implementation details, or NestJS lifecycle policy.
+- `@nest-batch/core/polling`: continuous polling task contracts and the
+  long-lived loop for work that should not create batch metadata per tick, such
+  as Transactional Outbox dispatch. It passes `workerId` and `AbortSignal` to a
+  task `runOnce` callback, drains busy work without sleeping, waits only when
+  idle, and retries worker/system errors with bounded exponential backoff and
+  jitter. Outbox message state, retry/backoff policy, dead-letter policy, lease
+  tokens, aggregate ordering, and horizontal scaling coordination remain
+  application or adapter responsibilities.
+- `@nest-batch/core/worker`: local and worker-thread `WorkerPool`
+  implementations.
 
 ## `@nest-batch/nest`
 
 Nest integration contains module APIs, decorators, discovery, and lifecycle
 integration. It depends on `@nest-batch/core`; core does not depend on NestJS.
 `NestBatchPollingModule` is a polling-only integration path. It depends on
-`@nest-batch/polling-core`, does not require `DatabaseBatchStorage`, and does
+`@nest-batch/core/polling`, does not require `DatabaseBatchStorage`, and does
 not create repository, checkpoint, lock, schedule, or `BatchRunner` providers.
 `NestBatchModule` can still accept `pollingWorkers` for compatibility when a
 process already needs normal batch job integration.
@@ -85,6 +79,12 @@ The MariaDB package contains driver-backed job and step execution repository,
 lock management, and checkpoint storage. It uses the `mariadb` driver, keeps
 MariaDB connection and database options inside the adapter package, and exposes
 `MariaDbBatchStorage` for Nest integration or programmatic runtime wiring.
+
+## `@nest-batch/bullmq`
+
+The BullMQ package adapts BullMQ queues and workers to the
+`@nest-batch/core/queue` `WorkQueue` contract. It owns BullMQ client details;
+queue-neutral worker-loop behavior remains in core.
 
 ## `@nest-batch/cli`
 

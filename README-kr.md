@@ -21,27 +21,55 @@ scheduling 1차 구현을 제공합니다.
 
 ## Packages
 
-- `@nest-batch/core`: framework에 독립적인 job/step contract.
+- `@nest-batch/core`: framework에 독립적인 job/step contract와 `queue`, `scheduler`, `polling`, `worker` subpath API.
 - `@nest-batch/nest`: NestJS module과 decorator integration.
 - `@nest-batch/inmemory`: test와 example용 비영속 in-memory repository, lock, checkpoint storage.
 - `@nest-batch/postgres`: Postgres driver-backed repository, lock, checkpoint storage.
 - `@nest-batch/mysql`: MySQL driver-backed repository, lock, checkpoint storage.
 - `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, checkpoint storage.
-- `@nest-batch/queue-core`: queue-neutral `WorkQueue` contract와 worker loop.
-- `@nest-batch/queue-bullmq`: BullMQ-compatible `WorkQueue` adapter 경계.
-- `@nest-batch/polling-core`: framework-independent continuous polling task loop.
-- `@nest-batch/scheduler-core`: framework-independent schedule definition, trigger evaluation, occurrence claim orchestration, dispatch helper.
-- `@nest-batch/scheduler-calendar`: 의존성이 작은 UTC daily, weekly, monthly trigger helper.
+- `@nest-batch/bullmq`: BullMQ-compatible `WorkQueue` adapter 경계.
 - `@nest-batch/cli`: 운영 CLI 경계.
+
+`@nest-batch/core/queue`, `@nest-batch/core/scheduler`,
+`@nest-batch/core/polling`, `@nest-batch/core/worker`는 별도 npm package가 아니라
+명시적인 core subpath API입니다. root `@nest-batch/core` entrypoint는 이 symbol을
+다시 export하지 않습니다.
+
+## Install and Quickstart
+
+`nest-batch`는 ESM-only이며 Node.js `>=20.18.0`을 지원합니다. runtime과 환경에
+맞는 storage adapter를 설치합니다.
+
+```bash
+npm install @nest-batch/core @nest-batch/inmemory
+```
+
+```ts
+import { DefaultBatchRunner, defineJob, defineStep } from "@nest-batch/core";
+import { InMemoryBatchStorage } from "@nest-batch/inmemory";
+
+const storage = new InMemoryBatchStorage();
+const runner = new DefaultBatchRunner(storage);
+const job = defineJob({
+  name: "hello",
+  steps: [defineStep({ name: "log", execute: async () => undefined })]
+});
+
+await runner.run(job, {});
+```
+
+NestJS integration에는 `@nest-batch/nest`, durable storage에는 SQL adapter,
+BullMQ-backed work queue가 필요할 때만 `@nest-batch/bullmq`를 사용합니다. public
+API는 pre-1.0 상태이므로 호환되는 `0.x` version을 함께 올립니다.
 
 ## Distributed Workers
 
-`@nest-batch/queue-core`는 pull 기반 `WorkQueue` contract와 `WorkerLoop`를
+`@nest-batch/core/queue`는 pull 기반 `WorkQueue` contract와 `WorkerLoop`를
 정의합니다. queue adapter는 work 전달만 담당하고, job/step/checkpoint/partition
 상태의 source of truth는 repository입니다. distributed execution은
 at-least-once를 전제로 하므로 writer와 외부 side effect는 idempotent해야 합니다.
 
-`@nest-batch/queue-bullmq`는 각 `WorkUnit.id`를 안정적인 BullMQ job id로
+`@nest-batch/bullmq`는 각 `WorkUnit.id`를 안정적인 BullMQ job id로
 매핑하고, batch runtime이 retry policy를 소유하도록 BullMQ retry를 기본
 비활성화합니다(`attempts: 1`). application은 실제 BullMQ `Queue`/worker
 instance를 감싼 뒤 `BullMqWorkQueue`에 주입할 수 있습니다. work id에 `:`가 들어
@@ -50,7 +78,7 @@ instance를 감싼 뒤 `BullMqWorkQueue`에 주입할 수 있습니다. work id�
 
 ## Continuous Polling Workers
 
-`@nest-batch/polling-core`는 Transactional Outbox dispatcher처럼 polling tick마다
+`@nest-batch/core/polling`은 Transactional Outbox dispatcher처럼 polling tick마다
 batch metadata를 만들면 안 되는 long-lived task loop를 제공합니다. 이 loop는
 `JobExecution`, `StepExecution`, checkpoint row, scheduler occurrence를 생성하지
 않습니다. outbox message claim, lease, retry/backoff, DEAD 처리, aggregate ordering은
@@ -58,7 +86,7 @@ task 저장소와 dispatcher가 소유하고, nest-batch는 worker lifecycle, id
 worker/system error backoff, observer event, graceful shutdown만 담당합니다.
 
 ```ts
-import { ContinuousPollingLoop } from "@nest-batch/polling-core";
+import { ContinuousPollingLoop } from "@nest-batch/core/polling";
 
 const loop = new ContinuousPollingLoop({
   workerId: "vote-outbox-worker-1",
@@ -123,7 +151,7 @@ I/O를 영구히 기다리지 않게 해야 합니다.
 
 ## Production Scheduling
 
-`@nest-batch/scheduler-core`는 code-defined schedule을 평가하고, `ScheduleStore`로
+`@nest-batch/core/scheduler`는 code-defined schedule을 평가하고, `ScheduleStore`로
 durable occurrence를 claim한 뒤 `BatchRunner` 또는 `WorkQueue`로 dispatch합니다.
 schedule definition은 application code가 소유하고, database는 중복 dispatch를
 줄이고 catch-up 판단을 하기 위한 occurrence state만 저장합니다.
@@ -135,7 +163,7 @@ import {
   createIntervalTrigger,
   createQueueScheduleDispatcher,
   defineSchedule
-} from "@nest-batch/scheduler-core";
+} from "@nest-batch/core/scheduler";
 
 const scheduleStore = new PostgresScheduleStore({
   connectionString: process.env.NEST_BATCH_POSTGRES_URL,
@@ -174,11 +202,11 @@ scheduler는 최신 terminal occurrence(`dispatched` 또는 `failed`)를 trigger
 기준으로 사용하므로 stale `claimed` occurrence는 claim TTL이 지난 뒤 다시
 회수될 수 있고, 영구히 건너뛰지 않습니다.
 
-UTC calendar schedule은 `scheduler-core` 밖에서 해석합니다. 기본 daily, weekly,
-monthly rule은 optional helper package를 사용할 수 있습니다.
+UTC calendar schedule의 기본 daily, weekly, monthly rule은
+`@nest-batch/core/scheduler`가 export하는 helper를 사용합니다.
 
 ```ts
-import { createUtcDailyTrigger } from "@nest-batch/scheduler-calendar";
+import { createUtcDailyTrigger } from "@nest-batch/core/scheduler";
 
 const trigger = createUtcDailyTrigger({
   startAt: new Date("2026-01-01T00:00:00.000Z"),
