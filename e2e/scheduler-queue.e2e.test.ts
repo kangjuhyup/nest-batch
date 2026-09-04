@@ -61,7 +61,7 @@ interface BullMqModule {
 type ScheduledWorkUnit = WorkUnit;
 
 const queueBullMqRequire = createRequire(
-  new URL("../packages/queue-bullmq/package.json", import.meta.url)
+  new URL("../packages/bullmq/package.json", import.meta.url)
 );
 const { Queue, Worker } = queueBullMqRequire("bullmq") as BullMqModule;
 const DEFAULT_POSTGRES_URL = "postgresql://nest_batch:nest_batch@127.0.0.1:15432/nest_batch";
