@@ -1,7 +1,10 @@
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { parseDocument } from "yaml";
 import { PUBLIC_PACKAGES } from "./package-catalog.mjs";
 import {
   createNpmRegistryAdapter,
@@ -12,6 +15,7 @@ import {
 } from "./publish-packages.mjs";
 
 const VERSION = "0.1.0";
+const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const temporaryRoots: string[] = [];
 
 type Artifact = {
@@ -82,6 +86,26 @@ const captureError = async (operation: () => Promise<unknown>) => {
   throw new Error("Expected operation to fail.");
 };
 
+const runPnpm = (arguments_: string[]) => new Promise<{ exitCode: number | null; stderr: string; stdout: string }>((resolve, reject) => {
+  const child = spawn("corepack", ["pnpm", "run", ...arguments_], {
+    cwd: REPOSITORY_ROOT,
+    env: { ...process.env },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk) => {
+    stdout += String(chunk);
+  });
+  child.stderr.on("data", (chunk) => {
+    stderr += String(chunk);
+  });
+  child.once("error", reject);
+  child.once("close", (exitCode) => {
+    resolve({ exitCode, stderr, stdout });
+  });
+});
+
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
@@ -103,6 +127,22 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
 
   it("rejects a tag version mismatch / tag와 package version 불일치를 거부한다", () => {
     expect(() => parseReleaseTag("v0.2.0", VERSION)).toThrow(/does not match/u);
+  });
+
+  it("forwards a mismatched tag through pnpm before pack or registry access / pnpm이 불일치 tag를 pack이나 registry 접근 전에 전달한다", async () => {
+    const publishWorkflow = parseDocument(
+      await readFile(join(REPOSITORY_ROOT, ".github/workflows/publish.yml"), "utf8"),
+      { version: "1.2" }
+    ).toJS() as { jobs: { publish: { steps: Array<{ name?: string; run?: string }> } } };
+    const publishStep = publishWorkflow.jobs.publish.steps.find(({ name }) => name === "Publish packages");
+
+    expect(publishStep?.run).toBe("pnpm run release:publish --tag \"$GITHUB_REF_NAME\"");
+
+    const result = await runPnpm(["release:publish", "--tag", "v0.0.0"]);
+
+    expect(result.exitCode).toBe(1);
+    expect(`${result.stdout}\n${result.stderr}`).toContain("Release tag v0.0.0 does not match expected version 0.1.0.");
+    expect(`${result.stdout}\n${result.stderr}`).not.toContain("Unknown publish argument");
   });
 
   it("skips the same published tarball / 같은 tarball이 이미 배포되면 건너뛴다", () => {

@@ -666,7 +666,7 @@ tag는 `--tag v0.1.0` 또는 `GITHUB_REF_NAME`에서 읽으며 둘 다 없으면
 }
 ```
 
-로컬 bootstrap 명령은 `pnpm release:publish -- --tag v0.1.0`이다. 이 명령은 test에서
+로컬 bootstrap 명령은 `pnpm run release:publish --tag v0.1.0`이다. 이 명령은 test에서
 mock adapter로만 검증하고 실제로 실행하지 않는다.
 
 - [ ] **Step 6: publish unit test와 전체 release check 실행**
@@ -711,7 +711,7 @@ git commit -m "chore : 멱등 npm publish script 추가" -m "- tag와 package ve
 actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803        # v6
 actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38      # v6
 pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86       # v6.0.10
-changesets/action/version@8488615a623b1b9c987934bb89eae8af6a946ac1 # v2.1.1 version-only
+changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1         # v2.1.1
 ```
 
 `ci.yml`은 `pull_request`와 `develop` push에 실행한다. `quality` job은 Node
@@ -765,24 +765,27 @@ E2E step은 `pnpm test:e2e`를 실행한다.
 - [ ] **Step 2: Changesets Version PR workflow 작성**
 
 `release-pr.yml`은 `develop` push에서 `contents: write`, `pull-requests: write`만 갖는다.
-frozen install 후 Changesets의 version-only sub-action을 사용한다. 2026-09-04 upstream
-검증에서 brief의 `changesets/action@0977fd99725f1db4007ccb2928dbb4e90d06cc86`는 해당
-repository에 존재하지 않고, 이 SHA는 `pnpm/action-setup`의 commit임을 확인했다. 또한
-`pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996` 역시 upstream에서 조회되지
-않았다. 따라서 실행 가능한 검토 대상 pin은 `pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86`,
-`changesets/action/version@8488615a623b1b9c987934bb89eae8af6a946ac1` (`v2.1.1` tag의
-commit)로 정정한다. 검증한 pnpm action metadata는 기본 `package_json_file: package.json`에서
-`packageManager` pin을 읽어 설치한다. version-only action은 publish/release/tag 기능 자체를
-제공하지 않으므로 `create-github-releases`와 `push-git-tags` 입력을 둘 수 없고, version command
-입력은 `version-script`가 아니라 `script`다. `pr-number` output은 그대로 사용한다.
+frozen install 후 official root `changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1`
+(`v2.1.1` commit)을 사용한다. 2026-09-04 upstream `action.yml` 검증에서 root action의
+공식 입력은 `version-script`, `commit-message`, `pr-title`, `pr-base-branch`,
+`create-github-releases`, `push-git-tags`이고 공식 output은 `pr-number`임을 확인했다.
+`GITHUB_TOKEN: ${{ github.token }}`을 제공한다. upstream implementation은 pending changeset이
+없거나 changeset이 모두 empty이면 publish script 없이 no-op으로 반환하므로, root action에서
+`create-github-releases: false`, `push-git-tags: false`를 명시해 Version PR만 관리한다.
+`pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86`의 공식 metadata는 기본
+`package_json_file: package.json`에서 `packageManager` pin을 읽어 설치한다.
 
 ```yaml
-uses: changesets/action/version@8488615a623b1b9c987934bb89eae8af6a946ac1
+uses: changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1
+env:
+  GITHUB_TOKEN: ${{ github.token }}
 with:
-  script: pnpm release:version
+  version-script: pnpm release:version
   commit-message: "chore : package version 업데이트"
   pr-title: "chore : package version 업데이트"
   pr-base-branch: develop
+  create-github-releases: false
+  push-git-tags: false
 ```
 
 action output `pr-number`가 있으면 `gh label create release --force` 후 해당 PR에
@@ -811,13 +814,13 @@ jobs:
 ```
 
 publish job은 cache 없이 Node 24를 설정하고 `npm install --global npm@12.0.2`, frozen
-pnpm install, `pnpm release:check`, `pnpm release:publish -- --tag "$GITHUB_REF_NAME"`을
+pnpm install, `pnpm release:check`, `pnpm run release:publish --tag "$GITHUB_REF_NAME"`을
 실행한다. `NODE_AUTH_TOKEN`이나 npm secret을 설정하지 않는다.
 
 GitHub Release job은 source checkout 없이 아래 명령만 실행한다.
 
 ```bash
-gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
+gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
 ```
 
 `GH_TOKEN: ${{ github.token }}`만 환경에 제공한다.
@@ -849,20 +852,26 @@ changelog:
 - [ ] **Step 5: workflow syntax와 보안 설정 자동 검증**
 
 root devDependency에 `yaml@2.9.0`을 추가한다. `verifyWorkflowFiles(root)`는 YAML 1.2로
-세 workflow와 release config를 parse하고 다음을 검사한다.
+세 workflow와 release config를 parse하고 duplicate key, anchor, alias를 거부한다. 승인된
+workflow의 root/job permission, trigger, job/step 순서, action owner/SHA allowlist, 정규화한
+run 명령, cache, Node matrix, Node 24 release-only condition, E2E service image/env/port/
+healthcheck, release category를 전체 exact schema로 비교한다. `release:check` 뒤에만 publish를
+허용하며 `always()`·`continue-on-error`·추가 privileged job을 거부한다.
 
 ```text
 publish trigger: v*.*.*
 publish environment: npm
 publish permission: id-token write, contents read
 github-release permission: contents write, id-token 없음
-금지 문자열: NPM_TOKEN, NODE_AUTH_TOKEN
-모든 uses 값: @ 뒤에 40자리 commit SHA
-필수 command: release:check, release:publish, gh release create --generate-notes
+금지 설정: secrets.*, NPM_TOKEN, NODE_AUTH_TOKEN, registry auth/.npmrc
+모든 uses 값: 검토한 owner/action의 exact 40자리 commit SHA
+필수 command: release:check, pnpm run release:publish --tag "$GITHUB_REF_NAME",
+  gh release create ... --repo "$GITHUB_REPOSITORY" --generate-notes
 ```
 
-`verify-workflows.test.ts`는 valid minimal workflow가 통과하고 token env, major-tag
-action, 빠진 `id-token: write`가 각각 실패하는 `English / 한국어` test를 작성한다.
+`verify-workflows.test.ts`는 exact valid workflow가 통과하고 trigger, permission, root action
+input, cache, command 순서, service, release category, secret/registry auth, YAML type/duplicate/
+anchor/alias 변이가 각각 실패하는 `English / 한국어` mutation test를 작성한다.
 `verify-release.mjs`의 repository runner가 `verifyWorkflowFiles`를 호출하게 한다.
 
 - [ ] **Step 6: workflow 정적 점검**
@@ -873,8 +882,8 @@ Run:
 pnpm install
 pnpm exec vitest run --config vitest.config.ts scripts/release/verify-workflows.test.ts
 node scripts/release/verify-release.mjs
-rg -n 'NPM_TOKEN|NODE_AUTH_TOKEN' .github/workflows
-rg -n 'id-token: write|environment: npm|release:check|release:publish' .github/workflows/publish.yml
+rg -n 'NPM_TOKEN|NODE_AUTH_TOKEN|secrets\.|registry-url|always-auth|_auth' .github/workflows
+rg -n 'id-token: write|environment: npm|release:check|pnpm run release:publish --tag|--repo "\$GITHUB_REPOSITORY"' .github/workflows/publish.yml
 git diff --check
 ```
 
@@ -919,7 +928,7 @@ git commit -m "chore : package release workflow 추가" -m "- Node 호환성과 
 ## 2. 최초 0.1.0 bootstrap
 - [ ] npm에서 `@nest-batch` scope 권한 확인
 - [ ] `npm whoami`와 2FA 상태 확인
-- [ ] `pnpm release:publish -- --tag v0.1.0`을 maintainer가 직접 실행
+- [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행
 - [ ] 8개 package의 `0.1.0`과 integrity 확인
 
 ## 3. Trusted Publisher 등록

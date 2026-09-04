@@ -1,7 +1,7 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { CORE_SUBPATHS, PUBLIC_PACKAGES } from "./package-catalog.mjs";
@@ -14,10 +14,6 @@ const BUGS_URL = "https://github.com/kangjuhyup/nest-batch/issues";
 const LICENSE_TEXT = "MIT License\n";
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const temporaryRoots: string[] = [];
-const CHECKOUT_ACTION = "d23441a48e516b6c34aea4fa41551a30e30af803";
-const SETUP_NODE_ACTION = "249970729cb0ef3589644e2896645e5dc5ba9c38";
-const SETUP_PNPM_ACTION = "0977fd99725f1db4007ccb2928dbb4e90d06cc86";
-const VERSION_PACKAGES_ACTION = "8488615a623b1b9c987934bb89eae8af6a946ac1";
 
 const createPackageReadme = (packageInfo: (typeof PUBLIC_PACKAGES)[number]) => `# ${packageInfo.name}
 
@@ -37,79 +33,16 @@ MIT. Report issues at https://github.com/kangjuhyup/nest-batch/issues.
 `;
 
 const createWorkflowFixtures = (root: string) => {
-  const workflowsDirectory = join(root, ".github/workflows");
-  mkdirSync(workflowsDirectory, { recursive: true });
-  writeFileSync(
-    join(workflowsDirectory, "ci.yml"),
-    `name: CI
-on:
-  pull_request:
-  push:
-    branches: [develop]
-jobs: {}
-`
-  );
-  writeFileSync(
-    join(workflowsDirectory, "release-pr.yml"),
-    `name: Version packages
-on:
-  push:
-    branches: [develop]
-permissions: {}
-jobs:
-  version:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@${CHECKOUT_ACTION}
-      - uses: changesets/action/version@${VERSION_PACKAGES_ACTION}
-        id: version
-        with:
-          script: pnpm release:version
-      - if: steps.version.outputs.pr-number != ''
-        env:
-          GITHUB_TOKEN: \${{ github.token }}
-        run: |
-          gh label create release --force
-          gh pr edit "\${{ steps.version.outputs.pr-number }}" --add-label release
-`
-  );
-  writeFileSync(
-    join(workflowsDirectory, "publish.yml"),
-    `name: Publish packages
-on:
-  push:
-    tags: ["v*.*.*"]
-permissions: {}
-jobs:
-  publish:
-    runs-on: ubuntu-latest
-    environment: npm
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@${CHECKOUT_ACTION}
-      - uses: pnpm/action-setup@${SETUP_PNPM_ACTION}
-      - uses: actions/setup-node@${SETUP_NODE_ACTION}
-      - run: npm install --global npm@12.0.2
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm release:check
-      - run: pnpm release:publish -- --tag "$GITHUB_REF_NAME"
-  github-release:
-    needs: publish
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - env:
-          GH_TOKEN: \${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
-`
-  );
-  writeFileSync(join(root, ".github/release.yml"), "changelog: {}\n");
+  for (const relativePath of [
+    ".github/workflows/ci.yml",
+    ".github/workflows/release-pr.yml",
+    ".github/workflows/publish.yml",
+    ".github/release.yml"
+  ]) {
+    const destination = join(root, relativePath);
+    mkdirSync(dirname(destination), { recursive: true });
+    copyFileSync(join(REPOSITORY_ROOT, relativePath), destination);
+  }
 };
 
 function createRepository(
@@ -225,7 +158,7 @@ describe("release metadata validation / release metadata 검증", () => {
     const publishWorkflow = join(root, ".github/workflows/publish.yml");
     writeFileSync(publishWorkflow, readFileSync(publishWorkflow, "utf8").replace("id-token: write", "id-token: read"));
 
-    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/id-token.*write/);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/exact approved release workflow schema/);
   });
 
   it("rejects a package version that differs from root / root와 다른 package version을 거부한다", async () => {

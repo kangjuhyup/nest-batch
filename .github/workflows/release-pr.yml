@@ -27,12 +27,16 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Create or update Version PR
         id: version
-        uses: changesets/action/version@8488615a623b1b9c987934bb89eae8af6a946ac1
+        uses: changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
-          script: pnpm release:version
+          version-script: pnpm release:version
           commit-message: "chore : package version 업데이트"
           pr-title: "chore : package version 업데이트"
           pr-base-branch: develop
+          create-github-releases: false
+          push-git-tags: false
       - name: Label Version PR
         if: steps.version.outputs.pr-number != ''
         env:
