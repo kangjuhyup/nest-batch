@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -86,10 +86,51 @@ const captureError = async (operation: () => Promise<unknown>) => {
   throw new Error("Expected operation to fail.");
 };
 
-const runPnpm = (arguments_: string[]) => new Promise<{ exitCode: number | null; stderr: string; stdout: string }>((resolve, reject) => {
+const readRootVersion = async (root: string) => {
+  const manifest = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as { version?: unknown };
+
+  if (typeof manifest.version !== "string") {
+    throw new Error(`${root}: package.json must contain a string version.`);
+  }
+
+  return manifest.version;
+};
+
+const differentStableTag = (version: string) => version === "0.0.0" ? "v0.0.1" : "v0.0.0";
+
+const createIsolatedPublishRepository = async (version: string) => {
+  const root = await mkdtemp(join(tmpdir(), "nest-batch-publish-cli-test-"));
+  temporaryRoots.push(root);
+  await mkdir(join(root, "scripts/release"), { recursive: true });
+
+  await writeFile(
+    join(root, "package.json"),
+    `${JSON.stringify({ name: "nest-batch-publish-cli-test", version, private: true, type: "module", packageManager: "pnpm@10.34.5", scripts: { "release:publish": "node scripts/release/publish-packages.mjs" } }, null, 2)}\n`
+  );
+
+  await Promise.all([
+    "command-runner.mjs",
+    "pack-packages.mjs",
+    "package-catalog.mjs",
+    "publish-packages.mjs"
+  ].map((file) => copyFile(join(REPOSITORY_ROOT, "scripts/release", file), join(root, "scripts/release", file))));
+
+  await Promise.all(PUBLIC_PACKAGES.map(async ({ directory, name }) => {
+    await mkdir(join(root, directory), { recursive: true });
+    await writeFile(join(root, directory, "package.json"), `${JSON.stringify({ name, version }, null, 2)}\n`);
+  }));
+
+  return root;
+};
+
+const runPnpm = (cwd: string, arguments_: string[]) => new Promise<{ exitCode: number | null; stderr: string; stdout: string }>((resolve, reject) => {
   const child = spawn("corepack", ["pnpm", "run", ...arguments_], {
-    cwd: REPOSITORY_ROOT,
-    env: { ...process.env },
+    cwd,
+    env: {
+      ...process.env,
+      NPM_CONFIG_REGISTRY: "http://127.0.0.1:9",
+      npm_config_registry: "http://127.0.0.1:9"
+    },
     stdio: ["ignore", "pipe", "pipe"]
   });
   let stdout = "";
@@ -105,6 +146,18 @@ const runPnpm = (arguments_: string[]) => new Promise<{ exitCode: number | null;
     resolve({ exitCode, stderr, stdout });
   });
 });
+
+const expectForwardedTagMismatch = async (root: string, expectedVersion: string) => {
+  const tag = differentStableTag(expectedVersion);
+  const result = await runPnpm(root, ["release:publish", "--tag", tag]);
+  const output = `${result.stdout}\n${result.stderr}`;
+
+  expect(result.exitCode).toBe(1);
+  expect(output).toContain(`Release tag ${tag} does not match expected version ${expectedVersion}.`);
+  expect(output).not.toContain("Unknown publish argument");
+  expect(output).not.toContain("npm view");
+  expect(output).not.toContain("pnpm pack");
+};
 
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -138,11 +191,14 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
 
     expect(publishStep?.run).toBe("pnpm run release:publish --tag \"$GITHUB_REF_NAME\"");
 
-    const result = await runPnpm(["release:publish", "--tag", "v0.0.0"]);
+    await expectForwardedTagMismatch(REPOSITORY_ROOT, await readRootVersion(REPOSITORY_ROOT));
+  });
 
-    expect(result.exitCode).toBe(1);
-    expect(`${result.stdout}\n${result.stderr}`).toContain("Release tag v0.0.0 does not match expected version 0.1.0.");
-    expect(`${result.stdout}\n${result.stderr}`).not.toContain("Unknown publish argument");
+  it("forwards a mismatched tag from an isolated 0.2.0 release copy / 격리된 0.2.0 릴리즈 복사본에서 불일치 tag를 전달한다", async () => {
+    const root = await createIsolatedPublishRepository("0.2.0");
+
+    await expect(readRootVersion(root)).resolves.toBe("0.2.0");
+    await expectForwardedTagMismatch(root, "0.2.0");
   });
 
   it("skips the same published tarball / 같은 tarball이 이미 배포되면 건너뛴다", () => {

@@ -853,9 +853,10 @@ changelog:
 
 root devDependency에 `yaml@2.9.0`을 추가한다. `verifyWorkflowFiles(root)`는 YAML 1.2로
 세 workflow와 release config를 parse하고 duplicate key, anchor, alias를 거부한다. 승인된
-workflow의 root/job permission, trigger, job/step 순서, action owner/SHA allowlist, 정규화한
-run 명령, cache, Node matrix, Node 24 release-only condition, E2E service image/env/port/
-healthcheck, release category를 전체 exact schema로 비교한다. `release:check` 뒤에만 publish를
+workflow의 root/job permission, trigger, job/step 순서, action owner/SHA allowlist, YAML parser가
+보존한 `run` scalar와 block scalar의 마지막 줄바꿈, cache, Node matrix, Node 24 release-only
+condition, E2E service image/env/port/healthcheck, release category를 전체 exact schema로 비교한다.
+`release:check` 뒤에만 publish를
 허용하며 `always()`·`continue-on-error`·추가 privileged job을 거부한다.
 
 ```text
@@ -871,7 +872,8 @@ github-release permission: contents write, id-token 없음
 
 `verify-workflows.test.ts`는 exact valid workflow가 통과하고 trigger, permission, root action
 input, cache, command 순서, service, release category, secret/registry auth, YAML type/duplicate/
-anchor/alias 변이가 각각 실패하는 `English / 한국어` mutation test를 작성한다.
+anchor/alias 및 shell-significant Unicode whitespace/마지막 줄바꿈 변이가 각각 실패하는
+`English / 한국어` mutation test를 작성한다.
 `verify-release.mjs`의 repository runner가 `verifyWorkflowFiles`를 호출하게 한다.
 
 - [ ] **Step 6: workflow 정적 점검**

@@ -49,7 +49,7 @@ const EXPECTED_FILES = {
           {
             name: "Verify release artifacts",
             if: "matrix.node == '24'",
-            run: "pnpm release:verify\npnpm release:smoke"
+            run: "pnpm release:verify\npnpm release:smoke\n"
           }
         ]
       },
@@ -145,7 +145,7 @@ const EXPECTED_FILES = {
             name: "Label Version PR",
             if: "steps.version.outputs.pr-number != ''",
             env: { GITHUB_TOKEN: "${{ github.token }}" },
-            run: "gh label create release --force --color \"5319e7\" --description \"Package version pull request\"\ngh pr edit \"${{ steps.version.outputs.pr-number }}\" --add-label release"
+            run: "gh label create release --force --color \"5319e7\" --description \"Package version pull request\"\ngh pr edit \"${{ steps.version.outputs.pr-number }}\" --add-label release\n"
           }
         ]
       }
@@ -204,18 +204,6 @@ const EXPECTED_FILES = {
 };
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
-
-const normalizeWorkflowValue = (value, key) => {
-  if (Array.isArray(value)) {
-    return value.map((item) => normalizeWorkflowValue(item));
-  }
-
-  if (isRecord(value)) {
-    return Object.fromEntries(Object.entries(value).map(([childKey, childValue]) => [childKey, normalizeWorkflowValue(childValue, childKey)]));
-  }
-
-  return key === "run" && typeof value === "string" ? value.trim() : value;
-};
 
 const hasExactShape = (actual, expected) => {
   if (Object.is(actual, expected)) {
@@ -280,7 +268,7 @@ const readYaml = async (path) => {
     throw new Error("YAML document must be an object");
   }
 
-  return { source, value: normalizeWorkflowValue(value) };
+  return { source, value };
 };
 
 const collectUses = (value, results = []) => {

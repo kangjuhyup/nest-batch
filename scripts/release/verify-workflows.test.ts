@@ -291,6 +291,52 @@ describe("release workflow validation / 릴리즈 workflow 검증", () => {
   });
 
   it.each([
+    ["leading NBSP", "앞 NBSP", "\\u00A0pnpm release:check"],
+    ["trailing NBSP", "뒤 NBSP", "pnpm release:check\\u00A0"],
+    ["leading BOM", "앞 BOM", "\\uFEFFpnpm release:check"],
+    ["trailing BOM", "뒤 BOM", "pnpm release:check\\uFEFF"],
+    ["leading vertical tab", "앞 vertical tab", "\\u000Bpnpm release:check"],
+    ["vertical tab", "vertical tab", "pnpm release:check\\u000B"],
+    ["leading form feed", "앞 form feed", "\\u000Cpnpm release:check"],
+    ["form feed", "form feed", "pnpm release:check\\u000C"],
+    ["leading carriage return", "앞 carriage return", "\\rpnpm release:check"],
+    ["carriage return", "carriage return", "pnpm release:check\\r"],
+    ["Ogham space mark", "Ogham 공백", "pnpm release:check\\u1680"],
+    ["en quad", "en quad 공백", "pnpm release:check\\u2000"],
+    ["em quad", "em quad 공백", "pnpm release:check\\u2001"],
+    ["en space", "en 공백", "pnpm release:check\\u2002"],
+    ["em space", "em 공백", "pnpm release:check\\u2003"],
+    ["three-per-em space", "3분의 1 em 공백", "pnpm release:check\\u2004"],
+    ["four-per-em space", "4분의 1 em 공백", "pnpm release:check\\u2005"],
+    ["six-per-em space", "6분의 1 em 공백", "pnpm release:check\\u2006"],
+    ["figure space", "숫자 공백", "pnpm release:check\\u2007"],
+    ["punctuation space", "구두점 공백", "pnpm release:check\\u2008"],
+    ["thin space", "얇은 공백", "pnpm release:check\\u2009"],
+    ["hair space", "hair 공백", "pnpm release:check\\u200A"],
+    ["line separator", "줄 구분자", "pnpm release:check\\u2028"],
+    ["paragraph separator", "문단 구분자", "pnpm release:check\\u2029"],
+    ["narrow no-break space", "좁은 non-break 공백", "pnpm release:check\\u202F"],
+    ["medium mathematical space", "중간 수학 공백", "pnpm release:check\\u205F"],
+    ["ideographic space", "전각 공백", "pnpm release:check\\u3000"]
+  ])("rejects shell-significant run whitespace: %s / %s", async (_englishLabel, _koreanLabel, command) => {
+    await rejectsMutation((sources) => replace(
+      sources,
+      ".github/workflows/publish.yml",
+      "run: pnpm release:check",
+      `run: "${command}"`
+    ));
+  });
+
+  it("rejects a block scalar without its final newline / block scalar 마지막 줄바꿈 누락을 거부한다", async () => {
+    await rejectsMutation((sources) => replace(
+      sources,
+      ".github/workflows/ci.yml",
+      "        run: |\n          pnpm release:verify",
+      "        run: |-\n          pnpm release:verify"
+    ));
+  });
+
+  it.each([
     ["rejects scalar permissions", "permissions scalar를 거부한다", (sources: WorkflowSources) => replace(sources, ".github/workflows/publish.yml", "permissions: {}", "permissions: read")],
     ["rejects scalar matrix values", "matrix scalar 값을 거부한다", (sources: WorkflowSources) => replace(sources, ".github/workflows/ci.yml", 'node: ["20.18.3", "24"]', 'node: "24"')],
     ["rejects duplicate YAML keys", "중복 YAML key를 거부한다", (sources: WorkflowSources) => replace(sources, ".github/workflows/ci.yml", "name: CI", "name: CI\nname: Duplicate")],
