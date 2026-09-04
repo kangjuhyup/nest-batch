@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE_SUBPATHS, PUBLIC_PACKAGES, REPOSITORY_URL } from "./package-catalog.mjs";
+import { verifyWorkflowFiles } from "./verify-workflows.mjs";
 
 const EXPECTED_HOMEPAGE = "https://github.com/kangjuhyup/nest-batch#readme";
 const EXPECTED_BUGS_URL = "https://github.com/kangjuhyup/nest-batch/issues";
@@ -216,7 +217,7 @@ function validateRootManifest(manifest) {
   return errors;
 }
 
-export function verifyReleaseRepository(root) {
+export async function verifyReleaseRepository(root) {
   const repositoryRoot = resolve(root);
   const errors = [];
   const rootManifestPath = join(repositoryRoot, "package.json");
@@ -268,6 +269,12 @@ export function verifyReleaseRepository(root) {
     }
   }
 
+  try {
+    await verifyWorkflowFiles(repositoryRoot);
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+  }
+
   if (errors.length > 0) {
     throw new Error(`Release repository verification failed:\n- ${errors.join("\n- ")}`);
   }
@@ -278,7 +285,7 @@ const isDirectExecution = () =>
 
 if (isDirectExecution()) {
   try {
-    verifyReleaseRepository(process.cwd());
+    await verifyReleaseRepository(process.cwd());
     console.log("Release repository verification passed.");
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

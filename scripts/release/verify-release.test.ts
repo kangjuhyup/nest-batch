@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,6 +14,10 @@ const BUGS_URL = "https://github.com/kangjuhyup/nest-batch/issues";
 const LICENSE_TEXT = "MIT License\n";
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const temporaryRoots: string[] = [];
+const CHECKOUT_ACTION = "d23441a48e516b6c34aea4fa41551a30e30af803";
+const SETUP_NODE_ACTION = "249970729cb0ef3589644e2896645e5dc5ba9c38";
+const SETUP_PNPM_ACTION = "0977fd99725f1db4007ccb2928dbb4e90d06cc86";
+const VERSION_PACKAGES_ACTION = "8488615a623b1b9c987934bb89eae8af6a946ac1";
 
 const createPackageReadme = (packageInfo: (typeof PUBLIC_PACKAGES)[number]) => `# ${packageInfo.name}
 
@@ -31,6 +35,82 @@ import {} from "${packageInfo.name}";
 
 MIT. Report issues at https://github.com/kangjuhyup/nest-batch/issues.
 `;
+
+const createWorkflowFixtures = (root: string) => {
+  const workflowsDirectory = join(root, ".github/workflows");
+  mkdirSync(workflowsDirectory, { recursive: true });
+  writeFileSync(
+    join(workflowsDirectory, "ci.yml"),
+    `name: CI
+on:
+  pull_request:
+  push:
+    branches: [develop]
+jobs: {}
+`
+  );
+  writeFileSync(
+    join(workflowsDirectory, "release-pr.yml"),
+    `name: Version packages
+on:
+  push:
+    branches: [develop]
+permissions: {}
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@${CHECKOUT_ACTION}
+      - uses: changesets/action/version@${VERSION_PACKAGES_ACTION}
+        id: version
+        with:
+          script: pnpm release:version
+      - if: steps.version.outputs.pr-number != ''
+        env:
+          GITHUB_TOKEN: \${{ github.token }}
+        run: |
+          gh label create release --force
+          gh pr edit "\${{ steps.version.outputs.pr-number }}" --add-label release
+`
+  );
+  writeFileSync(
+    join(workflowsDirectory, "publish.yml"),
+    `name: Publish packages
+on:
+  push:
+    tags: ["v*.*.*"]
+permissions: {}
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@${CHECKOUT_ACTION}
+      - uses: pnpm/action-setup@${SETUP_PNPM_ACTION}
+      - uses: actions/setup-node@${SETUP_NODE_ACTION}
+      - run: npm install --global npm@12.0.2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm release:check
+      - run: pnpm release:publish -- --tag "$GITHUB_REF_NAME"
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - env:
+          GH_TOKEN: \${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
+`
+  );
+  writeFileSync(join(root, ".github/release.yml"), "changelog: {}\n");
+};
 
 function createRepository(
   mutatePackage?: (manifest: Record<string, unknown>, packageInfo: (typeof PUBLIC_PACKAGES)[number]) => void,
@@ -99,6 +179,8 @@ function createRepository(
     }
   }
 
+  createWorkflowFixtures(root);
+
   return root;
 }
 
@@ -134,64 +216,72 @@ describe("release metadata validation / release metadata 검증", () => {
     expect(release.readJson(join(root, "package.json"))).toMatchObject({ name: "nest-batch", version: "0.1.0" });
   });
 
-  it("accepts a complete matching release repository / 완전히 일치하는 릴리즈 repository를 허용한다", () => {
-    expect(() => release.verifyReleaseRepository(createRepository())).not.toThrow();
+  it("accepts a complete matching release repository / 완전히 일치하는 릴리즈 repository를 허용한다", async () => {
+    await expect(release.verifyReleaseRepository(createRepository())).resolves.toBeUndefined();
   });
 
-  it("rejects a package version that differs from root / root와 다른 package version을 거부한다", () => {
+  it("rejects a repository with insecure publish workflow permissions / 안전하지 않은 publish workflow 권한을 거부한다", async () => {
+    const root = createRepository();
+    const publishWorkflow = join(root, ".github/workflows/publish.yml");
+    writeFileSync(publishWorkflow, readFileSync(publishWorkflow, "utf8").replace("id-token: write", "id-token: read"));
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/id-token.*write/);
+  });
+
+  it("rejects a package version that differs from root / root와 다른 package version을 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
       if (packageInfo.name === "@nest-batch/core") {
         manifest.version = "0.1.1";
       }
     });
 
-    expect(() => release.verifyReleaseRepository(root)).toThrow(/version.*0\.1\.0|0\.1\.0.*version/);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/version.*0\.1\.0|0\.1\.0.*version/);
   });
 
-  it("rejects a mismatched repository directory / repository directory 불일치를 거부한다", () => {
+  it("rejects a mismatched repository directory / repository directory 불일치를 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
       if (packageInfo.name === "@nest-batch/core") {
         manifest.repository = { type: "git", url: REPOSITORY_URL, directory: "packages/other" };
       }
     });
 
-    expect(() => release.verifyReleaseRepository(root)).toThrow(/repository\.directory/);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/repository\.directory/);
   });
 
-  it("rejects non-public package access / public이 아닌 package access를 거부한다", () => {
+  it("rejects non-public package access / public이 아닌 package access를 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
       if (packageInfo.name === "@nest-batch/core") {
         manifest.publishConfig = { access: "restricted" };
       }
     });
 
-    expect(() => release.verifyReleaseRepository(root)).toThrow(/publishConfig\.access/);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/publishConfig\.access/);
   });
 
-  it("rejects a package LICENSE that differs from root / root와 다른 package LICENSE를 거부한다", () => {
+  it("rejects a package LICENSE that differs from root / root와 다른 package LICENSE를 거부한다", async () => {
     const root = createRepository(undefined, (packageInfo) =>
       packageInfo.name === "@nest-batch/core" ? "Different license\n" : LICENSE_TEXT
     );
 
-    expect(() => release.verifyReleaseRepository(root)).toThrow(/LICENSE/);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/LICENSE/);
   });
 
-  it("rejects a missing core subpath declaration / core subpath 선언 파일 누락을 거부한다", () => {
+  it("rejects a missing core subpath declaration / core subpath 선언 파일 누락을 거부한다", async () => {
     const root = createRepository();
     rmSync(join(root, "packages/core/dist/worker/index.d.ts"));
 
-    expect(() => release.verifyReleaseRepository(root)).toThrow(/dist\/worker\/index\.d\.ts/);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/dist\/worker\/index\.d\.ts/);
   });
 
-  it("rejects a missing CLI binary / CLI 실행 파일 누락을 거부한다", () => {
+  it("rejects a missing CLI binary / CLI 실행 파일 누락을 거부한다", async () => {
     const root = createRepository();
     rmSync(join(root, "packages/cli/dist/bin.js"));
 
-    expect(() => release.verifyReleaseRepository(root)).toThrow(/dist\/bin\.js/);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/dist\/bin\.js/);
   });
 
-  it("verifies the checked-out release repository / 현재 checkout된 릴리즈 repository를 검증한다", () => {
-    expect(() => release.verifyReleaseRepository(REPOSITORY_ROOT)).not.toThrow();
+  it("verifies the checked-out release repository / 현재 checkout된 릴리즈 repository를 검증한다", async () => {
+    await expect(release.verifyReleaseRepository(REPOSITORY_ROOT)).resolves.toBeUndefined();
   });
 });
 

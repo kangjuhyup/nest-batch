@@ -710,8 +710,8 @@ git commit -m "chore : 멱등 npm publish script 추가" -m "- tag와 package ve
 ```text
 actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803        # v6
 actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38      # v6
-pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996       # v6
-changesets/action@0977fd99725f1db4007ccb2928dbb4e90d06cc86       # v2
+pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86       # v6.0.10
+changesets/action/version@8488615a623b1b9c987934bb89eae8af6a946ac1 # v2.1.1 version-only
 ```
 
 `ci.yml`은 `pull_request`와 `develop` push에 실행한다. `quality` job은 Node
@@ -765,16 +765,24 @@ E2E step은 `pnpm test:e2e`를 실행한다.
 - [ ] **Step 2: Changesets Version PR workflow 작성**
 
 `release-pr.yml`은 `develop` push에서 `contents: write`, `pull-requests: write`만 갖는다.
-frozen install 후 pinned Changesets action에 아래 input을 준다.
+frozen install 후 Changesets의 version-only sub-action을 사용한다. 2026-09-04 upstream
+검증에서 brief의 `changesets/action@0977fd99725f1db4007ccb2928dbb4e90d06cc86`는 해당
+repository에 존재하지 않고, 이 SHA는 `pnpm/action-setup`의 commit임을 확인했다. 또한
+`pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996` 역시 upstream에서 조회되지
+않았다. 따라서 실행 가능한 검토 대상 pin은 `pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86`,
+`changesets/action/version@8488615a623b1b9c987934bb89eae8af6a946ac1` (`v2.1.1` tag의
+commit)로 정정한다. 검증한 pnpm action metadata는 기본 `package_json_file: package.json`에서
+`packageManager` pin을 읽어 설치한다. version-only action은 publish/release/tag 기능 자체를
+제공하지 않으므로 `create-github-releases`와 `push-git-tags` 입력을 둘 수 없고, version command
+입력은 `version-script`가 아니라 `script`다. `pr-number` output은 그대로 사용한다.
 
 ```yaml
+uses: changesets/action/version@8488615a623b1b9c987934bb89eae8af6a946ac1
 with:
-  version-script: pnpm release:version
+  script: pnpm release:version
   commit-message: "chore : package version 업데이트"
   pr-title: "chore : package version 업데이트"
   pr-base-branch: develop
-  create-github-releases: false
-  push-git-tags: false
 ```
 
 action output `pr-number`가 있으면 `gh label create release --force` 후 해당 PR에
