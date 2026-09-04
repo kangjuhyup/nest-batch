@@ -4,7 +4,7 @@ import { NestFactory } from "@nestjs/core";
 import { describe, expect, it, vi } from "vitest";
 import { DatabaseBatchStorage } from "@nest-batch/core";
 import type { CheckpointStore, JobRepository, LockManager } from "@nest-batch/core";
-import type { ScheduleStore } from "@nest-batch/scheduler-core";
+import type { ScheduleStore } from "@nest-batch/core/scheduler";
 import { NestBatchModule } from "../src/index.js";
 import { FakeDatabaseBatchStorage } from "./support/providers.js";
 

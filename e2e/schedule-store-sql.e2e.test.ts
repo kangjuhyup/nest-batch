@@ -5,7 +5,7 @@ import type {
   ScheduleOccurrence,
   ScheduleOccurrenceCandidate,
   ScheduleStore
-} from "@nest-batch/scheduler-core";
+} from "@nest-batch/core/scheduler";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createMariaDbE2eDatabase } from "./support/mariadb.js";
 import { createMySqlE2eDatabase } from "./support/mysql.js";

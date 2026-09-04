@@ -16,7 +16,7 @@
     "test:e2e:example-nestjs": "vitest run --config vitest.e2e.config.ts examples/nestjs/test/nestjs-example.e2e.test.ts",
     "test:e2e:examples": "vitest run --config vitest.e2e.config.ts ./examples/",
     "test:e2e:postgres": "vitest run --config vitest.e2e.config.ts packages/postgres/test/postgres.e2e.test.ts",
-    "test:e2e:redis": "vitest run --config vitest.e2e.config.ts packages/queue-bullmq/test/bullmq-work-queue.e2e.test.ts",
+    "test:e2e:redis": "vitest run --config vitest.e2e.config.ts packages/bullmq/test/bullmq-work-queue.e2e.test.ts",
     "test:e2e:system": "vitest run --config vitest.e2e.config.ts ./e2e/",
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:perf:postgres": "vitest run --config vitest.perf.config.ts packages/postgres/test/postgres.perf.test.ts",

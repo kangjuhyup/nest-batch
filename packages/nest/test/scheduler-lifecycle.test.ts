@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import type { SchedulerLoop } from "@nest-batch/scheduler-core";
+import type { SchedulerLoop } from "@nest-batch/core/scheduler";
 import { describe, expect, it, vi } from "vitest";
 import { NestBatchModule } from "../src/index.js";
 import { FakeDatabaseBatchStorage } from "./support/providers.js";

@@ -7,7 +7,7 @@ import type {
   ScheduleOccurrence,
   ScheduleOccurrenceCandidate,
   ScheduleStore
-} from "@nest-batch/scheduler-core";
+} from "@nest-batch/core/scheduler";
 
 export class InMemoryScheduleStore implements ScheduleStore {
   private readonly occurrences = new Map<string, ScheduleOccurrence>();

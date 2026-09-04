@@ -2,14 +2,14 @@ import { createRequire } from "node:module";
 import { runCli } from "@nest-batch/cli";
 import { DefaultBatchRunner, defineJob, defineStep } from "@nest-batch/core";
 import { PostgresBatchStorage, PostgresScheduleStore } from "@nest-batch/postgres";
-import { BullMqWorkQueue, type BullMqWorkerLike } from "@nest-batch/queue-bullmq";
-import type { WorkUnit } from "@nest-batch/queue-core";
+import { BullMqWorkQueue, type BullMqWorkerLike } from "@nest-batch/bullmq";
+import type { WorkUnit } from "@nest-batch/core/queue";
 import {
   SchedulerLoop,
   createIntervalTrigger,
   createQueueScheduleDispatcher,
   defineSchedule
-} from "@nest-batch/scheduler-core";
+} from "@nest-batch/core/scheduler";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPostgresE2eDatabase } from "./support/postgres.js";
 

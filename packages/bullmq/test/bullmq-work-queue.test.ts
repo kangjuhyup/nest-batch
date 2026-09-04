@@ -6,7 +6,7 @@ import type {
   BullMqQueueLike,
   BullMqWorkerLike
 } from "../src/index.js";
-import type { WorkUnit } from "@nest-batch/queue-core";
+import type { WorkUnit } from "@nest-batch/core/queue";
 
 class FakeBullMqQueue<TWork extends WorkUnit> implements BullMqQueueLike<TWork> {
   readonly added: Array<{

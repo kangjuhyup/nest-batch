@@ -5,7 +5,7 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown
 } from "@nestjs/common";
-import { ContinuousPollingLoop } from "@nest-batch/polling-core";
+import { ContinuousPollingLoop } from "@nest-batch/core/polling";
 import { BATCH_POLLING_WORKERS } from "./constants.js";
 import type { NestBatchPollingWorkerOptions } from "./module-options.js";
 

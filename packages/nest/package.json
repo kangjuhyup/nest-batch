@@ -18,10 +18,7 @@
     "test": "vitest run --root ../.. --config vitest.config.ts packages/nest/test"
   },
   "dependencies": {
-    "@nest-batch/core": "workspace:*",
-    "@nest-batch/polling-core": "workspace:*",
-    "@nest-batch/queue-core": "workspace:*",
-    "@nest-batch/scheduler-core": "workspace:*"
+    "@nest-batch/core": "workspace:*"
   },
   "peerDependencies": {
     "@nestjs/common": "^10.0.0 || ^11.0.0",

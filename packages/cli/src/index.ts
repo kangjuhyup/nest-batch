@@ -7,19 +7,19 @@ import type {
   JobParameters,
   StepExecution
 } from "@nest-batch/core";
-import { WorkerLoop } from "@nest-batch/queue-core";
-import type { WorkHandler, WorkQueue, WorkUnit } from "@nest-batch/queue-core";
+import { WorkerLoop } from "@nest-batch/core/queue";
+import type { WorkHandler, WorkQueue, WorkUnit } from "@nest-batch/core/queue";
 import {
   SchedulerLoop,
   createQueueScheduleDispatcher,
   createRunnerScheduleDispatcher
-} from "@nest-batch/scheduler-core";
+} from "@nest-batch/core/scheduler";
 import type {
   ScheduleDefinition,
   ScheduleDispatcher,
   ScheduleOccurrence,
   ScheduleStore
-} from "@nest-batch/scheduler-core";
+} from "@nest-batch/core/scheduler";
 
 export interface CliResult {
   readonly exitCode: number;

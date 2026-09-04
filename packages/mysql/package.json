@@ -19,7 +19,6 @@
   },
   "dependencies": {
     "@nest-batch/core": "workspace:*",
-    "@nest-batch/scheduler-core": "workspace:*",
     "mysql2": "^3.23.0"
   }
 }

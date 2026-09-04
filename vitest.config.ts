@@ -16,13 +16,7 @@ export default defineConfig({
       "@nest-batch/postgres": fromRoot("./packages/postgres/src/index.ts"),
       "@nest-batch/mysql": fromRoot("./packages/mysql/src/index.ts"),
       "@nest-batch/mariadb": fromRoot("./packages/mariadb/src/index.ts"),
-      "@nest-batch/polling-core": fromRoot("./packages/polling-core/src/index.ts"),
-      "@nest-batch/scheduler-core": fromRoot("./packages/scheduler-core/src/index.ts"),
-      "@nest-batch/scheduler-calendar": fromRoot("./packages/scheduler-calendar/src/index.ts"),
-      "@nest-batch/queue-core": fromRoot("./packages/queue-core/src/index.ts"),
-      "@nest-batch/queue-bullmq": fromRoot("./packages/queue-bullmq/src/index.ts"),
-      "@nest-batch/worker-local": fromRoot("./packages/worker-local/src/index.ts"),
-      "@nest-batch/worker-threads": fromRoot("./packages/worker-threads/src/index.ts"),
+      "@nest-batch/bullmq": fromRoot("./packages/bullmq/src/index.ts"),
       "@nest-batch/cli": fromRoot("./packages/cli/src/index.ts")
     }
   },

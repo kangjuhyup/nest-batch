@@ -21,7 +21,6 @@
   },
   "dependencies": {
     "@nest-batch/core": "workspace:*",
-    "@nest-batch/scheduler-core": "workspace:*",
     "mariadb": "^3.5.3"
   }
 }

@@ -21,8 +21,6 @@
     "test": "vitest run --root ../.. --config vitest.config.ts packages/cli/test/run-cli.test.ts"
   },
   "dependencies": {
-    "@nest-batch/core": "workspace:*",
-    "@nest-batch/queue-core": "workspace:*",
-    "@nest-batch/scheduler-core": "workspace:*"
+    "@nest-batch/core": "workspace:*"
   }
 }
