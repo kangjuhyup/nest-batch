@@ -18,7 +18,7 @@ providers, expose a `BATCH_RUNNER` provider, and run discovered jobs through
 boundary, continuous polling workers, and a first production scheduling slice
 are available.
 
-## Packages
+## Public packages
 
 - `@nest-batch/core`: framework-independent job and step contracts, plus the `queue`, `scheduler`, `polling`, and `worker` subpath APIs.
 - `@nest-batch/nest`: NestJS module and decorator integration.
@@ -34,13 +34,19 @@ are available.
 subpath APIs, not separate npm packages. The root `@nest-batch/core` entrypoint
 does not re-export their symbols.
 
+## Requirements and compatibility
+
+- Node.js `>=20.18.0`
+- ESM-only packages
+- Initial release line: `0.x` APIs can change before `1.0.0`.
+
 ## Install and Quickstart
 
-`nest-batch` is ESM-only and supports Node.js `>=20.18.0`. Install the runtime
-and the storage adapter that matches the environment:
+Install the runtime and the storage adapter that matches the environment:
 
 ```bash
-npm install @nest-batch/core @nest-batch/inmemory
+pnpm add @nest-batch/core
+pnpm add @nest-batch/inmemory
 ```
 
 ```ts

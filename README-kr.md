@@ -19,7 +19,7 @@ batch component provider를 발견하고, `BATCH_RUNNER` provider와
 contract, BullMQ queue adapter 경계, continuous polling worker, production
 scheduling 1차 구현을 제공합니다.
 
-## Packages
+## Public packages
 
 - `@nest-batch/core`: framework에 독립적인 job/step contract와 `queue`, `scheduler`, `polling`, `worker` subpath API.
 - `@nest-batch/nest`: NestJS module과 decorator integration.
@@ -35,13 +35,19 @@ scheduling 1차 구현을 제공합니다.
 명시적인 core subpath API입니다. root `@nest-batch/core` entrypoint는 이 symbol을
 다시 export하지 않습니다.
 
+## Requirements and compatibility
+
+- Node.js `>=20.18.0`
+- ESM-only package
+- Initial release line: `0.x` API는 `1.0.0` 이전에 변경될 수 있습니다.
+
 ## Install and Quickstart
 
-`nest-batch`는 ESM-only이며 Node.js `>=20.18.0`을 지원합니다. runtime과 환경에
-맞는 storage adapter를 설치합니다.
+runtime과 환경에 맞는 storage adapter를 설치합니다.
 
 ```bash
-npm install @nest-batch/core @nest-batch/inmemory
+pnpm add @nest-batch/core
+pnpm add @nest-batch/inmemory
 ```
 
 ```ts

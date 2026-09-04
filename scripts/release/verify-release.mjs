@@ -20,6 +20,38 @@ const isRecord = (value) => value !== null && typeof value === "object" && !Arra
 const hasExactFiles = (files) =>
   Array.isArray(files) && files.length === EXPECTED_FILES.length && files.every((file, index) => file === EXPECTED_FILES[index]);
 
+const validatePackageDocuments = (root, packageInfo) => {
+  const readmePath = join(root, packageInfo.directory, "README.md");
+  let readme;
+
+  try {
+    readme = readFileSync(readmePath, "utf8");
+  } catch (error) {
+    throw new Error(`${packageInfo.directory}/README.md is required: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const requirements = [
+    [packageInfo.name, "package name"],
+    [`pnpm add ${packageInfo.name}`, "pnpm install command"],
+    [`from \"${packageInfo.name}\"`, "public import"],
+    ["https://github.com/kangjuhyup/nest-batch", "repository link"],
+    ["MIT", "MIT license"],
+    [EXPECTED_BUGS_URL, "issue tracker link"]
+  ];
+
+  const missing = requirements
+    .filter(([value]) => !readme.includes(value))
+    .map(([, description]) => description);
+
+  if (missing.length > 0) {
+    throw new Error(`${packageInfo.directory}/README.md is missing ${missing.join(", ")}`);
+  }
+};
+
+export async function verifyPackageDocuments(root, packageInfo) {
+  validatePackageDocuments(resolve(root), packageInfo);
+}
+
 export function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
@@ -177,6 +209,12 @@ export function verifyReleaseRepository(root) {
       if (readFileSync(packageLicensePath, "utf8") !== rootLicense) {
         errors.push(`${packageInfo.directory}/LICENSE must exactly match root LICENSE`);
       }
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+
+    try {
+      validatePackageDocuments(repositoryRoot, packageInfo);
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
     }

@@ -1,10 +1,11 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { CORE_SUBPATHS, PUBLIC_PACKAGES } from "./package-catalog.mjs";
-import { validateManifest } from "./verify-release.mjs";
+import { validateManifest, verifyPackageDocuments } from "./verify-release.mjs";
 import * as release from "./verify-release.mjs";
 
 const REPOSITORY_URL = "https://github.com/kangjuhyup/nest-batch.git";
@@ -13,6 +14,23 @@ const BUGS_URL = "https://github.com/kangjuhyup/nest-batch/issues";
 const LICENSE_TEXT = "MIT License\n";
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const temporaryRoots: string[] = [];
+
+const createPackageReadme = (packageInfo: (typeof PUBLIC_PACKAGES)[number]) => `# ${packageInfo.name}
+
+\`\`\`bash
+pnpm add ${packageInfo.name}
+\`\`\`
+
+\`\`\`ts
+import {} from "${packageInfo.name}";
+\`\`\`
+
+[Repository](https://github.com/kangjuhyup/nest-batch)
+
+## License
+
+MIT. Report issues at https://github.com/kangjuhyup/nest-batch/issues.
+`;
 
 function createRepository(
   mutatePackage?: (manifest: Record<string, unknown>, packageInfo: (typeof PUBLIC_PACKAGES)[number]) => void,
@@ -63,6 +81,7 @@ function createRepository(
     mkdirSync(packageDirectory, { recursive: true });
     writeFileSync(join(packageDirectory, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
     writeFileSync(join(packageDirectory, "LICENSE"), licenseForPackage(packageInfo));
+    writeFileSync(join(packageDirectory, "README.md"), createPackageReadme(packageInfo));
   }
 
   return root;
@@ -144,5 +163,23 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("verifies the checked-out release repository / 현재 checkout된 릴리즈 repository를 검증한다", () => {
     expect(() => release.verifyReleaseRepository(REPOSITORY_ROOT)).not.toThrow();
+  });
+});
+
+describe("package document validation / package 문서 검증", () => {
+  it("rejects a package without a README / README가 없는 package를 거부한다", async () => {
+    const root = await mkdtemp(join(tmpdir(), "nest-batch-readme-test-"));
+    const packageInfo = PUBLIC_PACKAGES[0];
+    const packageDirectory = join(root, packageInfo.directory);
+
+    try {
+      await mkdir(packageDirectory, { recursive: true });
+      await writeFile(join(packageDirectory, "package.json"), `${JSON.stringify({ name: packageInfo.name })}\n`);
+      await writeFile(join(packageDirectory, "LICENSE"), LICENSE_TEXT);
+
+      await expect(verifyPackageDocuments(root, packageInfo)).rejects.toThrow(/README\.md/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
