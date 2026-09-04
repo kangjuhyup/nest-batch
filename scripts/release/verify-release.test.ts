@@ -182,4 +182,43 @@ describe("package document validation / package 문서 검증", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it("rejects an issue link used as the repository link / issue link을 repository link로 사용하면 거부한다", async () => {
+    const root = await mkdtemp(join(tmpdir(), "nest-batch-readme-test-"));
+    const packageInfo = PUBLIC_PACKAGES[0];
+    const packageDirectory = join(root, packageInfo.directory);
+
+    try {
+      await mkdir(packageDirectory, { recursive: true });
+      await writeFile(
+        join(packageDirectory, "README.md"),
+        createPackageReadme(packageInfo).replace("[Repository](https://github.com/kangjuhyup/nest-batch)\n\n", "")
+      );
+
+      await expect(verifyPackageDocuments(root, packageInfo)).rejects.toThrow(/repository link/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an install command with a package-name prefix / package name prefix를 가진 install command를 거부한다", async () => {
+    const root = await mkdtemp(join(tmpdir(), "nest-batch-readme-test-"));
+    const packageInfo = PUBLIC_PACKAGES[0];
+    const packageDirectory = join(root, packageInfo.directory);
+
+    try {
+      await mkdir(packageDirectory, { recursive: true });
+      await writeFile(
+        join(packageDirectory, "README.md"),
+        createPackageReadme(packageInfo).replace(
+          `pnpm add ${packageInfo.name}`,
+          `pnpm add ${packageInfo.name}-extra`
+        )
+      );
+
+      await expect(verifyPackageDocuments(root, packageInfo)).rejects.toThrow(/pnpm install command/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

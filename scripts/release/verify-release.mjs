@@ -6,6 +6,7 @@ import { PUBLIC_PACKAGES } from "./package-catalog.mjs";
 
 const EXPECTED_HOMEPAGE = "https://github.com/kangjuhyup/nest-batch#readme";
 const EXPECTED_BUGS_URL = "https://github.com/kangjuhyup/nest-batch/issues";
+const EXPECTED_REPOSITORY_URL = "https://github.com/kangjuhyup/nest-batch";
 const EXPECTED_NODE_RANGE = ">=20.18.0";
 const EXPECTED_FILES = ["dist", "src", "README.md", "LICENSE"];
 const NUMERIC_IDENTIFIER = "(?:0|[1-9]\\d*)";
@@ -20,6 +21,28 @@ const isRecord = (value) => value !== null && typeof value === "object" && !Arra
 const hasExactFiles = (files) =>
   Array.isArray(files) && files.length === EXPECTED_FILES.length && files.every((file, index) => file === EXPECTED_FILES[index]);
 
+const escapeRegularExpression = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const hasPackageToken = (value, packageName) => {
+  const escapedPackageName = escapeRegularExpression(packageName);
+  return new RegExp(`(?:^|\\s)${escapedPackageName}(?=\\s|$)`, "u").test(value);
+};
+
+const hasPnpmAddPackage = (readme, packageName) => {
+  const commands = readme.matchAll(/(?:^|\n)\s*(?:[$>]\s*)?`?pnpm\s+add\s+([^\n`]+)`?/gu);
+
+  return Array.from(commands, (command) => hasPackageToken(command[1], packageName)).some(Boolean);
+};
+
+const hasMarkdownLinkTarget = (readme, target) => {
+  const escapedTarget = escapeRegularExpression(target);
+  const targetPattern = `${escapedTarget}/?(?:#[^\\s)>]+)?`;
+  const markdownLink = new RegExp(`\\[[^\\]]*\\]\\(\\s*<?${targetPattern}>?(?=\\s|\\))`, "u");
+  const autoLink = new RegExp(`<${targetPattern}>`, "u");
+
+  return markdownLink.test(readme) || autoLink.test(readme);
+};
+
 const validatePackageDocuments = (root, packageInfo) => {
   const readmePath = join(root, packageInfo.directory, "README.md");
   let readme;
@@ -31,16 +54,16 @@ const validatePackageDocuments = (root, packageInfo) => {
   }
 
   const requirements = [
-    [packageInfo.name, "package name"],
-    [`pnpm add ${packageInfo.name}`, "pnpm install command"],
-    [`from \"${packageInfo.name}\"`, "public import"],
-    ["https://github.com/kangjuhyup/nest-batch", "repository link"],
-    ["MIT", "MIT license"],
-    [EXPECTED_BUGS_URL, "issue tracker link"]
+    [hasPackageToken(readme, packageInfo.name), "package name"],
+    [hasPnpmAddPackage(readme, packageInfo.name), "pnpm install command"],
+    [new RegExp(`from\\s+[\"']${escapeRegularExpression(packageInfo.name)}[\"']`, "u").test(readme), "public import"],
+    [hasMarkdownLinkTarget(readme, EXPECTED_REPOSITORY_URL), "repository link"],
+    [readme.includes("MIT"), "MIT license"],
+    [readme.includes(EXPECTED_BUGS_URL), "issue tracker link"]
   ];
 
   const missing = requirements
-    .filter(([value]) => !readme.includes(value))
+    .filter(([isSatisfied]) => !isSatisfied)
     .map(([, description]) => description);
 
   if (missing.length > 0) {
