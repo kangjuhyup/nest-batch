@@ -47,13 +47,14 @@ const GITHUB_RELEASE_REST_RULE = "GraphQL object가 있으면 REST `GET repos/{o
 const GITHUB_RELEASE_LOOKUP_FAILURE_RULE = "GraphQL `errors`, REST 인증·권한·network 오류 또는 malformed 응답은 생성으로 전환하지 않고 workflow를 실패시킵니다.";
 const GITHUB_RELEASE_CREATE_RACE_RULE = "create가 실패하면 같은 GraphQL ID → REST by ID 경로로 정확히 한 번 재조회합니다. 그 사이 생성된 release가 계약과 정확히 일치할 때만 성공으로 복구하고, 여전히 없거나 조회가 실패하면 원래 create 오류를 보존하며, 충돌 release면 충돌 오류로 실패합니다.";
 const PERSONAL_NVM_BOOTSTRAP_PATH = "source /Users/kangjuhyup/.nvm/nvm.sh";
-const RELEASE_CHECKLIST_HEADINGS = [
-  "## 1. Release candidate 준비",
-  "## 2. 최초 0.1.0 bootstrap",
-  "## 3. Trusted Publisher 등록",
-  "## 4. Tag release",
-  "## 5. 실패 복구"
-];
+const RELEASE_CHECKLIST_SECTIONS = {
+  releaseCandidate: "## 1. Release candidate 준비",
+  bootstrap: "## 2. 최초 0.1.0 bootstrap",
+  trustedPublisher: "## 3. Trusted Publisher 등록",
+  tagRelease: "## 4. Tag release",
+  recovery: "## 5. 실패 복구"
+};
+const RELEASE_CHECKLIST_HEADINGS = Object.values(RELEASE_CHECKLIST_SECTIONS);
 const NUMERIC_IDENTIFIER = "(?:0|[1-9]\\d*)";
 const NON_NUMERIC_IDENTIFIER = "\\d*[A-Za-z-][0-9A-Za-z-]*";
 const PRERELEASE_IDENTIFIER = `(?:${NUMERIC_IDENTIFIER}|${NON_NUMERIC_IDENTIFIER})`;
@@ -147,15 +148,10 @@ const validateReleasingGuide = (root) => {
     GITHUB_RELEASE_CREATE_RACE_RULE
   ];
   const missing = requirements.filter((requirement) => !guide.includes(requirement));
-  const headingIndexes = RELEASE_CHECKLIST_HEADINGS.map((heading) => guide.indexOf(heading));
+  const missingHeadings = RELEASE_CHECKLIST_HEADINGS.filter((heading) => !guide.includes(heading));
 
-  if (headingIndexes.some((index) => index === -1)) {
-    const missingHeadings = RELEASE_CHECKLIST_HEADINGS.filter((_, index) => headingIndexes[index] === -1);
+  if (missingHeadings.length > 0) {
     throw new Error(`${RELEASING_GUIDE_PATH} is missing required checklist sections: ${missingHeadings.join(", ")}`);
-  }
-
-  if (headingIndexes.some((index, position) => position > 0 && index <= headingIndexes[position - 1])) {
-    throw new Error(`${RELEASING_GUIDE_PATH} checklist sections must stay in the approved order`);
   }
 
   const sectionHeadings = guide.match(/^## .+$/gmu) ?? [];
@@ -167,59 +163,38 @@ const validateReleasingGuide = (root) => {
     throw new Error(`${RELEASING_GUIDE_PATH} is missing required release values: ${missing.join(", ")}`);
   }
 
-  const orderedRequirements = {
-    versionPrChecklist: VERSION_PR_CHECKLIST_ITEM,
-    versionPrApproval: VERSION_PR_APPROVAL_RULE,
-    versionPrChecks: VERSION_PR_CHECKS_RULE,
-    versionPrSequence: VERSION_PR_SEQUENCE_RULE,
-    localCandidateChecks: LOCAL_CANDIDATE_CHECKLIST_ITEMS,
-    identityAudits: identityAuditCommands,
-    identityStop: IDENTITY_AUDIT_STOP_RULE,
-    bootstrapPublish: BOOTSTRAP_PUBLISH_CHECKLIST_ITEM,
-    trustedPublisher: TRUSTED_PUBLISHER_CHECKLIST_ITEM,
-    tagCreation: TAG_CREATION_CHECKLIST_ITEM,
-    provenance: LATER_PROVENANCE_REQUIREMENT
-  };
-  const orderedIndexes = Object.fromEntries(Object.entries(orderedRequirements).map(([key, value]) => [
-    key,
-    Array.isArray(value) ? value.map((requirement) => guide.indexOf(requirement)) : guide.indexOf(value)
-  ]));
-  const missingOrderedIndexes = Object.entries(orderedIndexes).flatMap(([key, value]) => {
-    const indexes = Array.isArray(value) ? value : [value];
-    return indexes.some((index) => index === -1) ? [key] : [];
-  });
-
-  if (missingOrderedIndexes.length > 0) {
-    throw new Error(`${RELEASING_GUIDE_PATH} cannot locate required release order values: ${missingOrderedIndexes.join(", ")}`);
-  }
-
-  const versionPrOrder = [
-    orderedIndexes.versionPrChecklist,
-    orderedIndexes.versionPrApproval,
-    orderedIndexes.versionPrChecks,
-    orderedIndexes.versionPrSequence,
-    ...orderedIndexes.localCandidateChecks
+  const releaseGuideFlow = [
+    { name: "release candidate section", marker: RELEASE_CHECKLIST_SECTIONS.releaseCandidate },
+    { name: "Version PR checklist", marker: VERSION_PR_CHECKLIST_ITEM },
+    { name: "Version PR workflow approval", marker: VERSION_PR_APPROVAL_RULE },
+    { name: "Version PR required checks", marker: VERSION_PR_CHECKS_RULE },
+    { name: "Version PR merge candidate", marker: VERSION_PR_SEQUENCE_RULE },
+    ...LOCAL_CANDIDATE_CHECKLIST_ITEMS.map((marker) => ({ name: `local candidate check ${marker}`, marker })),
+    { name: "bootstrap section", marker: RELEASE_CHECKLIST_SECTIONS.bootstrap },
+    ...identityAuditCommands.map((marker) => ({ name: `identity audit ${marker}`, marker })),
+    { name: "identity audit STOP rule", marker: IDENTITY_AUDIT_STOP_RULE },
+    { name: "bootstrap publish", marker: BOOTSTRAP_PUBLISH_CHECKLIST_ITEM },
+    { name: "Trusted Publisher section", marker: RELEASE_CHECKLIST_SECTIONS.trustedPublisher },
+    { name: "Trusted Publisher setup", marker: TRUSTED_PUBLISHER_CHECKLIST_ITEM },
+    { name: "tag release section", marker: RELEASE_CHECKLIST_SECTIONS.tagRelease },
+    { name: "signed tag creation", marker: TAG_CREATION_CHECKLIST_ITEM },
+    { name: "OIDC provenance confirmation", marker: LATER_PROVENANCE_REQUIREMENT },
+    { name: "recovery section", marker: RELEASE_CHECKLIST_SECTIONS.recovery }
   ];
+  let previousFlowMarker;
 
-  if (versionPrOrder.some((index, position) => position > 0 && index <= versionPrOrder[position - 1])) {
-    throw new Error(`${RELEASING_GUIDE_PATH} Version PR approval, checks, merge, and local candidate checks must stay in the approved order`);
-  }
+  for (const flowMarker of releaseGuideFlow) {
+    const index = guide.indexOf(flowMarker.marker);
 
-  const identityAuditOrder = [...orderedIndexes.identityAudits, orderedIndexes.identityStop, orderedIndexes.bootstrapPublish];
+    if (index === -1) {
+      throw new Error(`${RELEASING_GUIDE_PATH} cannot locate required release guide flow marker: ${flowMarker.name}`);
+    }
 
-  if (identityAuditOrder.some((index, position) => position > 0 && index <= identityAuditOrder[position - 1])) {
-    throw new Error(`${RELEASING_GUIDE_PATH} catalog identity audit and STOP rule must appear before the bootstrap publish checkbox`);
-  }
+    if (previousFlowMarker && index <= previousFlowMarker.index) {
+      throw new Error(`${RELEASING_GUIDE_PATH} release guide flow must stay in the approved order: ${previousFlowMarker.name} before ${flowMarker.name}`);
+    }
 
-  const publishSetupOrder = [
-    orderedIndexes.bootstrapPublish,
-    orderedIndexes.trustedPublisher,
-    orderedIndexes.tagCreation,
-    orderedIndexes.provenance
-  ];
-
-  if (publishSetupOrder.some((index, position) => position > 0 && index <= publishSetupOrder[position - 1])) {
-    throw new Error(`${RELEASING_GUIDE_PATH} bootstrap publish must appear before Trusted Publisher setup, tag creation, and provenance confirmation`);
+    previousFlowMarker = { name: flowMarker.name, index };
   }
 
   if (guide.includes(PERSONAL_NVM_BOOTSTRAP_PATH)) {

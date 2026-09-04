@@ -584,7 +584,7 @@ describe("release metadata validation / release metadata 검증", () => {
       .replace("__VERSION_PR_APPROVAL__", checks);
     writeFileSync(releasingGuide, guide);
 
-    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/Version PR.*approved order/u);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/release guide flow.*approved order/u);
   });
 
   it("rejects identity audits moved after bootstrap publish / bootstrap publish 뒤로 이동한 identity audit를 거부한다", async () => {
@@ -599,7 +599,7 @@ describe("release metadata validation / release metadata 검증", () => {
       .replace(`${bootstrap}\n`, `${bootstrap}\n${identityAuditBlock}\n`);
     writeFileSync(releasingGuide, guide);
 
-    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/identity audit.*before.*bootstrap publish/u);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/release guide flow.*identity audit/u);
   });
 
   it.each([
@@ -616,6 +616,73 @@ describe("release metadata validation / release metadata 검증", () => {
     writeFileSync(releasingGuide, guide);
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/bootstrap publish.*before/u);
+  });
+
+  it("rejects local E2E moved after signed tag creation / signed tag 생성 뒤로 이동한 local E2E를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    const localE2e = "- [ ] `pnpm test:e2e` 성공";
+    const tagCreation = "- [ ] `git tag -s vX.Y.Z <release-commit>`";
+    const guide = readFileSync(releasingGuide, "utf8")
+      .replace(`${localE2e}\n`, "")
+      .replace(`${tagCreation}\n`, `${tagCreation}\n${localE2e}\n`);
+    writeFileSync(releasingGuide, guide);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/release guide flow|approved order/u);
+  });
+
+  it("rejects release check and E2E moved after signed tag creation / signed tag 생성 뒤로 함께 이동한 release check와 E2E를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    const localChecks = "- [ ] `pnpm release:check` 성공\n- [ ] `pnpm test:e2e` 성공";
+    const tagCreation = "- [ ] `git tag -s vX.Y.Z <release-commit>`";
+    const guide = readFileSync(releasingGuide, "utf8")
+      .replace(`${localChecks}\n`, "")
+      .replace(`${tagCreation}\n`, `${tagCreation}\n${localChecks}\n`);
+    writeFileSync(releasingGuide, guide);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/release guide flow|approved order/u);
+  });
+
+  it("rejects identity audits moved before the bootstrap section / bootstrap section 앞쪽으로 이동한 identity audit를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    const identityAuditBlock = PUBLIC_PACKAGES
+      .map(({ name }) => `npm view ${name} name version maintainers repository dist-tags --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}`)
+      .join("\n");
+    const bootstrapHeading = "## 2. 최초 0.1.0 bootstrap";
+    const guide = readFileSync(releasingGuide, "utf8")
+      .replace(`${identityAuditBlock}\n`, "")
+      .replace(bootstrapHeading, `${identityAuditBlock}\n\n${bootstrapHeading}`);
+    writeFileSync(releasingGuide, guide);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/release guide flow|approved order/u);
+  });
+
+  it("rejects Trusted Publisher setup moved before its section / 해당 section 앞쪽으로 이동한 Trusted Publisher 설정을 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    const bootstrap = "- [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행";
+    const trustedPublisher = "- [ ] owner `kangjuhyup`, repository `nest-batch`, workflow `publish.yml`, environment `npm` 등록";
+    const guide = readFileSync(releasingGuide, "utf8")
+      .replace(`${trustedPublisher}\n`, "")
+      .replace(`${bootstrap}\n`, `${bootstrap}\n${trustedPublisher}\n`);
+    writeFileSync(releasingGuide, guide);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/release guide flow|approved order/u);
+  });
+
+  it("rejects signed tag creation moved before the tag section / tag section 앞쪽으로 이동한 signed tag 생성을 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    const trustedPublisher = "- [ ] owner `kangjuhyup`, repository `nest-batch`, workflow `publish.yml`, environment `npm` 등록";
+    const tagCreation = "- [ ] `git tag -s vX.Y.Z <release-commit>`";
+    const guide = readFileSync(releasingGuide, "utf8")
+      .replace(`${tagCreation}\n`, "")
+      .replace(`${trustedPublisher}\n`, `${trustedPublisher}\n${tagCreation}\n`);
+    writeFileSync(releasingGuide, guide);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/release guide flow|approved order/u);
   });
 
   it("rejects the obsolete bootstrap command / 이전 bootstrap 명령을 거부한다", async () => {
