@@ -1,6 +1,6 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { lstat, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { commandForPlatform, runCommand } from "./command-runner.mjs";
 import { packPackages } from "./pack-packages.mjs";
@@ -9,13 +9,21 @@ import { PUBLIC_PACKAGES } from "./package-catalog.mjs";
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
 const STABLE_TAG = /^v((0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*))$/u;
+const SHA512_SRI = /^sha512-([A-Za-z0-9+/]{86}==)$/u;
 const CONFIRMATION_ATTEMPTS = 6;
 const CONFIRMATION_DELAY_MILLISECONDS = 5_000;
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
 const assertIntegrity = (integrity, label) => {
-  if (typeof integrity !== "string" || !integrity.startsWith("sha512-") || integrity.length === "sha512-".length) {
+  const match = typeof integrity === "string" ? SHA512_SRI.exec(integrity) : undefined;
+  const encodedIntegrity = match?.[1];
+
+  if (
+    encodedIntegrity === undefined ||
+    Buffer.from(encodedIntegrity, "base64").length !== 64 ||
+    Buffer.from(encodedIntegrity, "base64").toString("base64") !== encodedIntegrity
+  ) {
     throw new Error(`${label}: integrity must be a non-empty sha512 value.`);
   }
 };
@@ -62,29 +70,98 @@ export const decidePublication = (localIntegrity, remoteIntegrity = undefined) =
   throw new Error("Registry version is occupied with a different integrity.");
 };
 
-const validateArtifacts = (artifacts, expectedVersion) => {
+const isStrictChild = (directory, path) => {
+  const pathFromDirectory = relative(directory, path);
+  return pathFromDirectory.length > 0 &&
+    pathFromDirectory !== ".." &&
+    !pathFromDirectory.startsWith(`..${sep}`) &&
+    !isAbsolute(pathFromDirectory);
+};
+
+const assertCanonicalAbsolutePath = (path, label) => {
+  if (
+    typeof path !== "string" ||
+    path.length === 0 ||
+    path.startsWith("-") ||
+    !isAbsolute(path) ||
+    path !== resolve(path)
+  ) {
+    throw new Error(`${label}: path must be canonical, absolute, and not option-like.`);
+  }
+};
+
+const canonicalArtifactRoot = async (artifactRoot) => {
+  assertCanonicalAbsolutePath(artifactRoot, "Artifact root");
+  let rootStats;
+
+  try {
+    rootStats = await lstat(artifactRoot);
+  } catch (error) {
+    throw new Error(`Artifact root: unable to inspect ${artifactRoot}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
+    throw new Error("Artifact root must be a canonical directory without symbolic links.");
+  }
+
+  const canonicalRoot = await realpath(artifactRoot);
+
+  return { canonicalRoot, artifactRoot };
+};
+
+const validateTarball = async (tarball, artifactRootBoundary, label) => {
+  assertCanonicalAbsolutePath(tarball, label);
+  const { artifactRoot, canonicalRoot } = artifactRootBoundary;
+
+  if (!isStrictChild(artifactRoot, tarball)) {
+    throw new Error(`${label}: tarball must be strictly inside the artifact root.`);
+  }
+
+  let tarballStats;
+
+  try {
+    tarballStats = await lstat(tarball);
+  } catch (error) {
+    throw new Error(`${label}: unable to inspect tarball: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  if (tarballStats.isSymbolicLink() || !tarballStats.isFile()) {
+    throw new Error(`${label}: tarball must be a regular file without symbolic links.`);
+  }
+
+  const canonicalTarball = await realpath(tarball);
+
+  if (!isStrictChild(canonicalRoot, canonicalTarball)) {
+    throw new Error(`${label}: tarball must be canonical and remain inside the artifact root.`);
+  }
+};
+
+const validateArtifacts = async (artifacts, expectedVersion, artifactRoot) => {
   if (!Array.isArray(artifacts) || artifacts.length !== PUBLIC_PACKAGES.length) {
     throw new Error(`Release artifacts must contain exactly ${PUBLIC_PACKAGES.length} catalog packages.`);
   }
 
-  return artifacts.map((artifact, index) => {
+  const artifactRootBoundary = await canonicalArtifactRoot(artifactRoot);
+
+  return Promise.all(artifacts.map(async (artifact, index) => {
     const packageInfo = PUBLIC_PACKAGES[index];
 
     if (!isRecord(artifact) || artifact.name !== packageInfo.name) {
       throw new Error(`Release artifact at catalog order ${index} must be ${packageInfo.name}.`);
     }
 
+    if (artifact.directory !== packageInfo.directory) {
+      throw new Error(`${artifact.name}: artifact directory must match catalog directory ${packageInfo.directory}.`);
+    }
+
     if (artifact.version !== expectedVersion) {
       throw new Error(`${artifact.name}: artifact version ${JSON.stringify(artifact.version)} does not match ${expectedVersion}.`);
     }
 
-    if (typeof artifact.tarball !== "string" || artifact.tarball.length === 0) {
-      throw new Error(`${artifact.name}: artifact tarball path must be a non-empty string.`);
-    }
-
+    await validateTarball(artifact.tarball, artifactRootBoundary, artifact.name);
     assertIntegrity(artifact.integrity, artifact.name);
     return artifact;
-  });
+  }));
 };
 
 const parseRemoteIntegrity = (stdout, name, version) => {
@@ -115,7 +192,8 @@ const isNotFoundResponse = (error) => {
 export const createNpmRegistryAdapter = ({
   run = runCommand,
   command = commandForPlatform("npm"),
-  cwd = REPOSITORY_ROOT
+  cwd = REPOSITORY_ROOT,
+  artifactRoot = undefined
 } = {}) => ({
   lookupIntegrity: async (name, version) => {
     try {
@@ -133,7 +211,9 @@ export const createNpmRegistryAdapter = ({
     }
   },
   publish: async (artifact) => {
-    await run(command, ["publish", artifact.tarball, "--access", "public"], {
+    const artifactRootBoundary = await canonicalArtifactRoot(artifactRoot);
+    await validateTarball(artifact?.tarball, artifactRootBoundary, "npm publish artifact");
+    await run(command, ["publish", "--access", "public", "--", artifact.tarball], {
       cwd,
       maxBuffer: 10 * 1024 * 1024
     });
@@ -166,11 +246,11 @@ const confirmPublication = async ({ artifacts, registry, sleep }) => {
   throw new Error(`Published package integrity was not visible after ${CONFIRMATION_ATTEMPTS} attempts: ${pending.join(", ")}.`);
 };
 
-export const publishRelease = async ({ tag, rootVersion, artifacts, registry, sleep = (milliseconds) => new Promise((resolve) => {
+export const publishRelease = async ({ tag, rootVersion, artifactRoot, artifacts, registry, sleep = (milliseconds) => new Promise((resolve) => {
   setTimeout(resolve, milliseconds);
 }) }) => {
   const version = parseReleaseTag(tag, rootVersion);
-  const validatedArtifacts = validateArtifacts(artifacts, version);
+  const validatedArtifacts = await validateArtifacts(artifacts, version, artifactRoot);
   assertRegistry(registry);
   const published = [];
   const skipped = [];
@@ -267,19 +347,44 @@ export const runPublishCli = async ({
   parseReleaseTag(tag, expectedVersion);
 
   const temporaryDirectory = await makeTemporaryDirectory();
+  let operationResult;
+  let operationFailure;
+  let operationFailed = false;
 
   try {
     const artifacts = await pack(temporaryDirectory);
-    return await publishRelease({
+    operationResult = await publishRelease({
       tag,
       rootVersion: expectedVersion,
+      artifactRoot: temporaryDirectory,
       artifacts,
-      registry: registry ?? createNpmRegistryAdapter(),
+      registry: registry ?? createNpmRegistryAdapter({ artifactRoot: temporaryDirectory }),
       ...(sleep === undefined ? {} : { sleep })
     });
+  } catch (error) {
+    operationFailed = true;
+    operationFailure = error;
   } finally {
-    await removeDirectory(temporaryDirectory);
+    try {
+      await removeDirectory(temporaryDirectory);
+    } catch (cleanupFailure) {
+      if (operationFailed) {
+        throw new AggregateError(
+          [operationFailure, cleanupFailure],
+          "Release publish operation and temporary directory cleanup both failed.",
+          { cause: operationFailure }
+        );
+      }
+
+      throw cleanupFailure;
+    }
   }
+
+  if (operationFailed) {
+    throw operationFailure;
+  }
+
+  return operationResult;
 };
 
 const isDirectExecution = () =>
