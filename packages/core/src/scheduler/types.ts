@@ -5,8 +5,8 @@ import type {
   JobDefinition,
   JobParameters,
   LockManager
-} from "@nest-batch/core";
-import type { WorkQueue, WorkUnit } from "@nest-batch/queue-core";
+} from "../types/index.js";
+import type { WorkQueue, WorkUnit } from "../queue/index.js";
 
 export type ScheduleOccurrenceStatus = "claimed" | "dispatched" | "failed";
 export type ScheduleMisfirePolicy = "fire-once" | "fire-all";

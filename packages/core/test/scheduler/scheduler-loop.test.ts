@@ -7,8 +7,8 @@ import type {
   ScheduleOccurrence,
   ScheduleOccurrenceCandidate,
   ScheduleStore
-} from "@nest-batch/scheduler-core";
-import { SchedulerLoop, createIntervalTrigger, defineSchedule } from "@nest-batch/scheduler-core";
+} from "@nest-batch/core/scheduler";
+import { SchedulerLoop, createIntervalTrigger, defineSchedule } from "@nest-batch/core/scheduler";
 
 describe("scheduler loop / scheduler loop를 검증한다", () => {
   it("claims and dispatches due occurrences / due occurrence를 claim하고 dispatch한다", async () => {

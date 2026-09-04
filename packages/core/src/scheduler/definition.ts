@@ -1,4 +1,4 @@
-import type { JobParameters } from "@nest-batch/core";
+import type { JobParameters } from "../types/index.js";
 import type { ScheduleDefinition } from "./types.js";
 
 export const defineSchedule = <Parameters extends JobParameters = JobParameters>(

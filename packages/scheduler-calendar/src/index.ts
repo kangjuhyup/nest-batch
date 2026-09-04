@@ -2,10 +2,10 @@ export {
   createUtcDailyTrigger,
   createUtcMonthlyTrigger,
   createUtcWeeklyTrigger
-} from "./calendar-trigger.js";
+} from "@nest-batch/core/scheduler";
 export type {
   UtcDailyTriggerOptions,
   UtcMonthlyTriggerOptions,
   UtcTimeOfDay,
   UtcWeeklyTriggerOptions
-} from "./calendar-trigger.js";
+} from "@nest-batch/core/scheduler";

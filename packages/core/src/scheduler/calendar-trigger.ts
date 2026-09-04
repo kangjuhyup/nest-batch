@@ -1,4 +1,4 @@
-import type { ScheduleTrigger } from "@nest-batch/scheduler-core";
+import type { ScheduleTrigger } from "./types.js";
 
 export interface UtcTimeOfDay {
   readonly hour: number;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createIntervalTrigger } from "@nest-batch/scheduler-core";
+import { createIntervalTrigger } from "@nest-batch/core/scheduler";
 
 describe("interval schedule trigger / interval schedule trigger를 검증한다", () => {
   it("returns due occurrences after durable state / durable state 이후 due occurrence를 반환한다", () => {
