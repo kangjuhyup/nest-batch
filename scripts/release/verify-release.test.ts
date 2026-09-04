@@ -34,6 +34,15 @@ MIT. Report issues at https://github.com/kangjuhyup/nest-batch/issues.
 
 const createReleasingGuide = () => `# Releasing nest-batch
 
+nvm은 maintainer shell에 설치·로드되어 있어야 합니다.
+
+\`\`\`bash
+nvm use
+corepack enable
+corepack pnpm --version # 10.34.5
+pnpm install --frozen-lockfile
+\`\`\`
+
 ## 1. Release candidate 준비
 
 - [ ] worktree가 clean이고 release commit이 \`develop\`에 포함됨
@@ -44,6 +53,14 @@ const createReleasingGuide = () => `# Releasing nest-batch
 ## 2. 최초 0.1.0 bootstrap
 
 - [ ] npm에서 \`@nest-batch\` scope 권한 확인
+  - 모든 catalog package의 identity를 먼저 read-only로 확인합니다.
+
+\`\`\`bash
+${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} name version maintainers repository dist-tags --json`).join("\n")}
+\`\`\`
+
+  - 기존 package는 승인된 repository identity와 ownership이 일치하거나 명시적인 transfer/rename 결정이 있어야 합니다. 그렇지 않으면 **STOP**합니다.
+  - \`E404\`는 scope publish 권한을 확인한 뒤에만 bootstrap 후보입니다.
 - [ ] \`npm whoami\`와 2FA 상태 확인
 - [ ] \`pnpm run release:publish --tag v0.1.0\`을 maintainer가 직접 실행
 - [ ] 8개 package의 \`0.1.0\`과 integrity 확인
@@ -63,6 +80,8 @@ const createReleasingGuide = () => `# Releasing nest-batch
 - [ ] 8개 package 모두 Allowed action \`npm publish\` 설정
 - [ ] GitHub \`npm\` environment와 required reviewer 설정
 - [ ] npm token publish 제한 설정
+  - 8개 package 각각의 npm package web UI에서 **Settings → Publishing access**를 열고 **Require two-factor authentication and disallow tokens**를 선택한 뒤 **Save**합니다.
+  - bootstrap에 token을 사용했다면 package-level setting과 별도로 해당 token을 revoke합니다.
 
 ## 4. Tag release
 
@@ -297,6 +316,48 @@ describe("release metadata validation / release metadata 검증", () => {
     );
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*pnpm run release:publish --tag v0\.1\.0/);
+  });
+
+  it("rejects a release checklist without every catalog identity audit / 모든 catalog identity audit가 없는 릴리즈 checklist를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      readFileSync(releasingGuide, "utf8").replace(
+        "npm view @nest-batch/cli name version maintainers repository dist-tags --json\n",
+        ""
+      )
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*npm view @nest-batch\/cli/);
+  });
+
+  it("rejects a release checklist that weakens the identity stop rule / identity 중단 규칙을 약화한 릴리즈 checklist를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      readFileSync(releasingGuide, "utf8").replace(
+        "그렇지 않으면 **STOP**합니다.",
+        "그렇지 않으면 계속 진행합니다."
+      )
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*STOP/);
+  });
+
+  it("rejects a release checklist that permits token publishing / token publish를 허용하는 릴리즈 checklist를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      readFileSync(releasingGuide, "utf8").replace(
+        "Require two-factor authentication and disallow tokens",
+        "Require two-factor authentication and allow tokens"
+      )
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*disallow tokens/);
   });
 
   it("verifies the checked-out release repository / 현재 checkout된 릴리즈 repository를 검증한다", async () => {

@@ -3,11 +3,10 @@
 이 문서는 `@nest-batch/*` package의 maintainer용 공개 배포 절차입니다. 모든 checkbox는
 수동 확인 항목이므로 이 저장소의 자동 검증이나 문서 작성으로 완료 처리하지 않습니다.
 
-로컬 명령은 Node `24`와 root의 `pnpm@10.34.5` pin을 사용합니다. 릴리즈 작업을 시작하기
-전에 다음을 한 번 실행합니다.
+로컬 명령은 Node `24`와 root의 `pnpm@10.34.5` pin을 사용합니다. 먼저 `nvm`이
+maintainer shell에 설치·로드되어 있는지 확인한 뒤 다음을 실행합니다.
 
 ```bash
-source /Users/kangjuhyup/.nvm/nvm.sh
 nvm use
 corepack enable
 corepack pnpm --version # 10.34.5
@@ -29,6 +28,21 @@ pnpm install --frozen-lockfile
 
 - [ ] npm에서 `@nest-batch` scope 권한 확인
   - npm web UI에서 `@nest-batch` scope의 Members/Teams 설정을 열어 실행 maintainer에게 public package publish 권한이 있는지 확인합니다.
+  - scope 권한을 확인한 뒤 아래의 read-only identity audit를 8개 catalog package 모두에 실행합니다.
+
+```bash
+npm view @nest-batch/core name version maintainers repository dist-tags --json
+npm view @nest-batch/nest name version maintainers repository dist-tags --json
+npm view @nest-batch/inmemory name version maintainers repository dist-tags --json
+npm view @nest-batch/postgres name version maintainers repository dist-tags --json
+npm view @nest-batch/mysql name version maintainers repository dist-tags --json
+npm view @nest-batch/mariadb name version maintainers repository dist-tags --json
+npm view @nest-batch/bullmq name version maintainers repository dist-tags --json
+npm view @nest-batch/cli name version maintainers repository dist-tags --json
+```
+
+  - 기존 package는 승인된 repository identity와 ownership이 일치하거나 명시적인 transfer/rename 결정이 있어야 합니다. 그렇지 않으면 **STOP**합니다.
+  - `E404`는 scope publish 권한을 확인한 뒤에만 bootstrap 후보입니다.
 - [ ] `npm whoami`와 2FA 상태 확인
   - `npm whoami`가 의도한 maintainer를 출력하고, `npm profile get`의 2FA 값이 publish를 보호하는 설정인지 확인합니다.
 - [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행
@@ -57,7 +71,8 @@ npm view @nest-batch/cli@0.1.0 version dist.integrity --json
 - [ ] GitHub `npm` environment와 required reviewer 설정
   - GitHub repository **Settings → Environments → npm**에서 environment name을 `npm`으로 만들고, **Required reviewers**에 release approver를 추가합니다.
 - [ ] npm token publish 제한 설정
-  - npm web UI의 **Access Tokens**에서 bootstrap용 token을 회수하거나 publish 권한을 제거하고, 이후 `publish.yml`의 OIDC Trusted Publisher만 publish 권한을 갖게 합니다.
+  - 8개 package 각각의 npm package web UI에서 **Settings → Publishing access**를 열고 **Require two-factor authentication and disallow tokens**를 선택한 뒤 **Save**합니다.
+  - bootstrap에 token을 사용했다면 package-level setting과 별도로 해당 token을 revoke합니다.
 
 ## 4. Tag release
 

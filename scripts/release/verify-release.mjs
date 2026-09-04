@@ -13,6 +13,15 @@ const RELEASING_GUIDE_PATH = "docs/releasing.md";
 const PUBLISH_WORKFLOW_FILENAME = "publish.yml";
 const PUBLISH_ENVIRONMENT = "npm";
 const BOOTSTRAP_PUBLISH_COMMAND = "pnpm run release:publish --tag v0.1.0";
+const IDENTITY_AUDIT_ARGUMENTS = "name version maintainers repository dist-tags --json";
+const IDENTITY_AUDIT_STOP_RULE = "기존 package는 승인된 repository identity와 ownership이 일치하거나 명시적인 transfer/rename 결정이 있어야 합니다. 그렇지 않으면 **STOP**합니다.";
+const E404_BOOTSTRAP_RULE = "`E404`는 scope publish 권한을 확인한 뒤에만 bootstrap 후보입니다.";
+const TOKEN_PUBLISHING_ACCESS_PATH = "Settings → Publishing access";
+const TOKEN_PUBLISHING_ACCESS_SETTING = "Require two-factor authentication and disallow tokens";
+const TOKEN_PUBLISHING_ACCESS_SAVE = "Save";
+const PORTABLE_NVM_COMMAND = "nvm use";
+const COREPACK_VERSION_CHECK = "corepack pnpm --version # 10.34.5";
+const PERSONAL_NVM_BOOTSTRAP_PATH = "source /Users/kangjuhyup/.nvm/nvm.sh";
 const RELEASE_CHECKLIST_HEADINGS = [
   "## 1. Release candidate 준비",
   "## 2. 최초 0.1.0 bootstrap",
@@ -69,12 +78,23 @@ const validateReleasingGuide = (root) => {
     `- [ ] owner \`kangjuhyup\`, repository \`nest-batch\`, workflow \`${PUBLISH_WORKFLOW_FILENAME}\`, environment \`${PUBLISH_ENVIRONMENT}\` 등록`,
     `- [ ] \`${BOOTSTRAP_PUBLISH_COMMAND}\`을 maintainer가 직접 실행`
   ];
+  const identityAuditCommands = PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} ${IDENTITY_AUDIT_ARGUMENTS}`);
   const requirements = [
     ...PUBLIC_PACKAGES.map(({ name }) => `\`${name}\``),
-    ...expectedChecklistLines
+    ...expectedChecklistLines,
+    ...identityAuditCommands,
+    IDENTITY_AUDIT_STOP_RULE,
+    E404_BOOTSTRAP_RULE,
+    TOKEN_PUBLISHING_ACCESS_PATH,
+    TOKEN_PUBLISHING_ACCESS_SETTING,
+    TOKEN_PUBLISHING_ACCESS_SAVE,
+    PORTABLE_NVM_COMMAND,
+    COREPACK_VERSION_CHECK
   ];
   const missing = requirements.filter((requirement) => !guide.includes(requirement));
   const headingIndexes = RELEASE_CHECKLIST_HEADINGS.map((heading) => guide.indexOf(heading));
+  const firstIdentityAuditIndex = guide.indexOf(identityAuditCommands[0]);
+  const bootstrapPublishChecklistIndex = guide.indexOf(expectedChecklistLines[2]);
 
   if (headingIndexes.some((index) => index === -1)) {
     const missingHeadings = RELEASE_CHECKLIST_HEADINGS.filter((_, index) => headingIndexes[index] === -1);
@@ -88,6 +108,14 @@ const validateReleasingGuide = (root) => {
   const sectionHeadings = guide.match(/^## .+$/gmu) ?? [];
   if (sectionHeadings.length !== RELEASE_CHECKLIST_HEADINGS.length) {
     throw new Error(`${RELEASING_GUIDE_PATH} must contain exactly five checklist sections`);
+  }
+
+  if (firstIdentityAuditIndex !== -1 && bootstrapPublishChecklistIndex !== -1 && firstIdentityAuditIndex > bootstrapPublishChecklistIndex) {
+    throw new Error(`${RELEASING_GUIDE_PATH} catalog identity audit must appear before the bootstrap publish checkbox`);
+  }
+
+  if (guide.includes(PERSONAL_NVM_BOOTSTRAP_PATH)) {
+    throw new Error(`${RELEASING_GUIDE_PATH} must not contain a personal absolute nvm bootstrap path`);
   }
 
   if (missing.length > 0) {
