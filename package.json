@@ -1,11 +1,23 @@
 {
   "name": "nest-batch",
-  "version": "0.0.1",
-  "description": "Node-native batch framework packages for NestJS applications.",
+  "version": "0.1.0",
+  "description": "Node-native durable batch framework packages for NestJS applications.",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@9.15.9",
   "license": "MIT",
+  "author": "kangjuhyup",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kangjuhyup/nest-batch.git"
+  },
+  "homepage": "https://github.com/kangjuhyup/nest-batch#readme",
+  "bugs": {
+    "url": "https://github.com/kangjuhyup/nest-batch/issues"
+  },
+  "engines": {
+    "node": ">=20.18.0"
+  },
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",

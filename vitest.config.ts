@@ -22,7 +22,7 @@ export default defineConfig({
   },
   test: {
     reporters: ["verbose"],
-    include: ["packages/**/*.test.ts"],
+    include: ["packages/**/*.test.ts", "scripts/**/*.test.ts"],
     exclude: [...configDefaults.exclude, "packages/**/*.e2e.test.ts", "packages/**/*.perf.test.ts"]
   }
 });
