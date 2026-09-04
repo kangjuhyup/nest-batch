@@ -960,6 +960,10 @@ git commit -m "chore : package release workflow 추가" -m "- Node 호환성과 
 
 ```markdown
 ## 1. Release candidate 준비
+- [ ] Changesets Version PR workflow 승인과 CI 성공 확인 후 merge
+  - 각 Changesets Version PR이 생성되거나 갱신될 때마다 write 권한 maintainer가 PR merge box에서 **Approve workflows to run**을 클릭합니다.
+  - **Quality (Node 20.18.3)**, **Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한 뒤에만 Version PR을 merge합니다.
+  - Version PR merge commit을 release candidate로 정하고 아래 local 검증을 마친 뒤에만 release tag를 생성합니다.
 - [ ] worktree가 clean이고 release commit이 `develop`에 포함됨
 - [ ] 8개 package와 root version이 동일함
 - [ ] `pnpm release:check` 성공
@@ -1014,8 +1018,11 @@ root README/README-kr의 Development section에는 `pnpm changeset`과
 - [ ] **Step 3: checklist와 catalog 일치 검증 추가**
 
 `verify-release.mjs`는 `docs/releasing.md`에 8개 package name, `publish.yml`, `npm`
-environment, `pnpm release:check`, bootstrap command가 있는지 확인한다. 문서가 workflow
-filename이나 package catalog와 달라지면 release check가 실패해야 한다.
+environment, Version PR 승인과 세 CI check, `pnpm release:check`, bootstrap command가
+있는지 확인한다. 이름 있는 exact checklist constant의 위치를 조회하여 Version PR 승인 →
+CI 성공 → merge → local candidate 검증, catalog identity audit/STOP → bootstrap publish →
+Trusted Publisher → tag → provenance 순서를 검사한다. 필요한 위치를 찾지 못하거나 문서가
+workflow filename/package catalog와 달라지면 release check가 실패해야 한다.
 
 - [ ] **Step 4: 전체 local verification**
 

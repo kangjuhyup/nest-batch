@@ -14,6 +14,7 @@ const RELEASING_GUIDE_PATH = "docs/releasing.md";
 const PUBLISH_WORKFLOW_FILENAME = "publish.yml";
 const PUBLISH_ENVIRONMENT = "npm";
 const BOOTSTRAP_PUBLISH_COMMAND = "pnpm run release:publish --tag v0.1.0";
+const BOOTSTRAP_PUBLISH_CHECKLIST_ITEM = `- [ ] \`${BOOTSTRAP_PUBLISH_COMMAND}\`을 maintainer가 직접 실행`;
 const BOOTSTRAP_VERSION = "0.1.0";
 const IDENTITY_AUDIT_ARGUMENTS = "name version maintainers repository dist-tags --json";
 const INTEGRITY_CONFIRMATION_ARGUMENTS = "version dist.integrity --json";
@@ -30,6 +31,14 @@ const VERSION_PR_CHECKLIST_ITEM = "- [ ] Changesets Version PR workflow 승인�
 const VERSION_PR_APPROVAL_RULE = "각 Changesets Version PR이 생성되거나 갱신될 때마다 write 권한 maintainer가 PR merge box에서 **Approve workflows to run**을 클릭합니다.";
 const VERSION_PR_CHECKS_RULE = "**Quality (Node 20.18.3)**, **Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한 뒤에만 Version PR을 merge합니다.";
 const VERSION_PR_SEQUENCE_RULE = "Version PR merge commit을 release candidate로 정하고 아래 local 검증을 마친 뒤에만 release tag를 생성합니다.";
+const LOCAL_CANDIDATE_CHECKLIST_ITEMS = [
+  "- [ ] worktree가 clean이고 release commit이 `develop`에 포함됨",
+  "- [ ] 8개 package와 root version이 동일함",
+  "- [ ] `pnpm release:check` 성공",
+  "- [ ] `pnpm test:e2e` 성공"
+];
+const TRUSTED_PUBLISHER_CHECKLIST_ITEM = `- [ ] owner \`kangjuhyup\`, repository \`nest-batch\`, workflow \`${PUBLISH_WORKFLOW_FILENAME}\`, environment \`${PUBLISH_ENVIRONMENT}\` 등록`;
+const TAG_CREATION_CHECKLIST_ITEM = "- [ ] `git tag -s vX.Y.Z <release-commit>`";
 const GITHUB_RELEASE_RERUN_RULE = "기존 GitHub Release가 있으면 검증 후 건너뛰고, 없을 때만 생성합니다.";
 const GITHUB_RELEASE_EXISTING_RULE = "기존 release는 tag 이름이 정확하고 draft/prerelease가 아니어야 합니다.";
 const GITHUB_RELEASE_CHECKOUT_RULE = "workflow checkout의 tag와 `HEAD`가 모두 `GITHUB_SHA`로 resolve되어야 하며, `target_commitish`가 40자리 commit SHA이면 그 값도 일치해야 합니다.";
@@ -103,9 +112,10 @@ const validateReleasingGuide = (root) => {
 
   const expectedChecklistLines = [
     VERSION_PR_CHECKLIST_ITEM,
-    "- [ ] `pnpm release:check` 성공",
-    `- [ ] owner \`kangjuhyup\`, repository \`nest-batch\`, workflow \`${PUBLISH_WORKFLOW_FILENAME}\`, environment \`${PUBLISH_ENVIRONMENT}\` 등록`,
-    `- [ ] \`${BOOTSTRAP_PUBLISH_COMMAND}\`을 maintainer가 직접 실행`
+    ...LOCAL_CANDIDATE_CHECKLIST_ITEMS,
+    BOOTSTRAP_PUBLISH_CHECKLIST_ITEM,
+    TRUSTED_PUBLISHER_CHECKLIST_ITEM,
+    TAG_CREATION_CHECKLIST_ITEM
   ];
   const identityAuditCommands = PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} ${IDENTITY_AUDIT_ARGUMENTS} --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}`);
   const integrityConfirmationCommands = PUBLIC_PACKAGES.map(({ name }) => `npm view ${name}@${BOOTSTRAP_VERSION} ${INTEGRITY_CONFIRMATION_ARGUMENTS} --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}`);
@@ -138,8 +148,6 @@ const validateReleasingGuide = (root) => {
   ];
   const missing = requirements.filter((requirement) => !guide.includes(requirement));
   const headingIndexes = RELEASE_CHECKLIST_HEADINGS.map((heading) => guide.indexOf(heading));
-  const firstIdentityAuditIndex = guide.indexOf(identityAuditCommands[0]);
-  const bootstrapPublishChecklistIndex = guide.indexOf(expectedChecklistLines[2]);
 
   if (headingIndexes.some((index) => index === -1)) {
     const missingHeadings = RELEASE_CHECKLIST_HEADINGS.filter((_, index) => headingIndexes[index] === -1);
@@ -155,16 +163,67 @@ const validateReleasingGuide = (root) => {
     throw new Error(`${RELEASING_GUIDE_PATH} must contain exactly five checklist sections`);
   }
 
-  if (firstIdentityAuditIndex !== -1 && bootstrapPublishChecklistIndex !== -1 && firstIdentityAuditIndex > bootstrapPublishChecklistIndex) {
-    throw new Error(`${RELEASING_GUIDE_PATH} catalog identity audit must appear before the bootstrap publish checkbox`);
+  if (missing.length > 0) {
+    throw new Error(`${RELEASING_GUIDE_PATH} is missing required release values: ${missing.join(", ")}`);
+  }
+
+  const orderedRequirements = {
+    versionPrChecklist: VERSION_PR_CHECKLIST_ITEM,
+    versionPrApproval: VERSION_PR_APPROVAL_RULE,
+    versionPrChecks: VERSION_PR_CHECKS_RULE,
+    versionPrSequence: VERSION_PR_SEQUENCE_RULE,
+    localCandidateChecks: LOCAL_CANDIDATE_CHECKLIST_ITEMS,
+    identityAudits: identityAuditCommands,
+    identityStop: IDENTITY_AUDIT_STOP_RULE,
+    bootstrapPublish: BOOTSTRAP_PUBLISH_CHECKLIST_ITEM,
+    trustedPublisher: TRUSTED_PUBLISHER_CHECKLIST_ITEM,
+    tagCreation: TAG_CREATION_CHECKLIST_ITEM,
+    provenance: LATER_PROVENANCE_REQUIREMENT
+  };
+  const orderedIndexes = Object.fromEntries(Object.entries(orderedRequirements).map(([key, value]) => [
+    key,
+    Array.isArray(value) ? value.map((requirement) => guide.indexOf(requirement)) : guide.indexOf(value)
+  ]));
+  const missingOrderedIndexes = Object.entries(orderedIndexes).flatMap(([key, value]) => {
+    const indexes = Array.isArray(value) ? value : [value];
+    return indexes.some((index) => index === -1) ? [key] : [];
+  });
+
+  if (missingOrderedIndexes.length > 0) {
+    throw new Error(`${RELEASING_GUIDE_PATH} cannot locate required release order values: ${missingOrderedIndexes.join(", ")}`);
+  }
+
+  const versionPrOrder = [
+    orderedIndexes.versionPrChecklist,
+    orderedIndexes.versionPrApproval,
+    orderedIndexes.versionPrChecks,
+    orderedIndexes.versionPrSequence,
+    ...orderedIndexes.localCandidateChecks
+  ];
+
+  if (versionPrOrder.some((index, position) => position > 0 && index <= versionPrOrder[position - 1])) {
+    throw new Error(`${RELEASING_GUIDE_PATH} Version PR approval, checks, merge, and local candidate checks must stay in the approved order`);
+  }
+
+  const identityAuditOrder = [...orderedIndexes.identityAudits, orderedIndexes.identityStop, orderedIndexes.bootstrapPublish];
+
+  if (identityAuditOrder.some((index, position) => position > 0 && index <= identityAuditOrder[position - 1])) {
+    throw new Error(`${RELEASING_GUIDE_PATH} catalog identity audit and STOP rule must appear before the bootstrap publish checkbox`);
+  }
+
+  const publishSetupOrder = [
+    orderedIndexes.bootstrapPublish,
+    orderedIndexes.trustedPublisher,
+    orderedIndexes.tagCreation,
+    orderedIndexes.provenance
+  ];
+
+  if (publishSetupOrder.some((index, position) => position > 0 && index <= publishSetupOrder[position - 1])) {
+    throw new Error(`${RELEASING_GUIDE_PATH} bootstrap publish must appear before Trusted Publisher setup, tag creation, and provenance confirmation`);
   }
 
   if (guide.includes(PERSONAL_NVM_BOOTSTRAP_PATH)) {
     throw new Error(`${RELEASING_GUIDE_PATH} must not contain a personal absolute nvm bootstrap path`);
-  }
-
-  if (missing.length > 0) {
-    throw new Error(`${RELEASING_GUIDE_PATH} is missing required release values: ${missing.join(", ")}`);
   }
 };
 

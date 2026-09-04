@@ -560,6 +560,64 @@ describe("release metadata validation / release metadata 검증", () => {
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/release candidate|release tag/u);
   });
 
+  it("rejects a Version PR checklist item moved after local candidate checks / local candidate 검증 뒤로 이동한 Version PR checklist를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    const versionItem = "- [ ] Changesets Version PR workflow 승인과 CI 성공 확인 후 merge";
+    const localCheck = "- [ ] `pnpm release:check` 성공";
+    const guide = readFileSync(releasingGuide, "utf8")
+      .replace(`${versionItem}\n`, "")
+      .replace(`${localCheck}\n`, `${localCheck}\n${versionItem}\n`);
+    writeFileSync(releasingGuide, guide);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/Version PR.*local candidate|approved order/u);
+  });
+
+  it("rejects Version PR checks ordered before workflow approval / workflow 승인보다 앞선 Version PR check를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    const approval = "각 Changesets Version PR이 생성되거나 갱신될 때마다 write 권한 maintainer가 PR merge box에서 **Approve workflows to run**을 클릭합니다.";
+    const checks = "**Quality (Node 20.18.3)**, **Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한 뒤에만 Version PR을 merge합니다.";
+    const guide = readFileSync(releasingGuide, "utf8")
+      .replace(approval, "__VERSION_PR_APPROVAL__")
+      .replace(checks, approval)
+      .replace("__VERSION_PR_APPROVAL__", checks);
+    writeFileSync(releasingGuide, guide);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/Version PR.*approved order/u);
+  });
+
+  it("rejects identity audits moved after bootstrap publish / bootstrap publish 뒤로 이동한 identity audit를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    const identityAuditBlock = PUBLIC_PACKAGES
+      .map(({ name }) => `npm view ${name} name version maintainers repository dist-tags --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}`)
+      .join("\n");
+    const bootstrap = "- [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행";
+    const guide = readFileSync(releasingGuide, "utf8")
+      .replace(`${identityAuditBlock}\n`, "")
+      .replace(`${bootstrap}\n`, `${bootstrap}\n${identityAuditBlock}\n`);
+    writeFileSync(releasingGuide, guide);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/identity audit.*before.*bootstrap publish/u);
+  });
+
+  it.each([
+    ["Trusted Publisher setup", "Trusted Publisher 설정", "- [ ] owner `kangjuhyup`, repository `nest-batch`, workflow `publish.yml`, environment `npm` 등록"],
+    ["release tag creation", "release tag 생성", "- [ ] `git tag -s vX.Y.Z <release-commit>`"],
+    ["OIDC provenance confirmation", "OIDC provenance 확인", "처음으로 OIDC publish되는 후속 version부터 provenance를 필수로 확인합니다."]
+  ])("rejects bootstrap publish moved after %s / %s 뒤로 이동한 bootstrap publish를 거부한다", async (_english, _korean, laterStep) => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    const bootstrap = "- [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행";
+    const guide = readFileSync(releasingGuide, "utf8")
+      .replace(`${bootstrap}\n`, "")
+      .replace(laterStep, `${laterStep}\n${bootstrap}`);
+    writeFileSync(releasingGuide, guide);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/bootstrap publish.*before/u);
+  });
+
   it("rejects the obsolete bootstrap command / 이전 bootstrap 명령을 거부한다", async () => {
     const root = createRepository();
     const releasingGuide = join(root, "docs", "releasing.md");
