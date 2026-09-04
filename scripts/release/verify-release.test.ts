@@ -98,7 +98,9 @@ ${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name}@0.1.0 version dist.integri
   - 처음으로 OIDC publish되는 후속 version부터 provenance를 필수로 확인합니다.
   - 기존 GitHub Release가 있으면 검증 후 건너뛰고, 없을 때만 생성합니다.
   - 기존 release는 tag 이름이 정확하고 draft/prerelease가 아니어야 합니다. workflow checkout의 tag와 \`HEAD\`가 모두 \`GITHUB_SHA\`로 resolve되어야 하며, \`target_commitish\`가 40자리 commit SHA이면 그 값도 일치해야 합니다. branch 이름처럼 가변 target이면 검증된 tag ref를 기준으로 삼습니다.
-  - \`gh api --include\` 조회에서 HTTP 404가 확인된 경우에만 새 release를 생성합니다. 인증, 권한, network 또는 그 밖의 조회 오류는 생성으로 전환하지 않고 workflow를 실패시킵니다.
+  - \`gh api graphql\` 조회는 published와 draft release를 모두 확인하며, \`data.repository.release\`가 \`null\`인 경우에만 새 release를 생성합니다.
+  - GraphQL \`errors\`, 인증, 권한, network 또는 malformed 응답은 생성으로 전환하지 않고 workflow를 실패시킵니다.
+  - create가 실패하면 정확히 한 번 재조회합니다. 그 사이 생성된 release가 계약과 정확히 일치할 때만 성공으로 복구하고, 여전히 없거나 조회가 실패하면 원래 create 오류를 보존하며, 충돌 release면 충돌 오류로 실패합니다.
 
 ## 5. 실패 복구
 
@@ -521,8 +523,9 @@ describe("release metadata validation / release metadata 검증", () => {
   it.each([
     ["existing release state", "기존 release 상태", "기존 release는 tag 이름이 정확하고 draft/prerelease가 아니어야 합니다.", "기존 release는 그대로 사용합니다."],
     ["tag checkout SHA", "tag checkout SHA", "workflow checkout의 tag와 `HEAD`가 모두 `GITHUB_SHA`로 resolve되어야 하며, `target_commitish`가 40자리 commit SHA이면 그 값도 일치해야 합니다.", "workflow checkout은 생략합니다."],
-    ["confirmed HTTP 404", "확인된 HTTP 404", "`gh api --include` 조회에서 HTTP 404가 확인된 경우에만 새 release를 생성합니다.", "조회 실패 시 새 release를 생성합니다."],
-    ["lookup failure", "조회 실패", "인증, 권한, network 또는 그 밖의 조회 오류는 생성으로 전환하지 않고 workflow를 실패시킵니다.", "조회 오류를 무시합니다."]
+    ["draft-aware GraphQL lookup", "draft 포함 GraphQL 조회", "`gh api graphql` 조회는 published와 draft release를 모두 확인하며, `data.repository.release`가 `null`인 경우에만 새 release를 생성합니다.", "조회 실패 시 새 release를 생성합니다."],
+    ["lookup failure", "조회 실패", "GraphQL `errors`, 인증, 권한, network 또는 malformed 응답은 생성으로 전환하지 않고 workflow를 실패시킵니다.", "조회 오류를 무시합니다."],
+    ["create race recovery", "create 경합 복구", "create가 실패하면 정확히 한 번 재조회합니다. 그 사이 생성된 release가 계약과 정확히 일치할 때만 성공으로 복구하고, 여전히 없거나 조회가 실패하면 원래 create 오류를 보존하며, 충돌 release면 충돌 오류로 실패합니다.", "create 실패를 그대로 무시합니다."]
   ])("rejects a release checklist without GitHub release contract: %s / GitHub release 계약이 없는 checklist를 거부한다: %s", async (_english, _korean, current, replacement) => {
     const root = createRepository();
     const releasingGuide = join(root, "docs", "releasing.md");

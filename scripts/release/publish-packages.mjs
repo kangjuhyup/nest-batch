@@ -164,14 +164,20 @@ const validateArtifacts = async (artifacts, expectedVersion, artifactRoot) => {
   }));
 };
 
-const parseRemoteIntegrity = (stdout, name, version) => {
-  let integrity;
+export const parseRemoteIntegrity = (stdout, name, version) => {
+  let response;
 
   try {
-    integrity = JSON.parse(stdout);
+    response = JSON.parse(stdout);
   } catch (error) {
     throw new Error(`${name}@${version}: registry returned invalid JSON for dist.integrity: ${error instanceof Error ? error.message : String(error)}`);
   }
+
+  if (Array.isArray(response) && response.length !== 1) {
+    throw new Error(`${name}@${version}: registry dist.integrity array must contain exactly one value.`);
+  }
+
+  const integrity = Array.isArray(response) ? response[0] : response;
 
   assertIntegrity(integrity, `${name}@${version}: registry artifact`);
   return integrity;

@@ -52,6 +52,7 @@ npm view @nest-batch/cli name version maintainers repository dist-tags --json --
   - 로컬에서 publish한 `0.1.0`은 provenance 예외입니다. 동일 artifact를 tag workflow가 건너뛰어도 기존 version에 provenance가 사후 추가되지는 않습니다.
 - [ ] 8개 package의 `0.1.0`과 integrity 확인
   - 아래 각 명령의 `version`이 `0.1.0`이고 `dist.integrity`가 publish script가 확인한 tarball integrity와 일치해야 합니다.
+  - workflow의 npm 12는 `dist.integrity --json`을 단일 원소 배열로 반환합니다. publish script는 npm 11의 JSON scalar와 npm 12의 정확한 단일 원소 배열만 허용하고, 빈 배열·복수 값·잘못된 integrity는 실패시킵니다.
 
 ```bash
 npm view @nest-batch/core@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
@@ -88,7 +89,9 @@ npm view @nest-batch/cli@0.1.0 version dist.integrity --json --registry https://
   - 처음으로 OIDC publish되는 후속 version부터 provenance를 필수로 확인합니다. 각 npm package version 페이지의 **Provenance**가 GitHub Actions `kangjuhyup/nest-batch`를 가리키는지 확인합니다. 로컬 bootstrap `0.1.0`에는 이 검사를 적용하지 않습니다.
   - GitHub **Releases → vX.Y.Z**에 generated release notes가 생성됐는지 확인합니다. 기존 GitHub Release가 있으면 검증 후 건너뛰고, 없을 때만 생성합니다.
   - 기존 release는 tag 이름이 정확하고 draft/prerelease가 아니어야 합니다. workflow checkout의 tag와 `HEAD`가 모두 `GITHUB_SHA`로 resolve되어야 하며, `target_commitish`가 40자리 commit SHA이면 그 값도 일치해야 합니다. branch 이름처럼 가변 target이면 검증된 tag ref를 기준으로 삼습니다.
-  - `gh api --include` 조회에서 HTTP 404가 확인된 경우에만 새 release를 생성합니다. 인증, 권한, network 또는 그 밖의 조회 오류는 생성으로 전환하지 않고 workflow를 실패시킵니다.
+  - `gh api graphql` 조회는 published와 draft release를 모두 확인하며, `data.repository.release`가 `null`인 경우에만 새 release를 생성합니다.
+  - GraphQL `errors`, 인증, 권한, network 또는 malformed 응답은 생성으로 전환하지 않고 workflow를 실패시킵니다.
+  - create가 실패하면 정확히 한 번 재조회합니다. 그 사이 생성된 release가 계약과 정확히 일치할 때만 성공으로 복구하고, 여전히 없거나 조회가 실패하면 원래 create 오류를 보존하며, 충돌 release면 충돌 오류로 실패합니다.
 
 ## 5. 실패 복구
 

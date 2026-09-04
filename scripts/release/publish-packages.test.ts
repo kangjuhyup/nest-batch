@@ -10,6 +10,7 @@ import { NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT, PUBLIC_PACKAGES } from "
 import {
   createNpmRegistryAdapter,
   decidePublication,
+  parseRemoteIntegrity,
   parseReleaseTag,
   publishRelease,
   runPublishCli
@@ -33,6 +34,7 @@ type Fixture = {
 };
 
 const integrity = (value: number) => `sha512-${Buffer.alloc(64, value).toString("base64")}`;
+const INTEGRITY = integrity(9);
 const packageLabel = (name: string) => `${name}@${VERSION}`;
 const lookupEvent = (name: string) => `lookup:${packageLabel(name)}`;
 const publishEvent = (name: string) => `publish:${packageLabel(name)}`;
@@ -165,6 +167,22 @@ afterEach(async () => {
 });
 
 describe("idempotent package publishing / 멱등 package 배포", () => {
+  it.each([
+    ["npm 11 scalar", "npm 11 scalar", JSON.stringify(INTEGRITY)],
+    ["npm 12 one-element array", "npm 12 단일 원소 배열", JSON.stringify([INTEGRITY])]
+  ])("parses a valid remote integrity shape: %s / 유효한 remote integrity 형태를 해석한다: %s", (_english, _korean, stdout) => {
+    expect(parseRemoteIntegrity(stdout, "@nest-batch/core", VERSION)).toBe(INTEGRITY);
+  });
+
+  it.each([
+    ["empty array", "빈 배열", []],
+    ["multiple values", "복수 값", [INTEGRITY, INTEGRITY]],
+    ["non-string value", "문자열이 아닌 값", [42]],
+    ["malformed integrity", "잘못된 integrity", ["sha512-not_base64!"]]
+  ])("rejects an invalid npm 12 integrity shape: %s / 잘못된 npm 12 integrity 형태를 거부한다: %s", (_english, _korean, value) => {
+    expect(() => parseRemoteIntegrity(JSON.stringify(value), "@nest-batch/core", VERSION)).toThrow(/integrity|exactly one/u);
+  });
+
   it("accepts only a matching stable release tag / 일치하는 stable release tag만 허용한다", () => {
     expect(parseReleaseTag("v0.1.0", VERSION)).toBe(VERSION);
   });
@@ -562,6 +580,47 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     const adapter = createNpmRegistryAdapter({ runLookup: async () => ({ stdout: JSON.stringify("sha512-not_base64!") }) });
 
     await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).rejects.toThrow(/integrity/u);
+  });
+
+  it("accepts an npm 12 one-element lookup array / npm 12 단일 원소 lookup 배열을 허용한다", async () => {
+    const adapter = createNpmRegistryAdapter({
+      runLookup: async () => ({ stdout: JSON.stringify([INTEGRITY]) })
+    });
+
+    await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).resolves.toBe(INTEGRITY);
+  });
+
+  it("confirms published artifacts through npm 12 arrays after retry / 재시도 뒤 npm 12 배열로 배포 artifact를 확인한다", async () => {
+    const fixture = await createFixture();
+    const lookupCounts = new Map<string, number>();
+    const publishCalls: string[] = [];
+    const sleepCalls: number[] = [];
+    const integrityByName = new Map(fixture.artifacts.map((artifact) => [artifact.name, artifact.integrity]));
+    const adapter = createNpmRegistryAdapter({
+      artifactRoot: fixture.root,
+      runLookup: async (_command: string, arguments_: string[]) => {
+        const packageReference = arguments_[1];
+        const name = packageReference.slice(0, packageReference.lastIndexOf("@"));
+        const count = (lookupCounts.get(name) ?? 0) + 1;
+        lookupCounts.set(name, count);
+
+        if (count === 1 || (name === "@nest-batch/core" && count === 2)) {
+          throw Object.assign(new Error("missing"), { code: "E404" });
+        }
+
+        return { stdout: JSON.stringify([integrityByName.get(name)]) };
+      },
+      runPublish: async (_command: string, arguments_: string[]) => {
+        publishCalls.push(arguments_.at(-1) ?? "");
+      }
+    });
+
+    await expect(publish(fixture, adapter, async (milliseconds) => {
+      sleepCalls.push(milliseconds);
+    })).resolves.toEqual({ published: catalogNames(), skipped: [] });
+    expect(publishCalls).toEqual(fixture.artifacts.map(({ tarball }) => tarball));
+    expect(sleepCalls).toEqual([5_000]);
+    expect(lookupCounts.get("@nest-batch/core")).toBe(3);
   });
 
   it("uses buffered lookup and inherited publish runners with the public registry / 조회와 배포에 각각 buffered 및 inherited runner와 public registry를 사용한다", async () => {

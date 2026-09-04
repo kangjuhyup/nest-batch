@@ -6,7 +6,7 @@ const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const STABLE_TAG = /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
 const FULL_SHA = /^[0-9a-f]{40}$/u;
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
-const HTTP_STATUS = /^HTTP\/\S+\s+(\d{3})(?:\s|$)/gmu;
+const RELEASE_QUERY = "query ReleaseByTag($owner: String!, $name: String!, $tagName: String!) { repository(owner: $owner, name: $name) { release(tagName: $tagName) { tagName targetCommitish isDraft isPrerelease } } }";
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -24,48 +24,53 @@ const assertInputs = (repository, tag, sha) => {
   }
 };
 
-export const parseGitHubApiResponse = (source) => {
+export const parseGitHubGraphQLResponse = (source) => {
   if (typeof source !== "string") {
-    throw new Error("GitHub API response must be text.");
+    throw new Error("GitHub GraphQL response must be text.");
   }
 
-  const matches = [...source.matchAll(HTTP_STATUS)];
-  const lastMatch = matches.at(-1);
-
-  if (lastMatch === undefined) {
-    throw new Error("GitHub API response did not include an HTTP status.");
-  }
-
-  const status = Number.parseInt(lastMatch[1], 10);
-  const responseFromStatus = source.slice(lastMatch.index);
-  const separator = /\r?\n\r?\n/u.exec(responseFromStatus);
-
-  if (separator === null) {
-    throw new Error(`GitHub API HTTP ${status} response did not include a body separator.`);
-  }
-
-  const bodySource = responseFromStatus.slice(separator.index + separator[0].length).trim();
-  let body;
+  let response;
 
   try {
-    body = JSON.parse(bodySource);
+    response = JSON.parse(source);
   } catch (error) {
-    throw new Error(`GitHub API HTTP ${status} response body was not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`GitHub GraphQL response was not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
 
-  return { status, body };
-};
+  if (!isRecord(response)) {
+    throw new Error("GitHub GraphQL response must be an object.");
+  }
 
-const responseFromError = (error) => {
-  if (!isRecord(error) || typeof error.stdout !== "string") {
+  if (Object.hasOwn(response, "errors")) {
+    throw new Error(`GitHub GraphQL response contained errors: ${JSON.stringify(response.errors)}.`);
+  }
+
+  if (!isRecord(response.data) || !isRecord(response.data.repository)) {
+    throw new Error("GitHub GraphQL response must contain data.repository.");
+  }
+
+  const release = response.data.repository.release;
+
+  if (release === null) {
     return undefined;
   }
 
-  try {
-    return parseGitHubApiResponse(error.stdout);
-  } catch {
-    return undefined;
+  if (
+    !isRecord(release) ||
+    typeof release.tagName !== "string" ||
+    typeof release.targetCommitish !== "string" ||
+    typeof release.isDraft !== "boolean" ||
+    typeof release.isPrerelease !== "boolean"
+  ) {
+    throw new Error("GitHub GraphQL response contained a malformed release.");
   }
+
+  return {
+    tag_name: release.tagName,
+    target_commitish: release.targetCommitish,
+    draft: release.isDraft,
+    prerelease: release.isPrerelease
+  };
 };
 
 export const createGitHubAdapter = ({
@@ -75,31 +80,21 @@ export const createGitHubAdapter = ({
   cwd = REPOSITORY_ROOT
 } = {}) => ({
   lookupRelease: async (repository, tag) => {
-    let result;
+    const [owner, name] = repository.split("/");
+    const result = await runLookup(command, [
+      "api",
+      "graphql",
+      "--raw-field",
+      `query=${RELEASE_QUERY}`,
+      "--raw-field",
+      `owner=${owner}`,
+      "--raw-field",
+      `name=${name}`,
+      "--raw-field",
+      `tagName=${tag}`
+    ], { cwd, maxBuffer: 10 * 1024 * 1024 });
 
-    try {
-      result = await runLookup(command, [
-        "api",
-        "--include",
-        "--method",
-        "GET",
-        `repos/${repository}/releases/tags/${encodeURIComponent(tag)}`
-      ], { cwd, maxBuffer: 10 * 1024 * 1024 });
-    } catch (error) {
-      if (responseFromError(error)?.status === 404) {
-        return undefined;
-      }
-
-      throw error;
-    }
-
-    const response = parseGitHubApiResponse(result.stdout);
-
-    if (response.status !== 200 || !isRecord(response.body)) {
-      throw new Error(`GitHub Release lookup expected HTTP 200 with an object body; received HTTP ${response.status}.`);
-    }
-
-    return response.body;
+    return parseGitHubGraphQLResponse(result.stdout);
   },
   createRelease: async (repository, tag) => runCreate(command, [
     "release",
@@ -175,8 +170,25 @@ export const ensureGitHubRelease = async ({
     return "skip";
   }
 
-  await github.createRelease(repository, tag);
-  return "create";
+  try {
+    await github.createRelease(repository, tag);
+    return "create";
+  } catch (createError) {
+    let racedRelease;
+
+    try {
+      racedRelease = await github.lookupRelease(repository, tag);
+    } catch {
+      throw createError;
+    }
+
+    if (racedRelease === undefined) {
+      throw createError;
+    }
+
+    assertExistingRelease(racedRelease, tag, sha);
+    return "race-recovered";
+  }
 };
 
 export const runGitHubReleaseCli = async ({ environment = process.env } = {}) => {
@@ -186,9 +198,9 @@ export const runGitHubReleaseCli = async ({ environment = process.env } = {}) =>
     sha: environment.GITHUB_SHA
   });
 
-  process.stdout.write(result === "skip"
-    ? "GitHub Release already exists and matches the release contract; skipping.\n"
-    : "GitHub Release created.\n");
+  process.stdout.write(result === "create"
+    ? "GitHub Release created.\n"
+    : `GitHub Release ${result === "race-recovered" ? "appeared during create and" : "already exists and"} matches the release contract; skipping.\n`);
 };
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

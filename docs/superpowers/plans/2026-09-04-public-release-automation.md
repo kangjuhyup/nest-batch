@@ -657,6 +657,8 @@ npm publish <tarball> --access public --registry https://registry.npmjs.org/ --@
 `npm view`의 404만 unpublished로 처리하고 network/auth 오류는 실패시킨다.
 generic registry와 `@nest-batch` scope registry를 모두 CLI에서 고정하여 ambient
 `.npmrc`의 hostile scope mapping이 lookup/publish destination을 바꾸지 못하게 한다.
+`dist.integrity --json` parser는 npm 11의 JSON scalar와 npm 12의 정확한 단일 원소 배열을
+정규화한다. 빈 배열, 복수 원소, non-string, malformed SHA-512 integrity는 모두 실패시킨다.
 `publishRelease`는 catalog 순서로 publish/skip하고, 완료 후 최대 6회·5초 간격으로 8개
 remote integrity를 재조회한다. test에서는 lookup/publish/sleep을 주입해 실제 registry를
 호출하지 않고 `missing -> publish`, `same -> skip`, `different -> fail`, partial retry를
@@ -824,12 +826,15 @@ pnpm install, `pnpm release:check`, `pnpm run release:publish --tag "$GITHUB_REF
 실행한다. `NODE_AUTH_TOKEN`이나 npm secret을 설정하지 않는다.
 
 GitHub Release job은 tag source를 checkout하고 `HEAD`와 tag ref가 모두
-`GITHUB_SHA`로 resolve되는지 검사한 뒤 explicit repository의 release-by-tag API를
-`gh api --include`로 조회한다. HTTP 404가 확인된 경우에만 아래 create 명령을 실행한다.
-기존 release는 exact tag, non-draft, non-prerelease를 검증하고 건너뛴다.
+`GITHUB_SHA`로 resolve되는지 검사한 뒤 explicit repository를 `gh api graphql`의
+`repository.release(tagName:)`로 조회하여 published와 draft를 함께 발견한다.
+`data.repository.release`가 `null`인 경우에만 아래 create 명령을 실행한다. 기존 release는
+exact tag, non-draft, non-prerelease를 검증하고 건너뛴다.
 `target_commitish`가 40자리 SHA이면 workflow SHA와 일치해야 하며, branch 이름이면
-검증된 tag ref를 authoritative source로 삼는다. 인증/network/기타 조회 실패는 그대로
-실패시켜 create를 실행하지 않는다.
+검증된 tag ref를 authoritative source로 삼는다. GraphQL `errors`, 인증/network/malformed
+응답은 그대로 실패시켜 create를 실행하지 않는다. create가 실패하면 정확히 한 번
+재조회하여 exact release가 생성된 경합만 성공으로 복구한다. 여전히 absent이거나 재조회가
+실패하면 원래 create 오류를 보존하고, conflicting release이면 충돌 오류로 실패한다.
 
 ```bash
 gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"

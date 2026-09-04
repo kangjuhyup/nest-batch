@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createGitHubAdapter,
   ensureGitHubRelease,
-  parseGitHubApiResponse
+  parseGitHubGraphQLResponse
 } from "./create-github-release.mjs";
 
 const TAG = "v0.1.0";
@@ -13,6 +13,20 @@ const release = (overrides: Record<string, unknown> = {}) => ({
   target_commitish: SHA,
   draft: false,
   prerelease: false,
+  ...overrides
+});
+const graphQLResponse = (releaseValue: Record<string, unknown> | null) => JSON.stringify({
+  data: {
+    repository: {
+      release: releaseValue
+    }
+  }
+});
+const graphQLRelease = (overrides: Record<string, unknown> = {}) => ({
+  tagName: TAG,
+  targetCommitish: SHA,
+  isDraft: false,
+  isPrerelease: false,
   ...overrides
 });
 
@@ -91,19 +105,13 @@ describe("idempotent GitHub release / 멱등 GitHub release", () => {
     })).rejects.toThrow(/tag checkout/u);
   });
 
-  it("parses explicit GitHub API status and body / 명시적인 GitHub API status와 body를 해석한다", () => {
-    expect(parseGitHubApiResponse("HTTP/2.0 200 OK\ncontent-type: application/json\n\n{\"tag_name\":\"v0.1.0\"}\n"))
-      .toEqual({ status: 200, body: { tag_name: "v0.1.0" } });
-    expect(parseGitHubApiResponse("HTTP/2.0 404 Not Found\ncontent-type: application/json\n\n{\"message\":\"Not Found\"}\n").status)
-      .toBe(404);
+  it("parses an exact GraphQL release object / 정확한 GraphQL release 객체를 해석한다", () => {
+    expect(parseGitHubGraphQLResponse(graphQLResponse(graphQLRelease()))).toEqual(release());
   });
 
-  it("maps only an explicit API 404 to missing / 명시적인 API 404만 없음으로 해석한다", async () => {
-    const notFound = Object.assign(new Error("gh exited 1"), {
-      stdout: "HTTP/2.0 404 Not Found\ncontent-type: application/json\n\n{\"message\":\"Not Found\"}\n"
-    });
+  it("maps an exact GraphQL null to confirmed absence / 정확한 GraphQL null을 확인된 부재로 해석한다", async () => {
     const github = createGitHubAdapter({
-      runLookup: async () => { throw notFound; },
+      runLookup: async () => ({ stdout: graphQLResponse(null) }),
       runCreate: async () => undefined,
       command: "fake-gh",
       cwd: "/repository"
@@ -113,19 +121,44 @@ describe("idempotent GitHub release / 멱등 GitHub release", () => {
   });
 
   it.each([
-    ["authentication response", "인증 응답", Object.assign(new Error("gh exited 1"), {
-      stdout: "HTTP/2.0 401 Unauthorized\ncontent-type: application/json\n\n{\"message\":\"Bad credentials\"}\n"
-    })],
-    ["network failure", "네트워크 실패", new Error("connect ECONNREFUSED")]
-  ])("propagates a non-404 fake-gh failure: %s / 404가 아닌 fake-gh 실패를 전파한다: %s", async (_english, _korean, failure) => {
+    ["GraphQL errors", "GraphQL 오류", async () => ({ stdout: JSON.stringify({ errors: [{ message: "Bad credentials" }], data: { repository: null } }) })],
+    ["malformed repository", "잘못된 repository", async () => ({ stdout: JSON.stringify({ data: { repository: null } }) })],
+    ["malformed release", "잘못된 release", async () => ({ stdout: graphQLResponse({ tagName: TAG }) })],
+    ["malformed JSON", "잘못된 JSON", async () => ({ stdout: "not-json" })],
+    ["network failure", "네트워크 실패", async () => { throw new Error("connect ECONNREFUSED"); }]
+  ])("rejects an unsafe fake-gh lookup: %s / 안전하지 않은 fake-gh 조회를 거부한다: %s", async (_english, _korean, runLookup) => {
     const github = createGitHubAdapter({
-      runLookup: async () => { throw failure; },
+      runLookup,
       runCreate: async () => undefined,
       command: "fake-gh",
       cwd: "/repository"
     });
 
-    await expect(github.lookupRelease(REPOSITORY, TAG)).rejects.toBe(failure);
+    await expect(github.lookupRelease(REPOSITORY, TAG)).rejects.toThrow();
+  });
+
+  it("discovers a draft through the adapter and never creates / adapter에서 draft를 발견하고 생성하지 않는다", async () => {
+    const events: string[] = [];
+    const github = createGitHubAdapter({
+      runLookup: async () => {
+        events.push("lookup");
+        return { stdout: graphQLResponse(graphQLRelease({ isDraft: true })) };
+      },
+      runCreate: async () => {
+        events.push("create");
+      },
+      command: "fake-gh",
+      cwd: "/repository"
+    });
+
+    await expect(ensureGitHubRelease({
+      tag: TAG,
+      sha: SHA,
+      repository: REPOSITORY,
+      github,
+      resolveCheckout: async () => ({ head: SHA, tag: SHA })
+    })).rejects.toThrow(/existing GitHub Release/u);
+    expect(events).toEqual(["lookup"]);
   });
 
   it("uses the explicit repository for lookup and inherited create / 조회와 inherited create에 명시적인 repository를 사용한다", async () => {
@@ -133,9 +166,7 @@ describe("idempotent GitHub release / 멱등 GitHub release", () => {
     const github = createGitHubAdapter({
       runLookup: async (command: string, arguments_: string[]) => {
         calls.push({ command, arguments_ });
-        return {
-          stdout: "HTTP/2.0 200 OK\ncontent-type: application/json\n\n{\"tag_name\":\"v0.1.0\",\"target_commitish\":\"main\",\"draft\":false,\"prerelease\":false}\n"
-        };
+        return { stdout: graphQLResponse(graphQLRelease({ targetCommitish: "main" })) };
       },
       runCreate: async (command: string, arguments_: string[]) => {
         calls.push({ command, arguments_ });
@@ -146,15 +177,91 @@ describe("idempotent GitHub release / 멱등 GitHub release", () => {
 
     await expect(github.lookupRelease(REPOSITORY, TAG)).resolves.toMatchObject({ tag_name: TAG });
     await github.createRelease(REPOSITORY, TAG);
+    const queryArgument = calls[0].arguments_.find((argument) => argument.startsWith("query="));
+    expect(queryArgument).toContain("release(tagName: $tagName)");
+    expect(queryArgument).toContain("tagName targetCommitish isDraft isPrerelease");
     expect(calls).toEqual([
       {
         command: "fake-gh",
-        arguments_: ["api", "--include", "--method", "GET", `repos/${REPOSITORY}/releases/tags/${TAG}`]
+        arguments_: expect.arrayContaining([
+          "api",
+          "graphql",
+          "--raw-field",
+          "owner=kangjuhyup",
+          "name=nest-batch",
+          `tagName=${TAG}`
+        ])
       },
       {
         command: "fake-gh",
         arguments_: ["release", "create", TAG, "--repo", REPOSITORY, "--verify-tag", "--generate-notes", "--title", TAG]
       }
     ]);
+  });
+
+  it("recovers a concurrent create race after one exact relookup / 한 번의 정확한 재조회로 동시 생성 경합을 복구한다", async () => {
+    const createFailure = new Error("already exists");
+    const events: string[] = [];
+    const lookupResults = [undefined, release()];
+    const github = {
+      lookupRelease: async () => {
+        events.push("lookup");
+        return lookupResults.shift();
+      },
+      createRelease: async () => {
+        events.push("create");
+        throw createFailure;
+      }
+    };
+
+    await expect(ensureGitHubRelease({
+      tag: TAG,
+      sha: SHA,
+      repository: REPOSITORY,
+      github,
+      resolveCheckout: async () => ({ head: SHA, tag: SHA })
+    })).resolves.toBe("race-recovered");
+    expect(events).toEqual(["lookup", "create", "lookup"]);
+  });
+
+  it.each([
+    ["still absent", "여전히 없음", undefined, undefined],
+    ["lookup failure", "조회 실패", new Error("LOOKUP_FAILURE"), undefined],
+    ["conflicting release", "충돌 release", release({ draft: true }), /existing GitHub Release/u]
+  ])("fails safely after a create race: %s / 생성 경합 뒤 안전하게 실패한다: %s", async (_english, _korean, secondLookup, expectedConflict) => {
+    const createFailure = new Error("CREATE_FAILURE");
+    const events: string[] = [];
+    let lookupCount = 0;
+    const github = {
+      lookupRelease: async () => {
+        events.push("lookup");
+        lookupCount += 1;
+        if (lookupCount === 1) {
+          return undefined;
+        }
+        if (secondLookup instanceof Error) {
+          throw secondLookup;
+        }
+        return secondLookup;
+      },
+      createRelease: async () => {
+        events.push("create");
+        throw createFailure;
+      }
+    };
+    const operation = ensureGitHubRelease({
+      tag: TAG,
+      sha: SHA,
+      repository: REPOSITORY,
+      github,
+      resolveCheckout: async () => ({ head: SHA, tag: SHA })
+    });
+
+    if (expectedConflict === undefined) {
+      await expect(operation).rejects.toBe(createFailure);
+    } else {
+      await expect(operation).rejects.toThrow(expectedConflict);
+    }
+    expect(events).toEqual(["lookup", "create", "lookup"]);
   });
 });
