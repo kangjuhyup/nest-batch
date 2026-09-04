@@ -91,12 +91,15 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     expect(parseReleaseTag("v0.1.0", VERSION)).toBe(VERSION);
   });
 
-  it.each(["0.1.0", "v0.1", "v01.1.0", "v0.1.0-next.1", "v0.1.0+build.1"])(
-    "rejects a non-stable release tag %s / stable SemVer가 아닌 tag를 거부한다",
-    (tag) => {
-      expect(() => parseReleaseTag(tag, VERSION)).toThrow(/stable SemVer/u);
-    }
-  );
+  it.each([
+    ["rejects tag without v prefix", "v 접두사가 없는 tag를 거부한다", "0.1.0"],
+    ["rejects incomplete tag", "불완전한 tag를 거부한다", "v0.1"],
+    ["rejects leading-zero tag", "leading zero tag를 거부한다", "v01.1.0"],
+    ["rejects prerelease tag", "prerelease tag를 거부한다", "v0.1.0-next.1"],
+    ["rejects build-metadata tag", "build metadata tag를 거부한다", "v0.1.0+build.1"]
+  ])("%s / %s", (_englishLabel, _koreanLabel, tag) => {
+    expect(() => parseReleaseTag(tag, VERSION)).toThrow(/stable SemVer/u);
+  });
 
   it("rejects a tag version mismatch / tag와 package version 불일치를 거부한다", () => {
     expect(() => parseReleaseTag("v0.2.0", VERSION)).toThrow(/does not match/u);
@@ -111,18 +114,18 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
   });
 
   it.each([
-    "sha512-not_base64!",
-    `sha512-${Buffer.alloc(63, 1).toString("base64")}`,
-    `${integrity(1)} ${integrity(2)}`
-  ])("rejects malformed local SRI %s / 잘못된 local SRI를 거부한다", (malformedIntegrity) => {
+    ["rejects bad-alphabet local SRI", "잘못된 alphabet local SRI를 거부한다", "sha512-not_base64!"],
+    ["rejects short local SRI", "길이가 짧은 local SRI를 거부한다", `sha512-${Buffer.alloc(63, 1).toString("base64")}`],
+    ["rejects multiple-token local SRI", "multiple token local SRI를 거부한다", `${integrity(1)} ${integrity(2)}`]
+  ])("%s / %s", (_englishLabel, _koreanLabel, malformedIntegrity) => {
     expect(() => decidePublication(malformedIntegrity)).toThrow(/integrity/u);
   });
 
   it.each([
-    "sha512-not_base64!",
-    `sha512-${Buffer.alloc(65, 1).toString("base64")}`,
-    `${integrity(1)} ${integrity(2)}`
-  ])("rejects malformed remote SRI %s / 잘못된 remote SRI를 거부한다", (malformedIntegrity) => {
+    ["rejects bad-alphabet remote SRI", "잘못된 alphabet remote SRI를 거부한다", "sha512-not_base64!"],
+    ["rejects long remote SRI", "길이가 긴 remote SRI를 거부한다", `sha512-${Buffer.alloc(65, 1).toString("base64")}`],
+    ["rejects multiple-token remote SRI", "multiple token remote SRI를 거부한다", `${integrity(1)} ${integrity(2)}`]
+  ])("%s / %s", (_englishLabel, _koreanLabel, malformedIntegrity) => {
     expect(() => decidePublication(integrity(1), malformedIntegrity)).toThrow(/integrity/u);
   });
 
@@ -182,6 +185,38 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
       ...Array.from({ length: 6 }).flatMap(() => catalogNames().map(lookupEvent))
     ]);
     expect(sleeps).toEqual([5_000, 5_000, 5_000, 5_000, 5_000]);
+  });
+
+  it("confirms delayed registry visibility on the second attempt / 두 번째 확인에서 지연된 registry 반영을 확인한다", async () => {
+    const fixture = await createFixture();
+    const events: string[] = [];
+    const sleeps: number[] = [];
+    let lookupCount = 0;
+    const registry = {
+      lookupIntegrity: async (name: string, version: string) => {
+        events.push(`lookup:${name}@${version}`);
+        lookupCount += 1;
+
+        if (lookupCount <= fixture.artifacts.length * 2) {
+          return undefined;
+        }
+
+        return fixture.artifacts.find((artifact) => artifact.name === name)?.integrity;
+      },
+      publish: async (artifact: Artifact) => {
+        events.push(`publish:${artifact.name}@${artifact.version}`);
+      }
+    };
+
+    await expect(publish(fixture, registry, async (milliseconds: number) => {
+      sleeps.push(milliseconds);
+    })).resolves.toEqual({ published: catalogNames(), skipped: [] });
+    expect(events).toEqual([
+      ...catalogNames().flatMap((name) => [lookupEvent(name), publishEvent(name)]),
+      ...catalogNames().map(lookupEvent),
+      ...catalogNames().map(lookupEvent)
+    ]);
+    expect(sleeps).toEqual([5_000]);
   });
 
   it("stops before publishing an occupied different artifact / 다른 integrity로 점유된 artifact는 publish 전에 중단한다", async () => {
@@ -278,22 +313,42 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     expect(lookupCount).toBe(fixture.artifacts.length + 1);
   });
 
+  it("rejects a late artifact version mismatch before registry access / 뒤쪽 artifact version 불일치를 registry 접근 전에 거부한다", async () => {
+    const fixture = await createFixture();
+    fixture.artifacts.at(-1)!.version = "0.1.1";
+    const events: string[] = [];
+    const { registry } = registryFrom(new Map(), events);
+
+    await expect(publish(fixture, registry)).rejects.toThrow(/artifact version/u);
+    expect(events).toEqual([]);
+  });
+
+  it("rejects malformed late local integrity before registry access / 뒤쪽의 잘못된 local integrity를 registry 접근 전에 거부한다", async () => {
+    const fixture = await createFixture();
+    fixture.artifacts.at(-1)!.integrity = "sha512-not_base64!";
+    const events: string[] = [];
+    const { registry } = registryFrom(new Map(), events);
+
+    await expect(publish(fixture, registry)).rejects.toThrow(/integrity/u);
+    expect(events).toEqual([]);
+  });
+
   it.each([
-    ["missing catalog artifact", (fixture: Fixture) => fixture.artifacts.slice(1)],
-    ["duplicate catalog artifact", (fixture: Fixture) => [fixture.artifacts[0], fixture.artifacts[0], ...fixture.artifacts.slice(2)]],
-    ["wrong catalog directory", (fixture: Fixture) => fixture.artifacts.map((artifact, index) =>
+    ["rejects missing catalog artifact before registry access", "registry 접근 전에 누락된 catalog artifact를 거부한다", (fixture: Fixture) => fixture.artifacts.slice(1)],
+    ["rejects duplicate catalog artifact before registry access", "registry 접근 전에 중복된 catalog artifact를 거부한다", (fixture: Fixture) => [fixture.artifacts[0], fixture.artifacts[0], ...fixture.artifacts.slice(2)]],
+    ["rejects wrong catalog directory before registry access", "registry 접근 전에 잘못된 catalog directory를 거부한다", (fixture: Fixture) => fixture.artifacts.map((artifact, index) =>
       index === 0 ? { ...artifact, directory: "packages/nest" } : artifact
     )],
-    ["relative tarball", (fixture: Fixture) => fixture.artifacts.map((artifact, index) =>
+    ["rejects relative tarball before registry access", "registry 접근 전에 상대 tarball을 거부한다", (fixture: Fixture) => fixture.artifacts.map((artifact, index) =>
       index === 0 ? { ...artifact, tarball: "relative.tgz" } : artifact
     )],
-    ["non-canonical traversal tarball", (fixture: Fixture) => fixture.artifacts.map((artifact, index) =>
+    ["rejects traversal tarball before registry access", "registry 접근 전에 traversal tarball을 거부한다", (fixture: Fixture) => fixture.artifacts.map((artifact, index) =>
       index === 0 ? { ...artifact, tarball: `${fixture.root}/nested/../0.tgz` } : artifact
     )],
-    ["leading-hyphen tarball", (fixture: Fixture) => fixture.artifacts.map((artifact, index) =>
+    ["rejects option-like tarball before registry access", "registry 접근 전에 option 형태 tarball을 거부한다", (fixture: Fixture) => fixture.artifacts.map((artifact, index) =>
       index === 0 ? { ...artifact, tarball: "--registry=https://attacker.invalid" } : artifact
     )]
-  ])("rejects %s before registry access / registry 접근 전에 %s를 거부한다", async (_label, mutate) => {
+  ])("%s / %s", async (_englishLabel, _koreanLabel, mutate) => {
     const fixture = await createFixture();
     const events: string[] = [];
     const { registry } = registryFrom(new Map(), events);
@@ -391,10 +446,10 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
   });
 
   it.each([
-    [Object.assign(new Error("unauthorized"), { stderr: "npm error code E401" })],
-    [Object.assign(new Error("network"), { code: "ECONNRESET" })],
-    [Object.assign(new Error("looks like 404"), { stderr: "npm error 404 but no E404 code" })]
-  ])("propagates non-404 registry lookup failures / 404가 아닌 registry 조회 실패를 전파한다", async (failure) => {
+    ["propagates auth lookup failure", "인증 lookup 실패를 전파한다", Object.assign(new Error("unauthorized"), { stderr: "npm error code E401" })],
+    ["propagates network lookup failure", "network lookup 실패를 전파한다", Object.assign(new Error("network"), { code: "ECONNRESET" })],
+    ["propagates 404-like non-E404 lookup failure", "E404가 아닌 404 형태 lookup 실패를 전파한다", Object.assign(new Error("looks like 404"), { stderr: "npm error 404 but no E404 code" })]
+  ])("%s / %s", async (_englishLabel, _koreanLabel, failure) => {
     const adapter = createNpmRegistryAdapter({ run: async () => { throw failure; } });
 
     await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).rejects.toBe(failure);
@@ -485,11 +540,11 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
   });
 
   it.each([
-    ["missing tag", [], {}],
-    ["unknown argument", ["--other"], {}],
-    ["duplicate tag", ["--tag", "v0.1.0", "--tag", "v0.1.0"], {}],
-    ["missing tag value", ["--tag"], {}]
-  ])("rejects CLI %s before temporary directory creation / temporary directory 생성 전에 CLI %s를 거부한다", async (_label, argv, environment) => {
+    ["rejects missing tag before temporary directory creation", "temporary directory 생성 전에 누락된 tag를 거부한다", [], {}],
+    ["rejects unknown argument before temporary directory creation", "temporary directory 생성 전에 알 수 없는 argument를 거부한다", ["--other"], {}],
+    ["rejects duplicate tag before temporary directory creation", "temporary directory 생성 전에 중복된 tag를 거부한다", ["--tag", "v0.1.0", "--tag", "v0.1.0"], {}],
+    ["rejects missing tag value before temporary directory creation", "temporary directory 생성 전에 누락된 tag 값을 거부한다", ["--tag"], {}]
+  ])("%s / %s", async (_englishLabel, _koreanLabel, argv, environment) => {
     let madeTemporaryDirectory = false;
 
     await expect(runPublishCli({
@@ -509,9 +564,44 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     expect(madeTemporaryDirectory).toBe(false);
   });
 
-  it.each(["pack", "lookup", "publish", "confirmation"])(
-    "cleans the exact temporary directory after %s failure / %s 실패 뒤 정확한 temporary directory를 정리한다",
-    async (failurePoint) => {
+  it.each([
+    ["rejects prerelease tag before any CLI side effect", "CLI 부작용 전에 prerelease tag를 거부한다", ["--tag", "v0.1.0-next.1"]],
+    ["rejects tag and root version mismatch before any CLI side effect", "CLI 부작용 전에 tag와 root version 불일치를 거부한다", ["--tag", "v0.1.1"]]
+  ])("%s / %s", async (_englishLabel, _koreanLabel, argv) => {
+    const effects: string[] = [];
+    const registry = {
+      lookupIntegrity: async () => {
+        effects.push("lookup");
+        return undefined;
+      },
+      publish: async () => {
+        effects.push("publish");
+      }
+    };
+
+    await expect(runPublishCli({
+      argv,
+      rootVersion: VERSION,
+      createTemporaryDirectory: async () => {
+        effects.push("temporary-directory");
+        return "/tmp/unreachable";
+      },
+      pack: async () => {
+        effects.push("pack");
+        return [];
+      },
+      registry,
+      sleep: async () => undefined
+    })).rejects.toThrow();
+    expect(effects).toEqual([]);
+  });
+
+  it.each([
+    ["cleans temporary directory after pack failure", "pack 실패 뒤 temporary directory를 정리한다", "pack"],
+    ["cleans temporary directory after lookup failure", "lookup 실패 뒤 temporary directory를 정리한다", "lookup"],
+    ["cleans temporary directory after publish failure", "publish 실패 뒤 temporary directory를 정리한다", "publish"],
+    ["cleans temporary directory after confirmation failure", "confirmation 실패 뒤 temporary directory를 정리한다", "confirmation"]
+  ])("%s / %s", async (_englishLabel, _koreanLabel, failurePoint) => {
       const fixture = await createFixture();
       const cleanupCalls: string[] = [];
       const failure = new Error(`${failurePoint.toUpperCase()}_FAILURE`);
@@ -551,8 +641,7 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
         sleep: async () => undefined
       })).rejects.toBe(failure);
       expect(cleanupCalls).toEqual([fixture.root]);
-    }
-  );
+    });
 
   it("preserves the primary failure before cleanup failure / cleanup 실패보다 원래 실패를 보존한다", async () => {
     const fixture = await createFixture();
