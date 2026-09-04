@@ -1,12 +1,10 @@
 import { createHash } from "node:crypto";
-import { execFile } from "node:child_process";
 import { mkdir, readFile } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import { commandForPlatform, runCommand } from "./command-runner.mjs";
 import { CORE_SUBPATHS, PUBLIC_PACKAGES } from "./package-catalog.mjs";
 
-const executeFile = promisify(execFile);
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const ALLOWED_ROOT_FILES = new Set(["README.md", "LICENSE", "package.json"]);
 const SENSITIVE_EXTENSIONS = new Set([".cer", ".crt", ".key", ".p12", ".pem", ".pfx"]);
@@ -34,6 +32,21 @@ const getFilePaths = (artifact) => {
 
     return file;
   });
+};
+
+const validateCanonicalPackedPath = (packageName, path) => {
+  const segments = path.split("/");
+
+  if (
+    path.length === 0 ||
+    path.includes("\0") ||
+    path.includes("\\") ||
+    posix.isAbsolute(path) ||
+    segments.some((segment) => segment.length === 0 || segment === "." || segment === "..") ||
+    posix.normalize(path) !== path
+  ) {
+    throw new Error(`${packageName}: packed file path ${JSON.stringify(path)} must be a canonical POSIX relative path.`);
+  }
 };
 
 const isForbiddenPath = (path) => {
@@ -65,6 +78,7 @@ const isForbiddenPath = (path) => {
 
 export function validatePackedFiles(artifact) {
   for (const path of getFilePaths(artifact)) {
+    validateCanonicalPackedPath(artifact.name, path);
     const forbiddenReason = isForbiddenPath(path);
 
     if (forbiddenReason !== undefined) {
@@ -143,8 +157,8 @@ export async function packPackages(destination) {
   const artifacts = [];
 
   for (const packageInfo of PUBLIC_PACKAGES) {
-    const { stdout } = await executeFile(
-      "pnpm",
+    const { stdout } = await runCommand(
+      commandForPlatform("pnpm"),
       ["--dir", join(REPOSITORY_ROOT, packageInfo.directory), "pack", "--pack-destination", outputDirectory, "--json"],
       { cwd: REPOSITORY_ROOT, maxBuffer: 10 * 1024 * 1024 }
     );

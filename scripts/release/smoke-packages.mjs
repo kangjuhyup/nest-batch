@@ -1,13 +1,11 @@
-import { execFile } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import { commandForPlatform, localBinaryForPlatform, runCommand } from "./command-runner.mjs";
 import { CORE_SUBPATHS, PUBLIC_PACKAGES } from "./package-catalog.mjs";
 import { packPackages } from "./pack-packages.mjs";
 
-const executeFile = promisify(execFile);
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 
 const consumerSource = `import { DefaultBatchRunner, defineJob } from "@nest-batch/core";
@@ -42,8 +40,19 @@ await Promise.all(specifiers.map(async (specifier) => {
 }));
 `;
 
+export const createConsumerTsconfig = () => ({
+  compilerOptions: {
+    target: "ES2022",
+    module: "NodeNext",
+    moduleResolution: "NodeNext",
+    strict: true,
+    noEmit: true
+  },
+  files: ["consumer.ts"]
+});
+
 const run = async (command, arguments_, options) => {
-  await executeFile(command, arguments_, {
+  await runCommand(command, arguments_, {
     ...options,
     maxBuffer: 10 * 1024 * 1024
   });
@@ -62,29 +71,19 @@ export async function smokePackages() {
       type: "module",
       dependencies
     };
-    const consumerTsconfig = {
-      compilerOptions: {
-        target: "ES2022",
-        module: "NodeNext",
-        moduleResolution: "NodeNext",
-        strict: true,
-        noEmit: true,
-        skipLibCheck: true
-      },
-      files: ["consumer.ts"]
-    };
+    const consumerTsconfig = createConsumerTsconfig();
 
     await writeFile(join(temporaryRoot, "package.json"), `${JSON.stringify(consumerManifest, null, 2)}\n`);
     await writeFile(join(temporaryRoot, "tsconfig.json"), `${JSON.stringify(consumerTsconfig, null, 2)}\n`);
     await writeFile(join(temporaryRoot, "consumer.ts"), consumerSource);
     await writeFile(join(temporaryRoot, "runtime-imports.mjs"), runtimeImportsSource);
 
-    await run("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund"], { cwd: temporaryRoot });
+    await run(commandForPlatform("npm"), ["install", "--ignore-scripts", "--no-audit", "--no-fund"], { cwd: temporaryRoot });
     await run(process.execPath, [join(REPOSITORY_ROOT, "node_modules", "typescript", "bin", "tsc"), "--project", "tsconfig.json"], {
       cwd: temporaryRoot
     });
     await run(process.execPath, ["runtime-imports.mjs"], { cwd: temporaryRoot });
-    await run(join(temporaryRoot, "node_modules", ".bin", "nest-batch"), ["--help"], { cwd: temporaryRoot });
+    await run(localBinaryForPlatform(temporaryRoot, "nest-batch"), ["--help"], { cwd: temporaryRoot });
 
     return artifacts;
   } finally {

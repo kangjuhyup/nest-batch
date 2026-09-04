@@ -37,6 +37,25 @@ describe("package tarball validation / package tarball 검증", () => {
     })).toThrow(expectedError);
   });
 
+  it.each([
+    ["", "empty path"],
+    [".", "dot path"],
+    ["..", "dot-dot path"],
+    ["./dist/index.js", "leading dot segment"],
+    ["dist/./index.js", "nested dot segment"],
+    ["dist/../secrets.txt", "dist traversal"],
+    ["src/a/../../secrets.txt", "src traversal"],
+    ["/dist/index.js", "absolute path"],
+    ["dist//index.js", "empty nested segment"],
+    ["dist\\index.js", "backslash separator"],
+    ["dist/\u0000index.js", "NUL byte"]
+  ])("rejects non-canonical path %s / %s를 거부한다", (path) => {
+    expect(() => validatePackedFiles({
+      name: "@nest-batch/core",
+      files: ["dist/index.js", path, "README.md", "LICENSE", "package.json"]
+    })).toThrow(/canonical POSIX relative path/u);
+  });
+
   it("rejects an invalid file list / 잘못된 파일 목록을 거부한다", () => {
     expect(() => validatePackedFiles({
       name: "@nest-batch/core",

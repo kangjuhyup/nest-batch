@@ -35,7 +35,7 @@
     "typecheck": "tsc -b",
     "release:verify": "node scripts/release/verify-release.mjs",
     "release:smoke": "node scripts/release/smoke-packages.mjs",
-    "release:check": "pnpm typecheck && pnpm test && pnpm build && pnpm release:verify && pnpm release:smoke"
+    "release:check": "node scripts/release/release-check.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",
