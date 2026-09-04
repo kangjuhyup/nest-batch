@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { commandForPlatform, localBinaryForPlatform, runCommand } from "./command-runner.mjs";
+import { commandForPlatform, localBinaryForPlatform, runCommandInherited } from "./command-runner.mjs";
 import { CORE_SUBPATHS, PUBLIC_PACKAGES } from "./package-catalog.mjs";
 import { packPackages } from "./pack-packages.mjs";
 
@@ -51,12 +51,7 @@ export const createConsumerTsconfig = () => ({
   files: ["consumer.ts"]
 });
 
-const run = async (command, arguments_, options) => {
-  await runCommand(command, arguments_, {
-    ...options,
-    maxBuffer: 10 * 1024 * 1024
-  });
-};
+const run = (command, arguments_, options) => runCommandInherited(command, arguments_, options);
 
 export async function smokePackages() {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "nest-batch-consumer-"));
