@@ -32,7 +32,10 @@
     "test:e2e:system": "vitest run --config vitest.e2e.config.ts ./e2e/",
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:perf:postgres": "vitest run --config vitest.perf.config.ts packages/postgres/test/postgres.perf.test.ts",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "release:verify": "node scripts/release/verify-release.mjs",
+    "release:smoke": "node scripts/release/smoke-packages.mjs",
+    "release:check": "pnpm typecheck && pnpm test && pnpm build && pnpm release:verify && pnpm release:smoke"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",

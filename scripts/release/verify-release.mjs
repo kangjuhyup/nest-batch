@@ -1,8 +1,7 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { REPOSITORY_URL } from "./package-catalog.mjs";
-import { PUBLIC_PACKAGES } from "./package-catalog.mjs";
+import { CORE_SUBPATHS, PUBLIC_PACKAGES, REPOSITORY_URL } from "./package-catalog.mjs";
 
 const EXPECTED_HOMEPAGE = "https://github.com/kangjuhyup/nest-batch#readme";
 const EXPECTED_BUGS_URL = "https://github.com/kangjuhyup/nest-batch/issues";
@@ -68,6 +67,26 @@ const validatePackageDocuments = (root, packageInfo) => {
 
   if (missing.length > 0) {
     throw new Error(`${packageInfo.directory}/README.md is missing ${missing.join(", ")}`);
+  }
+};
+
+const validateBuildArtifacts = (root, packageInfo) => {
+  const requiredFiles = ["dist/index.js", "dist/index.d.ts"];
+
+  if (packageInfo.name === "@nest-batch/core") {
+    for (const subpath of CORE_SUBPATHS) {
+      requiredFiles.push(`dist/${subpath}/index.js`, `dist/${subpath}/index.d.ts`);
+    }
+  }
+
+  if (packageInfo.name === "@nest-batch/cli") {
+    requiredFiles.push("dist/bin.js");
+  }
+
+  const missing = requiredFiles.filter((path) => !existsSync(join(root, packageInfo.directory, path)));
+
+  if (missing.length > 0) {
+    throw new Error(`${packageInfo.directory}: missing build artifacts ${missing.join(", ")}`);
   }
 };
 
@@ -238,6 +257,12 @@ export function verifyReleaseRepository(root) {
 
     try {
       validatePackageDocuments(repositoryRoot, packageInfo);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+
+    try {
+      validateBuildArtifacts(repositoryRoot, packageInfo);
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
     }

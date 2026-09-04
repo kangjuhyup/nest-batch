@@ -1,0 +1,106 @@
+import { execFile } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import { CORE_SUBPATHS, PUBLIC_PACKAGES } from "./package-catalog.mjs";
+import { packPackages } from "./pack-packages.mjs";
+
+const executeFile = promisify(execFile);
+const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
+
+const consumerSource = `import { DefaultBatchRunner, defineJob } from "@nest-batch/core";
+import { WorkerLoop } from "@nest-batch/core/queue";
+import { SchedulerLoop } from "@nest-batch/core/scheduler";
+import { ContinuousPollingLoop } from "@nest-batch/core/polling";
+import { LocalWorkerPool, WorkerThreadPool } from "@nest-batch/core/worker";
+import { NestBatchModule } from "@nest-batch/nest";
+import { InMemoryBatchStorage } from "@nest-batch/inmemory";
+import { PostgresBatchStorage } from "@nest-batch/postgres";
+import { MySqlBatchStorage } from "@nest-batch/mysql";
+import { MariaDbBatchStorage } from "@nest-batch/mariadb";
+import { BullMqWorkQueue } from "@nest-batch/bullmq";
+import { runCli } from "@nest-batch/cli";
+
+void [DefaultBatchRunner, defineJob, WorkerLoop, SchedulerLoop, ContinuousPollingLoop,
+  LocalWorkerPool, WorkerThreadPool, NestBatchModule, InMemoryBatchStorage,
+  PostgresBatchStorage, MySqlBatchStorage, MariaDbBatchStorage, BullMqWorkQueue, runCli];
+`;
+
+const runtimeImportsSource = `const specifiers = ${JSON.stringify([
+  ...PUBLIC_PACKAGES.map(({ name }) => name),
+  ...CORE_SUBPATHS.map((subpath) => `@nest-batch/core/${subpath}`)
+])};
+
+await Promise.all(specifiers.map(async (specifier) => {
+  const module = await import(specifier);
+
+  if (Object.keys(module).length === 0) {
+    throw new Error(specifier + " has no runtime exports.");
+  }
+}));
+`;
+
+const run = async (command, arguments_, options) => {
+  await executeFile(command, arguments_, {
+    ...options,
+    maxBuffer: 10 * 1024 * 1024
+  });
+};
+
+export async function smokePackages() {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "nest-batch-consumer-"));
+
+  try {
+    const tarballDirectory = join(temporaryRoot, "tarballs");
+    const artifacts = await packPackages(tarballDirectory);
+    const dependencies = Object.fromEntries(artifacts.map((artifact) => [artifact.name, `file:${artifact.tarball}`]));
+    const consumerManifest = {
+      name: "nest-batch-release-smoke-consumer",
+      private: true,
+      type: "module",
+      dependencies
+    };
+    const consumerTsconfig = {
+      compilerOptions: {
+        target: "ES2022",
+        module: "NodeNext",
+        moduleResolution: "NodeNext",
+        strict: true,
+        noEmit: true,
+        skipLibCheck: true
+      },
+      files: ["consumer.ts"]
+    };
+
+    await writeFile(join(temporaryRoot, "package.json"), `${JSON.stringify(consumerManifest, null, 2)}\n`);
+    await writeFile(join(temporaryRoot, "tsconfig.json"), `${JSON.stringify(consumerTsconfig, null, 2)}\n`);
+    await writeFile(join(temporaryRoot, "consumer.ts"), consumerSource);
+    await writeFile(join(temporaryRoot, "runtime-imports.mjs"), runtimeImportsSource);
+
+    await run("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund"], { cwd: temporaryRoot });
+    await run(process.execPath, [join(REPOSITORY_ROOT, "node_modules", "typescript", "bin", "tsc"), "--project", "tsconfig.json"], {
+      cwd: temporaryRoot
+    });
+    await run(process.execPath, ["runtime-imports.mjs"], { cwd: temporaryRoot });
+    await run(join(temporaryRoot, "node_modules", ".bin", "nest-batch"), ["--help"], { cwd: temporaryRoot });
+
+    return artifacts;
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+}
+
+const isDirectExecution = () =>
+  process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
+
+if (isDirectExecution()) {
+  try {
+    const artifacts = await smokePackages();
+    console.log(`Release smoke test passed for ${artifacts.length} packages.`);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}

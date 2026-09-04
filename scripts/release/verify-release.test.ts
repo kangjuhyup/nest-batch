@@ -82,6 +82,21 @@ function createRepository(
     writeFileSync(join(packageDirectory, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
     writeFileSync(join(packageDirectory, "LICENSE"), licenseForPackage(packageInfo));
     writeFileSync(join(packageDirectory, "README.md"), createPackageReadme(packageInfo));
+    mkdirSync(join(packageDirectory, "dist"), { recursive: true });
+    writeFileSync(join(packageDirectory, "dist", "index.js"), "export {};\n", { flag: "w" });
+    writeFileSync(join(packageDirectory, "dist", "index.d.ts"), "export {};\n", { flag: "w" });
+
+    if (packageInfo.name === "@nest-batch/core") {
+      for (const subpath of CORE_SUBPATHS) {
+        mkdirSync(join(packageDirectory, "dist", subpath), { recursive: true });
+        writeFileSync(join(packageDirectory, "dist", subpath, "index.js"), "export {};\n");
+        writeFileSync(join(packageDirectory, "dist", subpath, "index.d.ts"), "export {};\n");
+      }
+    }
+
+    if (packageInfo.name === "@nest-batch/cli") {
+      writeFileSync(join(packageDirectory, "dist", "bin.js"), "export {};\n");
+    }
   }
 
   return root;
@@ -159,6 +174,20 @@ describe("release metadata validation / release metadata 검증", () => {
     );
 
     expect(() => release.verifyReleaseRepository(root)).toThrow(/LICENSE/);
+  });
+
+  it("rejects a missing core subpath declaration / core subpath 선언 파일 누락을 거부한다", () => {
+    const root = createRepository();
+    rmSync(join(root, "packages/core/dist/worker/index.d.ts"));
+
+    expect(() => release.verifyReleaseRepository(root)).toThrow(/dist\/worker\/index\.d\.ts/);
+  });
+
+  it("rejects a missing CLI binary / CLI 실행 파일 누락을 거부한다", () => {
+    const root = createRepository();
+    rmSync(join(root, "packages/cli/dist/bin.js"));
+
+    expect(() => release.verifyReleaseRepository(root)).toThrow(/dist\/bin\.js/);
   });
 
   it("verifies the checked-out release repository / 현재 checkout된 릴리즈 repository를 검증한다", () => {
