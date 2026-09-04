@@ -237,6 +237,11 @@ pnpm test
 pnpm build
 ```
 
+사용자에게 보이는 package 변경이면 `pnpm changeset`을 실행하고 생성된 Changeset을
+PR에 포함합니다. package 산출물과 무관한 변경이면 `pnpm changeset --empty`를 실행하거나
+Changeset이 필요 없는 이유를 적습니다. maintainer는 bootstrap, Trusted Publisher, tag,
+실패 복구 절차를 [공개 배포 checklist](docs/releasing.md)에서 확인합니다.
+
 ## Test Services
 
 이 저장소는 local database와 queue integration test를 위해 Docker Compose를

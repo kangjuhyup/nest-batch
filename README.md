@@ -246,6 +246,12 @@ pnpm test
 pnpm build
 ```
 
+For a user-visible package change, run `pnpm changeset` and include the generated
+Changeset in the PR. For a change that does not affect a package artifact, run
+`pnpm changeset --empty` or explain why no Changeset is needed. Maintainers should
+follow the [release checklist](docs/releasing.md) for bootstrap, Trusted Publisher,
+tag, and recovery steps.
+
 ## Test Services
 
 The repository uses Docker Compose for local database and queue integration

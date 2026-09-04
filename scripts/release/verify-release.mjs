@@ -9,6 +9,17 @@ const EXPECTED_BUGS_URL = "https://github.com/kangjuhyup/nest-batch/issues";
 const EXPECTED_REPOSITORY_URL = "https://github.com/kangjuhyup/nest-batch";
 const EXPECTED_NODE_RANGE = ">=20.18.0";
 const EXPECTED_FILES = ["dist", "src", "README.md", "LICENSE"];
+const RELEASING_GUIDE_PATH = "docs/releasing.md";
+const PUBLISH_WORKFLOW_FILENAME = "publish.yml";
+const PUBLISH_ENVIRONMENT = "npm";
+const BOOTSTRAP_PUBLISH_COMMAND = "pnpm run release:publish --tag v0.1.0";
+const RELEASE_CHECKLIST_HEADINGS = [
+  "## 1. Release candidate 준비",
+  "## 2. 최초 0.1.0 bootstrap",
+  "## 3. Trusted Publisher 등록",
+  "## 4. Tag release",
+  "## 5. 실패 복구"
+];
 const NUMERIC_IDENTIFIER = "(?:0|[1-9]\\d*)";
 const NON_NUMERIC_IDENTIFIER = "\\d*[A-Za-z-][0-9A-Za-z-]*";
 const PRERELEASE_IDENTIFIER = `(?:${NUMERIC_IDENTIFIER}|${NON_NUMERIC_IDENTIFIER})`;
@@ -41,6 +52,47 @@ const hasMarkdownLinkTarget = (readme, target) => {
   const autoLink = new RegExp(`<${targetPattern}>`, "u");
 
   return markdownLink.test(readme) || autoLink.test(readme);
+};
+
+const validateReleasingGuide = (root) => {
+  const releasingGuidePath = join(root, RELEASING_GUIDE_PATH);
+  let guide;
+
+  try {
+    guide = readFileSync(releasingGuidePath, "utf8");
+  } catch (error) {
+    throw new Error(`${RELEASING_GUIDE_PATH} is required: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const expectedChecklistLines = [
+    "- [ ] `pnpm release:check` 성공",
+    `- [ ] owner \`kangjuhyup\`, repository \`nest-batch\`, workflow \`${PUBLISH_WORKFLOW_FILENAME}\`, environment \`${PUBLISH_ENVIRONMENT}\` 등록`,
+    `- [ ] \`${BOOTSTRAP_PUBLISH_COMMAND}\`을 maintainer가 직접 실행`
+  ];
+  const requirements = [
+    ...PUBLIC_PACKAGES.map(({ name }) => `\`${name}\``),
+    ...expectedChecklistLines
+  ];
+  const missing = requirements.filter((requirement) => !guide.includes(requirement));
+  const headingIndexes = RELEASE_CHECKLIST_HEADINGS.map((heading) => guide.indexOf(heading));
+
+  if (headingIndexes.some((index) => index === -1)) {
+    const missingHeadings = RELEASE_CHECKLIST_HEADINGS.filter((_, index) => headingIndexes[index] === -1);
+    throw new Error(`${RELEASING_GUIDE_PATH} is missing required checklist sections: ${missingHeadings.join(", ")}`);
+  }
+
+  if (headingIndexes.some((index, position) => position > 0 && index <= headingIndexes[position - 1])) {
+    throw new Error(`${RELEASING_GUIDE_PATH} checklist sections must stay in the approved order`);
+  }
+
+  const sectionHeadings = guide.match(/^## .+$/gmu) ?? [];
+  if (sectionHeadings.length !== RELEASE_CHECKLIST_HEADINGS.length) {
+    throw new Error(`${RELEASING_GUIDE_PATH} must contain exactly five checklist sections`);
+  }
+
+  if (missing.length > 0) {
+    throw new Error(`${RELEASING_GUIDE_PATH} is missing required release values: ${missing.join(", ")}`);
+  }
 };
 
 const validatePackageDocuments = (root, packageInfo) => {
@@ -226,6 +278,12 @@ export async function verifyReleaseRepository(root) {
   errors.push(...rootManifestErrors.map((error) => `package.json: ${error}`));
 
   const rootLicense = readFileSync(join(repositoryRoot, "LICENSE"), "utf8");
+
+  try {
+    validateReleasingGuide(repositoryRoot);
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+  }
 
   for (const packageInfo of PUBLIC_PACKAGES) {
     const manifestPath = join(repositoryRoot, packageInfo.directory, "package.json");
