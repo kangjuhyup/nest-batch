@@ -2,9 +2,9 @@ import { lstat, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { commandForPlatform, runCommand } from "./command-runner.mjs";
+import { commandForPlatform, runCommand, runCommandInherited } from "./command-runner.mjs";
 import { packPackages } from "./pack-packages.mjs";
-import { PUBLIC_PACKAGES } from "./package-catalog.mjs";
+import { NPM_REGISTRY_URL, PUBLIC_PACKAGES } from "./package-catalog.mjs";
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
@@ -190,14 +190,22 @@ const isNotFoundResponse = (error) => {
 };
 
 export const createNpmRegistryAdapter = ({
-  run = runCommand,
+  runLookup = runCommand,
+  runPublish = runCommandInherited,
   command = commandForPlatform("npm"),
   cwd = REPOSITORY_ROOT,
   artifactRoot = undefined
 } = {}) => ({
   lookupIntegrity: async (name, version) => {
     try {
-      const { stdout } = await run(command, ["view", `${name}@${version}`, "dist.integrity", "--json"], {
+      const { stdout } = await runLookup(command, [
+        "view",
+        `${name}@${version}`,
+        "dist.integrity",
+        "--json",
+        "--registry",
+        NPM_REGISTRY_URL
+      ], {
         cwd,
         maxBuffer: 10 * 1024 * 1024
       });
@@ -213,10 +221,15 @@ export const createNpmRegistryAdapter = ({
   publish: async (artifact) => {
     const artifactRootBoundary = await canonicalArtifactRoot(artifactRoot);
     await validateTarball(artifact?.tarball, artifactRootBoundary, "npm publish artifact");
-    await run(command, ["publish", "--access", "public", "--", artifact.tarball], {
-      cwd,
-      maxBuffer: 10 * 1024 * 1024
-    });
+    await runPublish(command, [
+      "publish",
+      "--access",
+      "public",
+      "--registry",
+      NPM_REGISTRY_URL,
+      "--",
+      artifact.tarball
+    ], { cwd });
   }
 });
 

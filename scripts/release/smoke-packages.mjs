@@ -1,10 +1,10 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { commandForPlatform, localBinaryForPlatform, runCommandInherited } from "./command-runner.mjs";
 import { CORE_SUBPATHS, PUBLIC_PACKAGES } from "./package-catalog.mjs";
-import { packPackages } from "./pack-packages.mjs";
+import { packPackages, validatePackedManifest } from "./pack-packages.mjs";
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -53,6 +53,32 @@ export const createConsumerTsconfig = () => ({
 
 const run = (command, arguments_, options) => runCommandInherited(command, arguments_, options);
 
+export const validateInstalledPackageMetadata = async (consumerRoot, artifacts) => {
+  if (!Array.isArray(artifacts) || artifacts.length !== PUBLIC_PACKAGES.length) {
+    throw new Error(`Installed metadata validation requires ${PUBLIC_PACKAGES.length} catalog artifacts.`);
+  }
+
+  for (let index = 0; index < PUBLIC_PACKAGES.length; index += 1) {
+    const packageInfo = PUBLIC_PACKAGES[index];
+    const artifact = artifacts[index];
+
+    if (artifact?.name !== packageInfo.name || typeof artifact.version !== "string") {
+      throw new Error(`Installed metadata artifact at catalog order ${index} must be ${packageInfo.name}.`);
+    }
+
+    const packagePath = join(consumerRoot, "node_modules", ...packageInfo.name.split("/"), "package.json");
+    let manifest;
+
+    try {
+      manifest = JSON.parse(await readFile(packagePath, "utf8"));
+    } catch (error) {
+      throw new Error(`${packageInfo.name}: unable to read installed package metadata: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    validatePackedManifest(manifest, packageInfo, artifact.version, artifact.manifest);
+  }
+};
+
 export async function smokePackages() {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "nest-batch-consumer-"));
 
@@ -74,6 +100,7 @@ export async function smokePackages() {
     await writeFile(join(temporaryRoot, "runtime-imports.mjs"), runtimeImportsSource);
 
     await run(commandForPlatform("npm"), ["install", "--ignore-scripts", "--no-audit", "--no-fund"], { cwd: temporaryRoot });
+    await validateInstalledPackageMetadata(temporaryRoot, artifacts);
     await run(process.execPath, [join(REPOSITORY_ROOT, "node_modules", "typescript", "bin", "tsc"), "--project", "tsconfig.json"], {
       cwd: temporaryRoot
     });

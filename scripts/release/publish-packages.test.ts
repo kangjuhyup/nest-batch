@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseDocument } from "yaml";
-import { PUBLIC_PACKAGES } from "./package-catalog.mjs";
+import { NPM_REGISTRY_URL, PUBLIC_PACKAGES } from "./package-catalog.mjs";
 import {
   createNpmRegistryAdapter,
   decidePublication,
@@ -521,19 +521,19 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
   it("classifies only explicit npm 404 lookup errors as missing / 명시적인 npm 404 조회 오류만 미배포로 처리한다", async () => {
     const commandCalls: unknown[][] = [];
     const adapter = createNpmRegistryAdapter({
-      run: async (...arguments_) => {
+      runLookup: async (...arguments_) => {
         commandCalls.push(arguments_);
         throw Object.assign(new Error("missing"), { code: "E404", statusCode: 404 });
       }
     });
 
     await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).resolves.toBeUndefined();
-    expect(commandCalls).toEqual([["npm", ["view", "@nest-batch/core@0.1.0", "dist.integrity", "--json"], expect.any(Object)]]);
+    expect(commandCalls).toEqual([["npm", ["view", "@nest-batch/core@0.1.0", "dist.integrity", "--json", "--registry", NPM_REGISTRY_URL], expect.any(Object)]]);
   });
 
   it("classifies npm E404 stderr as missing / npm E404 stderr를 미배포로 처리한다", async () => {
     const adapter = createNpmRegistryAdapter({
-      run: async () => {
+      runLookup: async () => {
         throw Object.assign(new Error("missing"), { stderr: "npm error code E404\nnpm error 404 Not Found" });
       }
     });
@@ -546,36 +546,42 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     ["propagates network lookup failure", "network lookup 실패를 전파한다", Object.assign(new Error("network"), { code: "ECONNRESET" })],
     ["propagates 404-like non-E404 lookup failure", "E404가 아닌 404 형태 lookup 실패를 전파한다", Object.assign(new Error("looks like 404"), { stderr: "npm error 404 but no E404 code" })]
   ])("%s / %s", async (_englishLabel, _koreanLabel, failure) => {
-    const adapter = createNpmRegistryAdapter({ run: async () => { throw failure; } });
+    const adapter = createNpmRegistryAdapter({ runLookup: async () => { throw failure; } });
 
     await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).rejects.toBe(failure);
   });
 
   it("rejects malformed npm lookup JSON / 잘못된 npm 조회 JSON을 거부한다", async () => {
-    const adapter = createNpmRegistryAdapter({ run: async () => ({ stdout: "not-json" }) });
+    const adapter = createNpmRegistryAdapter({ runLookup: async () => ({ stdout: "not-json" }) });
 
     await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).rejects.toThrow(/invalid JSON/u);
   });
 
   it("rejects malformed npm lookup integrity / 잘못된 npm 조회 integrity를 거부한다", async () => {
-    const adapter = createNpmRegistryAdapter({ run: async () => ({ stdout: JSON.stringify("sha512-not_base64!") }) });
+    const adapter = createNpmRegistryAdapter({ runLookup: async () => ({ stdout: JSON.stringify("sha512-not_base64!") }) });
 
     await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).rejects.toThrow(/integrity/u);
   });
 
-  it("publishes through a hardened npm argv boundary / 강화된 npm argv 경계로 tarball을 배포한다", async () => {
+  it("uses buffered lookup and inherited publish runners with the public registry / 조회와 배포에 각각 buffered 및 inherited runner와 public registry를 사용한다", async () => {
     const fixture = await createFixture();
-    const commandCalls: unknown[][] = [];
+    const lookupCalls: unknown[][] = [];
+    const publishCalls: unknown[][] = [];
     const adapter = createNpmRegistryAdapter({
       artifactRoot: fixture.root,
-      run: async (...arguments_) => {
-        commandCalls.push(arguments_);
-        return { stdout: "" };
+      runLookup: async (...arguments_) => {
+        lookupCalls.push(arguments_);
+        return { stdout: JSON.stringify(fixture.artifacts[0].integrity) };
+      },
+      runPublish: async (...arguments_) => {
+        publishCalls.push(arguments_);
       }
     });
 
+    await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).resolves.toBe(fixture.artifacts[0].integrity);
     await adapter.publish(fixture.artifacts[0]);
-    expect(commandCalls).toEqual([["npm", ["publish", "--access", "public", "--", fixture.artifacts[0].tarball], expect.any(Object)]]);
+    expect(lookupCalls).toEqual([["npm", ["view", "@nest-batch/core@0.1.0", "dist.integrity", "--json", "--registry", NPM_REGISTRY_URL], expect.objectContaining({ maxBuffer: expect.any(Number) })]]);
+    expect(publishCalls).toEqual([["npm", ["publish", "--access", "public", "--registry", NPM_REGISTRY_URL, "--", fixture.artifacts[0].tarball], expect.not.objectContaining({ maxBuffer: expect.anything() })]]);
   });
 
   it("rejects an option-like tarball in the npm adapter before command execution / npm adapter에서 option 형태 tarball을 명령 실행 전에 거부한다", async () => {
@@ -583,7 +589,7 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     const commandCalls: unknown[][] = [];
     const adapter = createNpmRegistryAdapter({
       artifactRoot: fixture.root,
-      run: async (...arguments_) => {
+      runPublish: async (...arguments_) => {
         commandCalls.push(arguments_);
         return { stdout: "" };
       }

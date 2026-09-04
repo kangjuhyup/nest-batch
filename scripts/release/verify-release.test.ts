@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { CORE_SUBPATHS, PUBLIC_PACKAGES } from "./package-catalog.mjs";
+import { CORE_SUBPATHS, NPM_REGISTRY_URL, PUBLIC_PACKAGES } from "./package-catalog.mjs";
 import { validateManifest, verifyPackageDocuments } from "./verify-release.mjs";
 import * as release from "./verify-release.mjs";
 
@@ -56,13 +56,15 @@ pnpm install --frozen-lockfile
   - 모든 catalog package의 identity를 먼저 read-only로 확인합니다.
 
 \`\`\`bash
-${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} name version maintainers repository dist-tags --json`).join("\n")}
+${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} name version maintainers repository dist-tags --json --registry ${NPM_REGISTRY_URL}`).join("\n")}
 \`\`\`
 
   - 기존 package는 승인된 repository identity와 ownership이 일치하거나 명시적인 transfer/rename 결정이 있어야 합니다. 그렇지 않으면 **STOP**합니다.
   - \`E404\`는 scope publish 권한을 확인한 뒤에만 bootstrap 후보입니다.
 - [ ] \`npm whoami\`와 2FA 상태 확인
+  - \`npm whoami --registry ${NPM_REGISTRY_URL}\`
 - [ ] \`pnpm run release:publish --tag v0.1.0\`을 maintainer가 직접 실행
+- 로컬에서 publish한 \`0.1.0\`은 provenance 예외입니다.
 - [ ] 8개 package의 \`0.1.0\`과 integrity 확인
 
 \`@nest-batch/core\`
@@ -89,6 +91,8 @@ ${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} name version maintainers r
 - [ ] \`git push origin vX.Y.Z\`
 - [ ] publish workflow 성공 확인
 - [ ] npm provenance와 GitHub generated release notes 확인
+  - 처음으로 OIDC publish되는 후속 version부터 provenance를 필수로 확인합니다.
+  - 기존 GitHub Release가 있으면 검증 후 건너뛰고, 없을 때만 생성합니다.
 
 ## 5. 실패 복구
 
@@ -154,7 +158,7 @@ function createRepository(
       bugs: { url: BUGS_URL },
       engines: { node: ">=20.18.0" },
       files: ["dist", "src", "README.md", "LICENSE"],
-      publishConfig: { access: "public" }
+      publishConfig: { access: "public", registry: NPM_REGISTRY_URL }
     };
     mutatePackage?.(manifest, packageInfo);
     const packageDirectory = join(root, packageInfo.directory);
@@ -178,6 +182,14 @@ function createRepository(
       writeFileSync(join(packageDirectory, "dist", "bin.js"), "export {};\n");
     }
   }
+
+  mkdirSync(join(root, ".changeset"), { recursive: true });
+  writeFileSync(join(root, ".changeset", "config.json"), `${JSON.stringify({ fixed: [PUBLIC_PACKAGES.map(({ name }) => name)] }, null, 2)}\n`);
+  writeFileSync(join(root, "tsconfig.json"), `${JSON.stringify({ references: [
+    ...PUBLIC_PACKAGES.map(({ directory }) => ({ path: `./${directory}` })),
+    { path: "./examples/basic" },
+    { path: "./examples/nestjs" }
+  ] }, null, 2)}\n`);
 
   createWorkflowFixtures(root);
 
@@ -203,6 +215,7 @@ describe("release metadata validation / release metadata 검증", () => {
       "@nest-batch/cli"
     ]);
     expect(CORE_SUBPATHS).toEqual(["queue", "scheduler", "polling", "worker"]);
+    expect(NPM_REGISTRY_URL).toBe("https://registry.npmjs.org/");
   });
 
   it("rejects missing public access / public access 누락을 거부한다", () => {
@@ -256,6 +269,63 @@ describe("release metadata validation / release metadata 검증", () => {
     });
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/publishConfig\.access/);
+  });
+
+  it("rejects a package private registry / package의 사설 registry를 거부한다", async () => {
+    const root = createRepository((manifest, packageInfo) => {
+      if (packageInfo.name === "@nest-batch/core") {
+        manifest.publishConfig = { access: "public", registry: "https://registry.example.test/" };
+      }
+    });
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/publishConfig\.registry/u);
+  });
+
+  it("rejects a Changesets fixed group drift / Changesets fixed group 변경을 거부한다", async () => {
+    const root = createRepository();
+    const configPath = join(root, ".changeset/config.json");
+    const config = JSON.parse(readFileSync(configPath, "utf8")) as { fixed: string[][] };
+    config.fixed[0].pop();
+    writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/fixed group/u);
+  });
+
+  it("rejects a root TypeScript package reference drift / root TypeScript package reference 변경을 거부한다", async () => {
+    const root = createRepository();
+    const configPath = join(root, "tsconfig.json");
+    const config = JSON.parse(readFileSync(configPath, "utf8")) as { references: Array<{ path: string }> };
+    config.references.splice(1, 1);
+    writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/public package references/u);
+  });
+
+  it("rejects a source internal dependency range / source 내부 dependency range를 거부한다", async () => {
+    const root = createRepository((manifest, packageInfo) => {
+      if (packageInfo.name === "@nest-batch/nest") {
+        manifest.dependencies = { "@nest-batch/core": "^0.1.0" };
+      }
+    });
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/workspace:\*/u);
+  });
+
+  it("rejects a removed package name outside historical docs / 과거 문서 밖의 제거된 package 이름을 거부한다", async () => {
+    const root = createRepository();
+    const removedName = ["@nest-batch", "queue-core"].join("/");
+    mkdirSync(join(root, "packages/core/src"), { recursive: true });
+    writeFileSync(join(root, "packages/core/src/legacy.ts"), `export * from "${removedName}";\n`);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/removed package name/u);
+  });
+
+  it("rejects a removed workspace package directory / 제거된 workspace package directory를 거부한다", async () => {
+    const root = createRepository();
+    const removedDirectory = ["packages", "worker-local"].join("/");
+    mkdirSync(join(root, removedDirectory), { recursive: true });
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/removed workspace package directory/u);
   });
 
   it("rejects a package LICENSE that differs from root / root와 다른 package LICENSE를 거부한다", async () => {
@@ -324,12 +394,56 @@ describe("release metadata validation / release metadata 검증", () => {
     writeFileSync(
       releasingGuide,
       readFileSync(releasingGuide, "utf8").replace(
-        "npm view @nest-batch/cli name version maintainers repository dist-tags --json\n",
+        `npm view @nest-batch/cli name version maintainers repository dist-tags --json --registry ${NPM_REGISTRY_URL}\n`,
         ""
       )
     );
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*npm view @nest-batch\/cli/);
+  });
+
+  it("rejects a release checklist with an ambient npm registry audit / ambient npm registry를 쓰는 릴리즈 audit를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      readFileSync(releasingGuide, "utf8").replace(` --registry ${NPM_REGISTRY_URL}`, "")
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/registry\.npmjs\.org/u);
+  });
+
+  it("rejects a release checklist without the bootstrap provenance exception / bootstrap provenance 예외가 없는 릴리즈 checklist를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      readFileSync(releasingGuide, "utf8").replace("로컬에서 publish한 `0.1.0`은 provenance 예외입니다.", "로컬 bootstrap에도 provenance가 필요합니다.")
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/provenance 예외/u);
+  });
+
+  it("rejects a release checklist without later OIDC provenance / 후속 OIDC provenance 규칙이 없는 릴리즈 checklist를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      readFileSync(releasingGuide, "utf8").replace("처음으로 OIDC publish되는 후속 version부터 provenance를 필수로 확인합니다.", "후속 provenance는 선택입니다.")
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/OIDC publish/u);
+  });
+
+  it("rejects a release checklist without idempotent GitHub release recovery / 멱등 GitHub release 복구 규칙이 없는 릴리즈 checklist를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      readFileSync(releasingGuide, "utf8").replace("기존 GitHub Release가 있으면 검증 후 건너뛰고, 없을 때만 생성합니다.", "GitHub Release를 항상 다시 생성합니다.")
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/GitHub Release/u);
   });
 
   it("rejects a release checklist that weakens the identity stop rule / identity 중단 규칙을 약화한 릴리즈 checklist를 거부한다", async () => {

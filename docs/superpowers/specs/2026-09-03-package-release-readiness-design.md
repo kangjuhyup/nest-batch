@@ -139,7 +139,9 @@ npm Trusted Publisher는 registry에 이미 존재하는 package에만 설정할
 Trusted Publisher 등록을 마친 뒤 `v0.1.0` tag를 push한다. workflow의 publish
 script는 이미 존재하는 정확한 version을 검증 후 건너뛰므로 중복 publish 없이
 GitHub Release만 생성할 수 있다. 이후 version부터는 tag workflow가 OIDC로 직접
-배포한다.
+배포한다. 로컬에서 bootstrap한 `0.1.0`은 provenance 예외이며 기존 version에는
+provenance가 사후 첨부되지 않는다. 따라서 provenance는 처음으로 OIDC publish되는
+후속 version부터 필수로 확인한다.
 
 ## package 산출물 설계
 
@@ -155,6 +157,7 @@ GitHub Release만 생성할 수 있다. 이후 version부터는 tag workflow가 
 - `homepage`, `bugs.url`
 - `engines.node: >=20.18.0`
 - `publishConfig.access: public`
+- `publishConfig.registry: https://registry.npmjs.org/`
 
 root package는 private workspace 상태를 유지하며 repository와 engines 같은 공통
 프로젝트 metadata를 가진다. publish workflow는 package runtime 지원 범위와 별개로
@@ -203,6 +206,8 @@ repository script는 다음 조건을 검사하고 하나라도 어기면 실패
   declaration entrypoint가 build 및 pack 결과에 존재한다.
 - tarball에 허용된 파일만 들어 있고 `.tsbuildinfo`, test, local secret이 없다.
 - package tarball의 README/LICENSE와 내부 dependency 치환이 올바르다.
+- catalog가 소유한 `dist`를 build 전에 안전하게 비워 stale 파일이 tarball에 섞이지
+  않는다.
 
 ### 소비자 smoke test
 
@@ -242,7 +247,8 @@ publish workflow는 재현성을 위해 cache를 사용하지 않고 tag commit�
 
 `.github/release.yml`에서 feature, fix, documentation, dependency, maintenance
 category를 label로 분류한다. Version PR은 `release` label을 붙여 generated notes에서
-제외한다. GitHub Release는 npm의 8개 package 확인이 끝난 뒤에만 생성한다.
+제외한다. GitHub Release는 npm의 8개 package 확인이 끝난 뒤에만 생성한다. 같은 tag의
+release가 이미 있으면 검증 후 건너뛰고, 없을 때만 생성한다.
 
 ## 실패와 재실행
 

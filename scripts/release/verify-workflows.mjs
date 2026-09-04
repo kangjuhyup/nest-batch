@@ -182,7 +182,7 @@ const EXPECTED_FILES = {
           {
             name: "Create GitHub Release",
             env: { GH_TOKEN: "${{ github.token }}" },
-            run: "gh release create \"$GITHUB_REF_NAME\" --repo \"$GITHUB_REPOSITORY\" --verify-tag --generate-notes --title \"$GITHUB_REF_NAME\""
+            run: "if release_tag=\"$(gh release view \"$GITHUB_REF_NAME\" --repo \"$GITHUB_REPOSITORY\" --json tagName --jq .tagName 2>/dev/null)\"; then\n  test \"$release_tag\" = \"$GITHUB_REF_NAME\"\n  echo \"GitHub Release already exists; skipping.\"\nelse\n  gh release create \"$GITHUB_REF_NAME\" --repo \"$GITHUB_REPOSITORY\" --verify-tag --generate-notes --title \"$GITHUB_REF_NAME\"\nfi\n"
           }
         ]
       }

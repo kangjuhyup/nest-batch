@@ -23,6 +23,9 @@
 - repository URL은 `https://github.com/kangjuhyup/nest-batch.git`과 일치해야 한다.
 - 실제 npm publish, npm 설정 변경, Git tag push는 이 계획에서 실행하지 않는다.
 - credential이나 `NPM_TOKEN`을 repository 또는 workflow에 저장하지 않는다.
+- 로컬 bootstrap `0.1.0`은 provenance 예외이고 처음으로 OIDC publish되는 후속
+  version부터 provenance를 필수로 확인한다.
+- 모든 npm 조회와 publish는 `https://registry.npmjs.org/`를 명시한다.
 - 테스트 설명은 `English / 한국어` 형식을 유지한다.
 
 ## File Structure
@@ -154,7 +157,8 @@ code 1을 설정한다.
   },
   "files": ["dist", "src", "README.md", "LICENSE"],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }
 ```
@@ -646,8 +650,8 @@ remote integrity가 없으면 publish, local과 같으면 skip, 다르면 error�
 기본 adapter가 실행할 명령:
 
 ```text
-npm view <name>@<version> dist.integrity --json
-npm publish <tarball> --access public
+npm view <name>@<version> dist.integrity --json --registry https://registry.npmjs.org/
+npm publish <tarball> --access public --registry https://registry.npmjs.org/
 ```
 
 `npm view`의 404만 unpublished로 처리하고 network/auth 오류는 실패시킨다.
@@ -817,7 +821,8 @@ publish job은 cache 없이 Node 24를 설정하고 `npm install --global npm@12
 pnpm install, `pnpm release:check`, `pnpm run release:publish --tag "$GITHUB_REF_NAME"`을
 실행한다. `NODE_AUTH_TOKEN`이나 npm secret을 설정하지 않는다.
 
-GitHub Release job은 source checkout 없이 아래 명령만 실행한다.
+GitHub Release job은 source checkout 없이 같은 tag의 release를 먼저 조회한다. 기존
+release가 있으면 tag를 검증하고 건너뛰며, 없을 때만 아래 create 명령을 실행한다.
 
 ```bash
 gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
@@ -944,6 +949,8 @@ git commit -m "chore : package release workflow 추가" -m "- Node 호환성과 
 - [ ] `git push origin vX.Y.Z`
 - [ ] publish workflow 성공 확인
 - [ ] npm provenance와 GitHub generated release notes 확인
+  - 로컬 bootstrap `0.1.0`은 provenance 예외로 두고, 처음으로 OIDC publish되는 후속
+    version부터 provenance를 필수로 확인한다.
 
 ## 5. 실패 복구
 - [ ] 같은 tag workflow 재실행으로 동일 integrity package를 skip
@@ -995,7 +1002,7 @@ Task 7에서 의도한 문서와 validator 변경만 나타난다.
 
 - [ ] **Step 5: npm registry read-only availability audit**
 
-각 catalog name에 `npm view <name> version --json`을 실행한다. 404는 최초 bootstrap
+각 catalog name에 `npm view <name> version --json --registry https://registry.npmjs.org/`을 실행한다. 404는 최초 bootstrap
 대상으로 checklist에 기록하고, 이미 존재하면 owner/version을 확인하되 publish나 access
 변경은 하지 않는다.
 

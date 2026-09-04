@@ -1,7 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CORE_SUBPATHS, PUBLIC_PACKAGES, REPOSITORY_URL } from "./package-catalog.mjs";
+import { CORE_SUBPATHS, NPM_REGISTRY_URL, PUBLIC_PACKAGES, REPOSITORY_URL } from "./package-catalog.mjs";
 import { verifyWorkflowFiles } from "./verify-workflows.mjs";
 
 const EXPECTED_HOMEPAGE = "https://github.com/kangjuhyup/nest-batch#readme";
@@ -21,6 +21,9 @@ const TOKEN_PUBLISHING_ACCESS_SETTING = "Require two-factor authentication and d
 const TOKEN_PUBLISHING_ACCESS_SAVE = "Save";
 const PORTABLE_NVM_COMMAND = "nvm use";
 const COREPACK_VERSION_CHECK = "corepack pnpm --version # 10.34.5";
+const BOOTSTRAP_PROVENANCE_EXCEPTION = "로컬에서 publish한 `0.1.0`은 provenance 예외입니다.";
+const LATER_PROVENANCE_REQUIREMENT = "처음으로 OIDC publish되는 후속 version부터 provenance를 필수로 확인합니다.";
+const GITHUB_RELEASE_RERUN_RULE = "기존 GitHub Release가 있으면 검증 후 건너뛰고, 없을 때만 생성합니다.";
 const PERSONAL_NVM_BOOTSTRAP_PATH = "source /Users/kangjuhyup/.nvm/nvm.sh";
 const RELEASE_CHECKLIST_HEADINGS = [
   "## 1. Release candidate 준비",
@@ -35,6 +38,19 @@ const PRERELEASE_IDENTIFIER = `(?:${NUMERIC_IDENTIFIER}|${NON_NUMERIC_IDENTIFIER
 const SEMVER_PATTERN = new RegExp(
   `^${NUMERIC_IDENTIFIER}\\.${NUMERIC_IDENTIFIER}\\.${NUMERIC_IDENTIFIER}(?:-${PRERELEASE_IDENTIFIER}(?:\\.${PRERELEASE_IDENTIFIER})*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$`
 );
+const PUBLIC_PACKAGE_NAMES = new Set(PUBLIC_PACKAGES.map(({ name }) => name));
+const DEPENDENCY_FIELDS = ["dependencies", "optionalDependencies", "peerDependencies", "devDependencies"];
+const LEGACY_PACKAGE_NAMES = [
+  "queue-core",
+  "scheduler-core",
+  "scheduler-calendar",
+  "polling-core",
+  "worker-local",
+  "worker-threads",
+  "queue-bullmq"
+].map((name) => ["@nest-batch", name].join("/"));
+const SCANNED_EXTENSIONS = new Set([".js", ".json", ".md", ".mjs", ".ts", ".yaml", ".yml"]);
+const IGNORED_SCAN_DIRECTORIES = new Set([".git", ".superpowers", ".tsbuildinfo", ".worktrees", "dist", "node_modules"]);
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -78,7 +94,7 @@ const validateReleasingGuide = (root) => {
     `- [ ] owner \`kangjuhyup\`, repository \`nest-batch\`, workflow \`${PUBLISH_WORKFLOW_FILENAME}\`, environment \`${PUBLISH_ENVIRONMENT}\` 등록`,
     `- [ ] \`${BOOTSTRAP_PUBLISH_COMMAND}\`을 maintainer가 직접 실행`
   ];
-  const identityAuditCommands = PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} ${IDENTITY_AUDIT_ARGUMENTS}`);
+  const identityAuditCommands = PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} ${IDENTITY_AUDIT_ARGUMENTS} --registry ${NPM_REGISTRY_URL}`);
   const requirements = [
     ...PUBLIC_PACKAGES.map(({ name }) => `\`${name}\``),
     ...expectedChecklistLines,
@@ -89,7 +105,11 @@ const validateReleasingGuide = (root) => {
     TOKEN_PUBLISHING_ACCESS_SETTING,
     TOKEN_PUBLISHING_ACCESS_SAVE,
     PORTABLE_NVM_COMMAND,
-    COREPACK_VERSION_CHECK
+    COREPACK_VERSION_CHECK,
+    `npm whoami --registry ${NPM_REGISTRY_URL}`,
+    BOOTSTRAP_PROVENANCE_EXCEPTION,
+    LATER_PROVENANCE_REQUIREMENT,
+    GITHUB_RELEASE_RERUN_RULE
   ];
   const missing = requirements.filter((requirement) => !guide.includes(requirement));
   const headingIndexes = RELEASE_CHECKLIST_HEADINGS.map((heading) => guide.indexOf(heading));
@@ -234,6 +254,10 @@ export function validateManifest(manifest, directory) {
     errors.push('publishConfig.access must equal "public"');
   }
 
+  if (!isRecord(manifest.publishConfig) || manifest.publishConfig.registry !== NPM_REGISTRY_URL) {
+    errors.push(`publishConfig.registry must equal ${NPM_REGISTRY_URL}`);
+  }
+
   if (typeof manifest.description !== "string" || manifest.description.trim().length === 0) {
     errors.push("description must be a non-empty string");
   }
@@ -246,6 +270,116 @@ export function validateManifest(manifest, directory) {
     throw new Error(`${directory}: ${errors.join("; ")}`);
   }
 }
+
+const validateReleaseTopology = (root) => {
+  const errors = [];
+  const expectedNames = PUBLIC_PACKAGES.map(({ name }) => name);
+  const expectedDirectories = PUBLIC_PACKAGES.map(({ directory }) => directory);
+  const changesetConfig = readJson(join(root, ".changeset/config.json"));
+  const fixed = changesetConfig?.fixed;
+
+  if (!Array.isArray(fixed) || fixed.length !== 1 || JSON.stringify(fixed[0]) !== JSON.stringify(expectedNames)) {
+    errors.push(`.changeset/config.json fixed group must exactly equal ${JSON.stringify(expectedNames)}`);
+  }
+
+  const rootTsconfig = readJson(join(root, "tsconfig.json"));
+  const references = rootTsconfig?.references;
+
+  if (!Array.isArray(references)) {
+    errors.push("tsconfig.json references must be an array");
+  } else {
+    const packageReferences = references.flatMap((reference) => {
+      if (!isRecord(reference) || typeof reference.path !== "string") {
+        errors.push("tsconfig.json references must contain string paths");
+        return [];
+      }
+
+      const path = reference.path.startsWith("./") ? reference.path.slice(2) : reference.path;
+      return path.startsWith("packages/") ? [path] : [];
+    });
+
+    if (JSON.stringify(packageReferences) !== JSON.stringify(expectedDirectories)) {
+      errors.push(`tsconfig.json public package references must exactly equal ${JSON.stringify(expectedDirectories)}`);
+    }
+  }
+
+  return errors;
+};
+
+const validateSourceInternalDependencies = (manifest, packageInfo) => {
+  const errors = [];
+
+  for (const field of DEPENDENCY_FIELDS) {
+    const dependencies = manifest[field];
+
+    if (dependencies === undefined) {
+      continue;
+    }
+
+    if (!isRecord(dependencies)) {
+      errors.push(`${packageInfo.directory}: ${field} must be an object`);
+      continue;
+    }
+
+    for (const [name, version] of Object.entries(dependencies)) {
+      if (PUBLIC_PACKAGE_NAMES.has(name) && version !== "workspace:*") {
+        errors.push(`${packageInfo.directory}: ${field}.${name} must equal workspace:*`);
+      }
+    }
+  }
+
+  return errors;
+};
+
+const scanFiles = (directory) => {
+  if (!existsSync(directory)) {
+    return [];
+  }
+
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.isSymbolicLink()) {
+      throw new Error(`${entry.name}: symbolic links are not allowed in release scan paths`);
+    }
+
+    if (entry.isDirectory()) {
+      return IGNORED_SCAN_DIRECTORIES.has(entry.name) ? [] : scanFiles(join(directory, entry.name));
+    }
+
+    return entry.isFile() && SCANNED_EXTENSIONS.has(extname(entry.name)) ? [join(directory, entry.name)] : [];
+  });
+};
+
+const validateLegacyPackageAbsence = (root) => {
+  const scanRoots = ["packages", "examples", "scripts", ".github", "docs"];
+  const rootFiles = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json", "README.md", "README-kr.md"];
+  const files = [
+    ...scanRoots.flatMap((directory) => directory === "docs"
+      ? readdirSync(join(root, directory), { withFileTypes: true }).flatMap((entry) => entry.name === "superpowers" ? [] : entry.isDirectory() ? scanFiles(join(root, directory, entry.name)) : SCANNED_EXTENSIONS.has(extname(entry.name)) ? [join(root, directory, entry.name)] : [])
+      : scanFiles(join(root, directory))),
+    ...rootFiles.map((path) => join(root, path)).filter(existsSync)
+  ];
+  const errors = [];
+
+  for (const legacyName of LEGACY_PACKAGE_NAMES) {
+    const legacyDirectory = join(root, "packages", legacyName.slice("@nest-batch/".length));
+
+    if (existsSync(legacyDirectory)) {
+      errors.push(`${relative(root, legacyDirectory)} is a removed workspace package directory`);
+    }
+  }
+
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+
+    for (const legacyName of LEGACY_PACKAGE_NAMES) {
+      if (source.includes(legacyName)) {
+        errors.push(`${relative(root, file)} contains removed package name ${legacyName}`);
+      }
+    }
+  }
+
+  return errors;
+};
 
 function validateRootManifest(manifest) {
   const errors = [];
@@ -305,6 +439,13 @@ export async function verifyReleaseRepository(root) {
   const rootManifestErrors = validateRootManifest(rootManifest);
   errors.push(...rootManifestErrors.map((error) => `package.json: ${error}`));
 
+  try {
+    errors.push(...validateReleaseTopology(repositoryRoot));
+    errors.push(...validateLegacyPackageAbsence(repositoryRoot));
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+  }
+
   const rootLicense = readFileSync(join(repositoryRoot, "LICENSE"), "utf8");
 
   try {
@@ -332,6 +473,8 @@ export async function verifyReleaseRepository(root) {
     if (manifest.version !== rootManifest.version) {
       errors.push(`${packageInfo.directory}: version ${manifest.version} must match root version ${rootManifest.version}`);
     }
+
+    errors.push(...validateSourceInternalDependencies(manifest, packageInfo));
 
     const packageLicensePath = join(repositoryRoot, packageInfo.directory, "LICENSE");
     try {

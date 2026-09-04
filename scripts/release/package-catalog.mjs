@@ -11,3 +11,4 @@ export const PUBLIC_PACKAGES = [
 
 export const CORE_SUBPATHS = ["queue", "scheduler", "polling", "worker"];
 export const REPOSITORY_URL = "https://github.com/kangjuhyup/nest-batch.git";
+export const NPM_REGISTRY_URL = "https://registry.npmjs.org/";

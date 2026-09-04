@@ -124,6 +124,15 @@ const projectBuildInfoTarget = async (repositoryRoot, projectDirectory) => {
   return cleanupPath;
 };
 
+const projectDistTarget = async (repositoryRoot, projectDirectory) => {
+  const projectPath = resolve(repositoryRoot, projectDirectory);
+  await assertContainedPath(repositoryRoot, projectPath, projectDirectory);
+  const cleanupPath = resolve(projectPath, "dist");
+  assertProjectBoundary(projectPath, cleanupPath, projectDirectory);
+  await assertContainedPath(repositoryRoot, cleanupPath, projectDirectory);
+  return cleanupPath;
+};
+
 const exampleDirectoriesFromRootConfig = async (repositoryRoot) => {
   const rootConfigPath = join(repositoryRoot, "tsconfig.json");
   await assertContainedPath(repositoryRoot, rootConfigPath, "root tsconfig");
@@ -186,10 +195,30 @@ export const cleanupReleaseBuildInfo = async (root = REPOSITORY_ROOT, options = 
   }
 };
 
+export const releaseOutputTargets = async (
+  root = REPOSITORY_ROOT,
+  { publicPackages = PUBLIC_PACKAGES } = {}
+) => {
+  const repositoryRoot = await realpath(resolve(root));
+  const packageDirectories = publicPackages.map(publicPackageDirectory);
+  return Promise.all(packageDirectories.map((projectDirectory) => projectDistTarget(repositoryRoot, projectDirectory)));
+};
+
+export const cleanupReleaseOutputs = async (root = REPOSITORY_ROOT, options = {}) => {
+  const targets = await releaseOutputTargets(root, options);
+
+  for (const target of targets) {
+    await rm(target, { recursive: true, force: true });
+  }
+};
+
 export const runReleaseCheck = async ({ repositoryRoot = REPOSITORY_ROOT, run = runCommandInherited } = {}) => {
   const root = resolve(repositoryRoot);
 
   try {
+    await cleanupReleaseOutputs(root);
+    await cleanupReleaseBuildInfo(root);
+
     for (const script of RELEASE_CHECK_SCRIPTS) {
       await run(commandForPlatform("pnpm"), [script], { cwd: root });
     }
