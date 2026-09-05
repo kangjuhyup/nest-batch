@@ -1,4 +1,4 @@
-import type { BatchExecutionId, CheckpointStore } from "@rv-nest-batch/core";
+import type { BatchExecutionId, CheckpointStore } from "@rvkang/batch-core";
 
 export class InMemoryCheckpointStore implements CheckpointStore {
   private readonly checkpoints = new Map<string, unknown>();

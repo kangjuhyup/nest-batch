@@ -23,7 +23,7 @@ const createVersionFixture = async ({
   await writeFile(join(root, ".changeset", "README.md"), "# Changeset\n");
 
   if (pendingChangeset) {
-    await writeFile(join(root, ".changeset", "pending.md"), `---\n\"${PUBLIC_PACKAGE_SCOPE}/core\": minor\n---\n\nrelease\n`);
+    await writeFile(join(root, ".changeset", "pending.md"), `---\n\"${PUBLIC_PACKAGE_SCOPE}/batch-core\": minor\n---\n\nrelease\n`);
   }
 
   await Promise.all(PUBLIC_PACKAGES.map(async ({ directory, name }) => {

@@ -1,7 +1,7 @@
 import { Inject } from "@nestjs/common";
-import { defineChunkStep, skipItem } from "@rv-nest-batch/core";
-import type { Processor, Reader, ReaderSession, Writer } from "@rv-nest-batch/core";
-import { BatchContextAccessor, BatchProcessor, BatchReader, BatchWriter } from "@rv-nest-batch/nest";
+import { defineChunkStep, skipItem } from "@rvkang/batch-core";
+import type { Processor, Reader, ReaderSession, Writer } from "@rvkang/batch-core";
+import { BatchContextAccessor, BatchProcessor, BatchReader, BatchWriter } from "@rvkang/batch-nest";
 import type {
   BillingAccount,
   BillingCharge,

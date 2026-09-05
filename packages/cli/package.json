@@ -1,5 +1,5 @@
 {
-  "name": "@rv-nest-batch/cli",
+  "name": "@rvkang/batch-cli",
   "version": "0.1.0",
   "description": "Operational CLI for running and inspecting nest-batch jobs.",
   "keywords": ["nestjs", "batch", "cli", "operations"],
@@ -39,6 +39,6 @@
     "test": "vitest run --root ../.. --config vitest.config.ts packages/cli/test/run-cli.test.ts"
   },
   "dependencies": {
-    "@rv-nest-batch/core": "workspace:*"
+    "@rvkang/batch-core": "workspace:*"
   }
 }

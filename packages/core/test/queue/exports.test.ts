@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { WorkerLoop } from "@rv-nest-batch/core/queue";
-import type { WorkQueue, WorkUnit } from "@rv-nest-batch/core/queue";
+import { WorkerLoop } from "@rvkang/batch-core/queue";
+import type { WorkQueue, WorkUnit } from "@rvkang/batch-core/queue";
 
 describe("core queue subpath exports / core queue subpath export를 검증한다", () => {
   it("exports queue contracts and worker loop / queue contract와 worker loop를 export한다", () => {

@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
-import { InMemoryBatchStorage } from "@rv-nest-batch/inmemory";
-import { NestBatchModule, NestBatchPollingModule } from "@rv-nest-batch/nest";
+import { InMemoryBatchStorage } from "@rvkang/batch-inmemory";
+import { NestBatchModule, NestBatchPollingModule } from "@rvkang/batch-nest";
 import { BillingModule } from "./jobs/billing/billing.module.js";
 import { ReaderExamplesModule } from "./jobs/reader-examples/reader-examples.module.js";
 import {

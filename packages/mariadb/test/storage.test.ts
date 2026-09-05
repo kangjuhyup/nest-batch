@@ -1,4 +1,4 @@
-import { DatabaseBatchStorage } from "@rv-nest-batch/core";
+import { DatabaseBatchStorage } from "@rvkang/batch-core";
 import { describe, expect, it } from "vitest";
 import {
   MariaDbBatchStorage,

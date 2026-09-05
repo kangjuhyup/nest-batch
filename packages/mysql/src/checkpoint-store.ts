@@ -1,4 +1,4 @@
-import type { BatchExecutionId, CheckpointStore } from "@rv-nest-batch/core";
+import type { BatchExecutionId, CheckpointStore } from "@rvkang/batch-core";
 import { resolveMySqlPool } from "./driver.js";
 import type { MySqlBatchOptions } from "./options.js";
 import type { MySqlPoolLike } from "./options.js";

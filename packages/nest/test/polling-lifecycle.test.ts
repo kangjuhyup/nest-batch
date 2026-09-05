@@ -2,9 +2,9 @@ import "reflect-metadata";
 import { Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { describe, expect, it, vi } from "vitest";
-import { DatabaseBatchStorage } from "@rv-nest-batch/core";
-import type { CheckpointStore, JobRepository, LockManager } from "@rv-nest-batch/core";
-import type { ScheduleStore } from "@rv-nest-batch/core/scheduler";
+import { DatabaseBatchStorage } from "@rvkang/batch-core";
+import type { CheckpointStore, JobRepository, LockManager } from "@rvkang/batch-core";
+import type { ScheduleStore } from "@rvkang/batch-core/scheduler";
 import { NestBatchModule } from "../src/index.js";
 import { FakeDatabaseBatchStorage } from "./support/providers.js";
 

@@ -1,6 +1,6 @@
-import { DefaultBatchRunner, getReaderCheckpoint, openReader } from "@rv-nest-batch/core";
-import type { ChunkReader } from "@rv-nest-batch/core";
-import { InMemoryBatchStorage } from "@rv-nest-batch/inmemory";
+import { DefaultBatchRunner, getReaderCheckpoint, openReader } from "@rvkang/batch-core";
+import type { ChunkReader } from "@rvkang/batch-core";
+import { InMemoryBatchStorage } from "@rvkang/batch-inmemory";
 import { describe, expect, it } from "vitest";
 import {
   cursorReaderExample,

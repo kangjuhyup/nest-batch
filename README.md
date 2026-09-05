@@ -12,7 +12,7 @@ the same `JobInstance`, skip steps that already completed, and resume the failed
 step from its checkpoint. Chunk steps support processor/writer retry policy,
 processor skip policy, and `BatchObserver` lifecycle events. The CLI can run,
 retry, inspect, and list jobs when an application supplies storage and a job
-registry. `@rv-nest-batch/nest` can discover decorated job and batch component
+registry. `@rvkang/batch-nest` can discover decorated job and batch component
 providers, expose a `BATCH_RUNNER` provider, and run discovered jobs through
 `NestBatchRunner`. Distributed worker contracts, the BullMQ queue adapter
 boundary, continuous polling workers, and a first production scheduling slice
@@ -20,18 +20,18 @@ are available.
 
 ## Public packages
 
-- `@rv-nest-batch/core`: framework-independent job and step contracts, plus the `queue`, `scheduler`, `polling`, and `worker` subpath APIs.
-- `@rv-nest-batch/nest`: NestJS module and decorator integration.
-- `@rv-nest-batch/inmemory`: non-durable in-memory repository, lock, and checkpoint storage for tests and examples.
-- `@rv-nest-batch/postgres`: Postgres driver-backed repository, lock, and checkpoint storage.
-- `@rv-nest-batch/mysql`: MySQL driver-backed repository, lock, and checkpoint storage.
-- `@rv-nest-batch/mariadb`: MariaDB driver-backed repository, lock, and checkpoint storage.
-- `@rv-nest-batch/bullmq`: BullMQ-compatible `WorkQueue` adapter boundary.
-- `@rv-nest-batch/cli`: operational CLI boundary.
+- `@rvkang/batch-core`: framework-independent job and step contracts, plus the `queue`, `scheduler`, `polling`, and `worker` subpath APIs.
+- `@rvkang/batch-nest`: NestJS module and decorator integration.
+- `@rvkang/batch-inmemory`: non-durable in-memory repository, lock, and checkpoint storage for tests and examples.
+- `@rvkang/batch-postgres`: Postgres driver-backed repository, lock, and checkpoint storage.
+- `@rvkang/batch-mysql`: MySQL driver-backed repository, lock, and checkpoint storage.
+- `@rvkang/batch-mariadb`: MariaDB driver-backed repository, lock, and checkpoint storage.
+- `@rvkang/batch-bullmq`: BullMQ-compatible `WorkQueue` adapter boundary.
+- `@rvkang/batch-cli`: operational CLI boundary.
 
-`@rv-nest-batch/core/queue`, `@rv-nest-batch/core/scheduler`,
-`@rv-nest-batch/core/polling`, and `@rv-nest-batch/core/worker` are explicit core
-subpath APIs, not separate npm packages. The root `@rv-nest-batch/core` entrypoint
+`@rvkang/batch-core/queue`, `@rvkang/batch-core/scheduler`,
+`@rvkang/batch-core/polling`, and `@rvkang/batch-core/worker` are explicit core
+subpath APIs, not separate npm packages. The root `@rvkang/batch-core` entrypoint
 does not re-export their symbols.
 
 ## Requirements and compatibility
@@ -45,13 +45,13 @@ does not re-export their symbols.
 Install the runtime and the storage adapter that matches the environment:
 
 ```bash
-pnpm add @rv-nest-batch/core
-pnpm add @rv-nest-batch/inmemory
+pnpm add @rvkang/batch-core
+pnpm add @rvkang/batch-inmemory
 ```
 
 ```ts
-import { DefaultBatchRunner, defineJob, defineStep } from "@rv-nest-batch/core";
-import { InMemoryBatchStorage } from "@rv-nest-batch/inmemory";
+import { DefaultBatchRunner, defineJob, defineStep } from "@rvkang/batch-core";
+import { InMemoryBatchStorage } from "@rvkang/batch-inmemory";
 
 const storage = new InMemoryBatchStorage();
 const runner = new DefaultBatchRunner(storage);
@@ -63,18 +63,18 @@ const job = defineJob({
 await runner.run(job, {});
 ```
 
-Use `@rv-nest-batch/nest` for NestJS integration, an SQL adapter for durable
-storage, and `@rv-nest-batch/bullmq` only when a BullMQ-backed work queue is
+Use `@rvkang/batch-nest` for NestJS integration, an SQL adapter for durable
+storage, and `@rvkang/batch-bullmq` only when a BullMQ-backed work queue is
 needed. The public API is pre-1.0; update compatible `0.x` versions together.
 
 ## Distributed Workers
 
-`@rv-nest-batch/core/queue` defines a pull-based `WorkQueue` contract and
+`@rvkang/batch-core/queue` defines a pull-based `WorkQueue` contract and
 `WorkerLoop`. Queue adapters deliver work; repository state remains the source
 of truth for job, step, checkpoint, and partition status. Distributed execution
 is at-least-once, so writers and external side effects should be idempotent.
 
-`@rv-nest-batch/bullmq` maps each `WorkUnit.id` to a stable BullMQ job id and
+`@rvkang/batch-bullmq` maps each `WorkUnit.id` to a stable BullMQ job id and
 disables BullMQ retry by default (`attempts: 1`) so retry policy stays owned by
 the batch runtime. Applications can wrap real BullMQ `Queue`/worker instances
 and pass them into `BullMqWorkQueue`. When a work id contains `:`, the adapter
@@ -83,7 +83,7 @@ remains unchanged.
 
 ## Continuous Polling Workers
 
-`@rv-nest-batch/core/polling` provides a framework-independent loop for long-lived
+`@rvkang/batch-core/polling` provides a framework-independent loop for long-lived
 polling tasks such as Transactional Outbox dispatchers. It does not create
 `JobExecution`, `StepExecution`, checkpoint rows, or scheduler occurrences per
 polling tick. The task owns store-specific claim, lease, retry, dead-letter, and
@@ -91,7 +91,7 @@ ordering semantics; nest-batch owns only worker lifecycle, idle sleep, system
 error backoff, observer events, and graceful shutdown.
 
 ```ts
-import { ContinuousPollingLoop } from "@rv-nest-batch/core/polling";
+import { ContinuousPollingLoop } from "@rvkang/batch-core/polling";
 
 const loop = new ContinuousPollingLoop({
   workerId: "vote-outbox-worker-1",
@@ -123,7 +123,7 @@ the API role:
 
 ```ts
 import { Module } from "@nestjs/common";
-import { NestBatchPollingModule } from "@rv-nest-batch/nest";
+import { NestBatchPollingModule } from "@rvkang/batch-nest";
 
 @Module({
   imports: [
@@ -166,20 +166,20 @@ cannot wait forever on in-flight I/O.
 
 ## Production Scheduling
 
-`@rv-nest-batch/core/scheduler` evaluates code-defined schedules, claims durable
+`@rvkang/batch-core/scheduler` evaluates code-defined schedules, claims durable
 occurrences through a `ScheduleStore`, and dispatches them to either
 `BatchRunner` or `WorkQueue`. Schedule definitions stay in application code; the
 database stores occurrence state for duplicate-dispatch reduction and catch-up
 decisions.
 
 ```ts
-import { PostgresScheduleStore } from "@rv-nest-batch/postgres";
+import { PostgresScheduleStore } from "@rvkang/batch-postgres";
 import {
   SchedulerLoop,
   createIntervalTrigger,
   createQueueScheduleDispatcher,
   defineSchedule
-} from "@rv-nest-batch/core/scheduler";
+} from "@rvkang/batch-core/scheduler";
 
 const scheduleStore = new PostgresScheduleStore({
   connectionString: process.env.NEST_BATCH_POSTGRES_URL,
@@ -218,10 +218,10 @@ the trigger boundary, so a stale `claimed` occurrence can be reclaimed after its
 claim TTL instead of being skipped forever.
 
 For UTC calendar schedules, use the calendar helpers exported by
-`@rv-nest-batch/core/scheduler`:
+`@rvkang/batch-core/scheduler`:
 
 ```ts
-import { createUtcDailyTrigger } from "@rv-nest-batch/core/scheduler";
+import { createUtcDailyTrigger } from "@rvkang/batch-core/scheduler";
 
 const trigger = createUtcDailyTrigger({
   startAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -367,14 +367,14 @@ same `*.perf.test.ts` pattern and `test:perf` script.
 
 ## In-Memory Storage
 
-`@rv-nest-batch/inmemory` provides non-durable implementations of `JobRepository`,
+`@rvkang/batch-inmemory` provides non-durable implementations of `JobRepository`,
 `CheckpointStore`, and `LockManager`. State lives only in process memory, so do
 not use it for restart, multi-process worker, or production durability
 validation. It is intended for example e2e tests, runner unit tests, and fast
 local smoke tests where a database fixture is not the behavior under test.
 
 ```ts
-import { InMemoryBatchStorage } from "@rv-nest-batch/inmemory";
+import { InMemoryBatchStorage } from "@rvkang/batch-inmemory";
 
 const storage = new InMemoryBatchStorage();
 ```
@@ -392,9 +392,9 @@ transaction 안에서 instance 생성, active execution 확인, execution 생성
 처리합니다. `initialize()`는 필요한 schema와 table을 idempotent하게 준비합니다.
 
 ```ts
-import { PostgresBatchStorage } from "@rv-nest-batch/postgres";
-import { MySqlBatchStorage } from "@rv-nest-batch/mysql";
-import { createJobInstanceId, hashJobParameters } from "@rv-nest-batch/core";
+import { PostgresBatchStorage } from "@rvkang/batch-postgres";
+import { MySqlBatchStorage } from "@rvkang/batch-mysql";
+import { createJobInstanceId, hashJobParameters } from "@rvkang/batch-core";
 
 const postgresStorage = new PostgresBatchStorage({
   connectionString: process.env.NEST_BATCH_POSTGRES_URL,
@@ -441,8 +441,8 @@ true`를 넘기면 같은 instance의 최신 failed execution에서 checkpoint�
 checkpoint를 다시 저장합니다.
 
 ```ts
-import { DefaultBatchRunner, defineJob, defineStep } from "@rv-nest-batch/core";
-import { PostgresBatchStorage } from "@rv-nest-batch/postgres";
+import { DefaultBatchRunner, defineJob, defineStep } from "@rvkang/batch-core";
+import { PostgresBatchStorage } from "@rvkang/batch-postgres";
 
 const storage = new PostgresBatchStorage({
   connectionString: process.env.NEST_BATCH_POSTGRES_URL,
@@ -585,8 +585,8 @@ checkpoint, lock, the default `BATCH_RUNNER`, `BatchContextAccessor`,
 
 ```ts
 import { Module } from "@nestjs/common";
-import { NestBatchModule, BatchJob, BatchStep, NestBatchRunner } from "@rv-nest-batch/nest";
-import { defineStep } from "@rv-nest-batch/core";
+import { NestBatchModule, BatchJob, BatchStep, NestBatchRunner } from "@rvkang/batch-nest";
+import { defineStep } from "@rvkang/batch-core";
 
 @BatchJob("daily-billing")
 class BillingJob {
@@ -617,7 +617,7 @@ runtime context through every method signature. The accessor is backed by
 
 ```ts
 import { Injectable } from "@nestjs/common";
-import { BatchContextAccessor } from "@rv-nest-batch/nest";
+import { BatchContextAccessor } from "@rvkang/batch-nest";
 
 @Injectable()
 class BillingService {
@@ -640,13 +640,13 @@ module-level default run options from `runner` before per-call options.
 
 ## Operational CLI
 
-`@rv-nest-batch/cli` exposes `runCli(args, { storage, jobs })` for application-owned
+`@rvkang/batch-cli` exposes `runCli(args, { storage, jobs })` for application-owned
 CLI bootstrapping. The package-level `nest-batch` binary cannot infer database
 settings or job registration by itself yet, so production apps should wrap
 `runCli` in their own bootstrap until config loading is added.
 
 ```ts
-import { runCli } from "@rv-nest-batch/cli";
+import { runCli } from "@rvkang/batch-cli";
 
 const result = await runCli(
   [
@@ -671,7 +671,7 @@ output is JSON for operational commands.
 ## Core Example
 
 ```ts
-import { defineJob, defineStep } from "@rv-nest-batch/core";
+import { defineJob, defineStep } from "@rvkang/batch-core";
 
 const step = defineStep({
   name: "load-users",
@@ -701,8 +701,8 @@ processor 실패 item을 건너뛰는 데만 적용됩니다. writer 실패 skip
 `docs/readers-kr.md`를 참고하세요.
 
 ```ts
-import { defineChunkStep, skipItem } from "@rv-nest-batch/core";
-import type { ChunkReaderContext, Processor, Reader, ReaderSession, Writer } from "@rv-nest-batch/core";
+import { defineChunkStep, skipItem } from "@rvkang/batch-core";
+import type { ChunkReaderContext, Processor, Reader, ReaderSession, Writer } from "@rvkang/batch-core";
 
 interface SourceUser {
   readonly id: string;

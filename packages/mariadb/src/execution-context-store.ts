@@ -1,4 +1,4 @@
-import type { ExecutionContextKey, ExecutionContextStore } from "@rv-nest-batch/core";
+import type { ExecutionContextKey, ExecutionContextStore } from "@rvkang/batch-core";
 import { resolveMariaDbPool } from "./driver.js";
 import type { MariaDbBatchOptions, MariaDbPoolLike } from "./options.js";
 import {

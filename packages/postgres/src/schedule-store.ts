@@ -7,7 +7,7 @@ import type {
   ScheduleOccurrence,
   ScheduleOccurrenceCandidate,
   ScheduleStore
-} from "@rv-nest-batch/core/scheduler";
+} from "@rvkang/batch-core/scheduler";
 import { resolvePostgresPool } from "./driver.js";
 import type { PostgresBatchOptions, PostgresPoolLike } from "./options.js";
 import { ensurePostgresScheduleSchema } from "./schedule-schema.js";

@@ -1,4 +1,4 @@
-# @rv-nest-batch/nest
+# @rvkang/batch-nest
 
 ## 0.1.0
 

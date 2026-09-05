@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { BatchRunner, JobDefinition } from "@rv-nest-batch/core";
-import type { WorkQueue, WorkUnit } from "@rv-nest-batch/core/queue";
+import type { BatchRunner, JobDefinition } from "@rvkang/batch-core";
+import type { WorkQueue, WorkUnit } from "@rvkang/batch-core/queue";
 import {
   createQueueScheduleDispatcher,
   createRunnerScheduleDispatcher,
   defineSchedule
-} from "@rv-nest-batch/core/scheduler";
+} from "@rvkang/batch-core/scheduler";
 
 describe("schedule dispatchers / schedule dispatcher를 검증한다", () => {
   it("runs jobs through BatchRunner / BatchRunner로 job을 실행한다", async () => {

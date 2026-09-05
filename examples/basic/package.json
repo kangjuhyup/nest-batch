@@ -1,5 +1,5 @@
 {
-  "name": "@rv-nest-batch/example-basic",
+  "name": "@rvkang/batch-example-basic",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -7,10 +7,10 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@rv-nest-batch/core": "workspace:*"
+    "@rvkang/batch-core": "workspace:*"
   },
   "devDependencies": {
-    "@rv-nest-batch/inmemory": "workspace:*",
+    "@rvkang/batch-inmemory": "workspace:*",
     "typescript": "^5.7.3"
   }
 }

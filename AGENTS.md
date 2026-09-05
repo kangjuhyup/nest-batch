@@ -26,7 +26,7 @@
 ## Core Principles
 
 - Node-native 설계를 우선합니다. `AsyncIterable`, stream/backpressure, `AbortSignal`, graceful shutdown, worker process, queue adapter를 1급 개념으로 둡니다.
-- `@rv-nest-batch/core`는 NestJS에 의존하지 않습니다.
+- `@rvkang/batch-core`는 NestJS에 의존하지 않습니다.
 - NestJS 통합은 별도 패키지에서 처리합니다.
 - Job 실행은 durable해야 하며, 실패와 재시작을 정상 시나리오로 다룹니다.
 - 분산 실행은 at-least-once를 기본 전제로 두고 idempotency를 명시적으로 지원합니다.

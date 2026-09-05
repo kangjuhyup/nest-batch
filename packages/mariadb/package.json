@@ -1,5 +1,5 @@
 {
-  "name": "@rv-nest-batch/mariadb",
+  "name": "@rvkang/batch-mariadb",
   "version": "0.1.0",
   "description": "MariaDB persistence adapter for nest-batch.",
   "keywords": ["nestjs", "batch", "mariadb", "persistence"],
@@ -36,7 +36,7 @@
     "test": "vitest run --root ../.. --config vitest.config.ts packages/mariadb/test"
   },
   "dependencies": {
-    "@rv-nest-batch/core": "workspace:*",
+    "@rvkang/batch-core": "workspace:*",
     "mariadb": "^3.5.3"
   }
 }

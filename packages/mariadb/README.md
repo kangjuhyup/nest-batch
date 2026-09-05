@@ -1,4 +1,4 @@
-# @rv-nest-batch/mariadb
+# @rvkang/batch-mariadb
 
 MariaDB-backed repository, checkpoint, execution-context, and lock storage for
 `nest-batch`.
@@ -6,13 +6,13 @@ MariaDB-backed repository, checkpoint, execution-context, and lock storage for
 ## Install
 
 ```bash
-pnpm add @rv-nest-batch/mariadb
+pnpm add @rvkang/batch-mariadb
 ```
 
 ## Initialize storage
 
 ```ts
-import { MariaDbBatchStorage } from "@rv-nest-batch/mariadb";
+import { MariaDbBatchStorage } from "@rvkang/batch-mariadb";
 
 const storage = new MariaDbBatchStorage({
   connectionString: process.env.DATABASE_URL,

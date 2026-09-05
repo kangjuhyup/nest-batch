@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { LockHandle, LockManager } from "@rv-nest-batch/core";
+import type { LockHandle, LockManager } from "@rvkang/batch-core";
 import type {
   ScheduleFindLatestOccurrenceOptions,
   ScheduleListOccurrencesOptions,
@@ -7,8 +7,8 @@ import type {
   ScheduleOccurrence,
   ScheduleOccurrenceCandidate,
   ScheduleStore
-} from "@rv-nest-batch/core/scheduler";
-import { SchedulerLoop, createIntervalTrigger, defineSchedule } from "@rv-nest-batch/core/scheduler";
+} from "@rvkang/batch-core/scheduler";
+import { SchedulerLoop, createIntervalTrigger, defineSchedule } from "@rvkang/batch-core/scheduler";
 
 describe("scheduler loop / scheduler loop를 검증한다", () => {
   it("claims and dispatches due occurrences / due occurrence를 claim하고 dispatch한다", async () => {

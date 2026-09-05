@@ -1,4 +1,4 @@
-# @rv-nest-batch/core
+# @rvkang/batch-core
 
 ## 0.1.0
 

@@ -12,7 +12,7 @@ const installedManifest = (packageInfo: (typeof PUBLIC_PACKAGES)[number], depend
     ".": { types: "./dist/index.d.ts", import: "./dist/index.js" }
   };
 
-  if (packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/core`) {
+  if (packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/batch-core`) {
     for (const subpath of CORE_SUBPATHS) {
       exports[`./${subpath}`] = {
         types: `./dist/${subpath}/index.d.ts`,
@@ -30,7 +30,7 @@ const installedManifest = (packageInfo: (typeof PUBLIC_PACKAGES)[number], depend
     main: "./dist/index.js",
     types: "./dist/index.d.ts",
     exports,
-    ...(packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/cli` ? { bin: { "nest-batch": "./dist/bin.js" } } : {}),
+    ...(packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/batch-cli` ? { bin: { "nest-batch": "./dist/bin.js" } } : {}),
     ...(dependencies === undefined ? {} : { dependencies })
   };
 };
@@ -66,7 +66,7 @@ describe("installed package metadata / 설치된 package metadata", () => {
         join(directory, "package.json"),
         `${JSON.stringify(installedManifest(
           packageInfo,
-          packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/core` ? undefined : { [`${PUBLIC_PACKAGE_SCOPE}/core`]: "0.1.0" }
+          packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/batch-core` ? undefined : { [`${PUBLIC_PACKAGE_SCOPE}/batch-core`]: "0.1.0" }
         ), null, 2)}\n`
       );
     }
@@ -86,7 +86,7 @@ describe("installed package metadata / 설치된 package metadata", () => {
         join(directory, "package.json"),
         `${JSON.stringify(installedManifest(
           packageInfo,
-          packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/nest` ? { [`${PUBLIC_PACKAGE_SCOPE}/core`]: "^0.1.0" } : undefined
+          packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/batch-nest` ? { [`${PUBLIC_PACKAGE_SCOPE}/batch-core`]: "^0.1.0" } : undefined
         ), null, 2)}\n`
       );
     }
@@ -101,7 +101,7 @@ describe("installed package metadata / 설치된 package metadata", () => {
       name,
       directory,
       version: "0.1.0",
-      manifest: name === `${PUBLIC_PACKAGE_SCOPE}/nest` ? { dependencies: { [`${PUBLIC_PACKAGE_SCOPE}/core`]: "0.1.0" } } : {}
+      manifest: name === `${PUBLIC_PACKAGE_SCOPE}/batch-nest` ? { dependencies: { [`${PUBLIC_PACKAGE_SCOPE}/batch-core`]: "0.1.0" } } : {}
     }));
 
     for (const packageInfo of PUBLIC_PACKAGES) {

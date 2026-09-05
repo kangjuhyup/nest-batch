@@ -4,7 +4,7 @@ import type {
   JobParameters,
   PartitionExecutionStatus,
   StepExecutionStatus
-} from "@rv-nest-batch/core";
+} from "@rvkang/batch-core";
 import type { MariaDbBatchOptions } from "./options.js";
 
 const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;

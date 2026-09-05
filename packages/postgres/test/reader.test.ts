@@ -1,4 +1,4 @@
-import { getReaderCheckpoint, openReader } from "@rv-nest-batch/core";
+import { getReaderCheckpoint, openReader } from "@rvkang/batch-core";
 import { describe, expect, it } from "vitest";
 import { createPostgresCursorReader } from "../src/index.js";
 import type { PostgresCursorReaderOptions } from "../src/index.js";

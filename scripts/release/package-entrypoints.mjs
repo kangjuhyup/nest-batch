@@ -21,7 +21,7 @@ const hasExactKeys = (value, expectedKeys) => {
 const expectedEntrypoints = (packageInfo) => {
   const exports = { ".": { ...ROOT_EXPORT } };
 
-  if (packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/core`) {
+  if (packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/batch-core`) {
     for (const subpath of CORE_SUBPATHS) {
       exports[`./${subpath}`] = {
         types: `./dist/${subpath}/index.d.ts`,
@@ -34,7 +34,7 @@ const expectedEntrypoints = (packageInfo) => {
     main: ROOT_EXPORT.import,
     types: ROOT_EXPORT.types,
     exports,
-    bin: packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/cli` ? { "nest-batch": "./dist/bin.js" } : undefined
+    bin: packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/batch-cli` ? { "nest-batch": "./dist/bin.js" } : undefined
   };
 };
 

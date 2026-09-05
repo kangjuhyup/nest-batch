@@ -17,7 +17,7 @@ import {
 } from "./publish-packages.mjs";
 
 const VERSION = "0.1.0";
-const CORE_PACKAGE_NAME = `${PUBLIC_PACKAGE_SCOPE}/core`;
+const CORE_PACKAGE_NAME = `${PUBLIC_PACKAGE_SCOPE}/batch-core`;
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const temporaryRoots: string[] = [];
 
@@ -698,7 +698,7 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     const arguments_ = lookupCalls[0][1] as string[];
     const previousScopeRegistryArgument = `--${["@nest", "batch"].join("-")}:registry=${NPM_REGISTRY_URL}`;
 
-    expect(NPM_SCOPE_REGISTRY_ARGUMENT).toBe("--@rv-nest-batch:registry=https://registry.npmjs.org/");
+    expect(NPM_SCOPE_REGISTRY_ARGUMENT).toBe("--@rvkang:registry=https://registry.npmjs.org/");
     expect(arguments_).toContain(NPM_SCOPE_REGISTRY_ARGUMENT);
     expect(arguments_).not.toContain(previousScopeRegistryArgument);
   });
@@ -715,7 +715,7 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
       cwd: REPOSITORY_ROOT,
       env: {
         ...process.env,
-        "npm_config_@rv-nest-batch:registry": "http://127.0.0.1:9/"
+        "npm_config_@rvkang:registry": "http://127.0.0.1:9/"
       }
     });
 

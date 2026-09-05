@@ -1,7 +1,7 @@
 import { Queue, Worker } from "bullmq";
 import type { ConnectionOptions, Job } from "bullmq";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { WorkUnit } from "@rv-nest-batch/core/queue";
+import type { WorkUnit } from "@rvkang/batch-core/queue";
 import { BullMqWorkQueue } from "../src/index.js";
 import type { BullMqWorkerLike } from "../src/index.js";
 

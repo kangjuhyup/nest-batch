@@ -1,4 +1,4 @@
-import { createSqlCursorReader, type SqlCursorReader } from "@rv-nest-batch/core";
+import { createSqlCursorReader, type SqlCursorReader } from "@rvkang/batch-core";
 import type { MySqlPoolLike } from "./options.js";
 import { rowsFromMySqlResult } from "./sql.js";
 

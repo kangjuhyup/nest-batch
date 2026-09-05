@@ -7,7 +7,7 @@ const packedManifest = (packageInfo = PUBLIC_PACKAGES[1]) => {
     ".": { types: "./dist/index.d.ts", import: "./dist/index.js" }
   };
 
-  if (packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/core`) {
+  if (packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/batch-core`) {
     for (const subpath of CORE_SUBPATHS) {
       exports[`./${subpath}`] = {
         types: `./dist/${subpath}/index.d.ts`,
@@ -22,21 +22,21 @@ const packedManifest = (packageInfo = PUBLIC_PACKAGES[1]) => {
     repository: { type: "git", url: REPOSITORY_URL, directory: packageInfo.directory },
     engines: { node: ">=20.18.0" },
     publishConfig: { access: "public", registry: NPM_REGISTRY_URL },
-    dependencies: { [`${PUBLIC_PACKAGE_SCOPE}/core`]: "0.1.0" },
+    dependencies: { [`${PUBLIC_PACKAGE_SCOPE}/batch-core`]: "0.1.0" },
     main: "./dist/index.js",
     types: "./dist/index.d.ts",
     exports,
-    ...(packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/cli` ? { bin: { "nest-batch": "./dist/bin.js" } } : {})
+    ...(packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/batch-cli` ? { bin: { "nest-batch": "./dist/bin.js" } } : {})
   };
 };
 
 const packedFiles = (packageInfo = PUBLIC_PACKAGES[1]) => [
   "dist/index.js",
   "dist/index.d.ts",
-  ...(packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/core`
+  ...(packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/batch-core`
     ? CORE_SUBPATHS.flatMap((subpath) => [`dist/${subpath}/index.js`, `dist/${subpath}/index.d.ts`])
     : []),
-  ...(packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/cli` ? ["dist/bin.js"] : []),
+  ...(packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/batch-cli` ? ["dist/bin.js"] : []),
   "README.md",
   "LICENSE",
   "package.json"
@@ -61,7 +61,7 @@ describe("package tarball validation / package tarball 검증", () => {
 
   it("rejects build metadata / build metadata 포함을 거부한다", () => {
     expect(() => validatePackedFiles({
-      name: `${PUBLIC_PACKAGE_SCOPE}/core`,
+      name: `${PUBLIC_PACKAGE_SCOPE}/batch-core`,
       files: ["dist/index.js", "dist/.tsbuildinfo", "README.md", "LICENSE", "package.json"]
     })).toThrow(/tsbuildinfo/u);
   });
@@ -74,7 +74,7 @@ describe("package tarball validation / package tarball 검증", () => {
     ["scripts/release.mjs", /not allowed/u]
   ])("rejects forbidden path %s / 금지된 경로를 거부한다", (path, expectedError) => {
     expect(() => validatePackedFiles({
-      name: `${PUBLIC_PACKAGE_SCOPE}/core`,
+      name: `${PUBLIC_PACKAGE_SCOPE}/batch-core`,
       files: ["dist/index.js", path, "README.md", "LICENSE", "package.json"]
     })).toThrow(expectedError);
   });
@@ -93,14 +93,14 @@ describe("package tarball validation / package tarball 검증", () => {
     ["dist/\u0000index.js", "NUL byte"]
   ])("rejects non-canonical path %s / %s를 거부한다", (path) => {
     expect(() => validatePackedFiles({
-      name: `${PUBLIC_PACKAGE_SCOPE}/core`,
+      name: `${PUBLIC_PACKAGE_SCOPE}/batch-core`,
       files: ["dist/index.js", path, "README.md", "LICENSE", "package.json"]
     })).toThrow(/canonical POSIX relative path/u);
   });
 
   it("rejects an invalid file list / 잘못된 파일 목록을 거부한다", () => {
     expect(() => validatePackedFiles({
-      name: `${PUBLIC_PACKAGE_SCOPE}/core`,
+      name: `${PUBLIC_PACKAGE_SCOPE}/batch-core`,
       files: ["dist/index.js", 42] as unknown as string[]
     })).toThrow(/file path/u);
   });
@@ -114,7 +114,7 @@ describe("package tarball validation / package tarball 검증", () => {
     (missing) => {
       const files = ["dist/index.js", "README.md", "LICENSE", "package.json"].filter((path) => path !== missing);
 
-      expect(() => validatePackedFiles({ name: `${PUBLIC_PACKAGE_SCOPE}/core`, files })).toThrow(/required root files/u);
+      expect(() => validatePackedFiles({ name: `${PUBLIC_PACKAGE_SCOPE}/batch-core`, files })).toThrow(/required root files/u);
     }
   );
 
@@ -182,15 +182,15 @@ describe("package tarball validation / package tarball 검증", () => {
 
   it("rejects a packed internal dependency range / packed 내부 dependency range를 거부한다", () => {
     const manifest = packedManifest();
-    manifest.dependencies[`${PUBLIC_PACKAGE_SCOPE}/core`] = "^0.1.0";
+    manifest.dependencies[`${PUBLIC_PACKAGE_SCOPE}/batch-core`] = "^0.1.0";
 
     expect(() => validatePackedManifest(manifest, PUBLIC_PACKAGES[1], "0.1.0")).toThrow(/exact fixed version/u);
   });
 
   it("rejects a packed manifest missing a source internal dependency / source 내부 dependency가 빠진 packed manifest를 거부한다", () => {
     const manifest = packedManifest();
-    delete manifest.dependencies[`${PUBLIC_PACKAGE_SCOPE}/core`];
-    const sourceManifest = { dependencies: { [`${PUBLIC_PACKAGE_SCOPE}/core`]: "workspace:*" } };
+    delete manifest.dependencies[`${PUBLIC_PACKAGE_SCOPE}/batch-core`];
+    const sourceManifest = { dependencies: { [`${PUBLIC_PACKAGE_SCOPE}/batch-core`]: "workspace:*" } };
 
     expect(() => validatePackedManifest(manifest, PUBLIC_PACKAGES[1], "0.1.0", sourceManifest)).toThrow(/source manifest/u);
   });

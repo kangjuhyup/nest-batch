@@ -1,4 +1,4 @@
-import type { ExecutionContextKey, ExecutionContextStore } from "@rv-nest-batch/core";
+import type { ExecutionContextKey, ExecutionContextStore } from "@rvkang/batch-core";
 import { resolvePostgresPool } from "./driver.js";
 import type { PostgresBatchOptions, PostgresPoolLike } from "./options.js";
 import {

@@ -1,4 +1,4 @@
-# @rv-nest-batch/cli
+# @rvkang/batch-cli
 
 ## 0.1.0
 

@@ -1,18 +1,18 @@
 # Basic Example
 
-이 예제는 Nest 없이 `@rv-nest-batch/core`만 사용하는 programmatic project 구조를
+이 예제는 Nest 없이 `@rvkang/batch-core`만 사용하는 programmatic project 구조를
 보여줍니다.
 
 외부 application에서는 다음 package를 설치합니다.
 
 ```bash
-npm install @rv-nest-batch/core
+npm install @rvkang/batch-core
 ```
 
 durable runner를 빠르게 검증하는 test fixture가 필요하면
-`@rv-nest-batch/inmemory`를 함께 설치합니다. queue, scheduler, polling, worker API는
-별도 package가 아니라 `@rv-nest-batch/core/queue`, `@rv-nest-batch/core/scheduler`,
-`@rv-nest-batch/core/polling`, `@rv-nest-batch/core/worker`에서 import합니다.
+`@rvkang/batch-inmemory`를 함께 설치합니다. queue, scheduler, polling, worker API는
+별도 package가 아니라 `@rvkang/batch-core/queue`, `@rvkang/batch-core/scheduler`,
+`@rvkang/batch-core/polling`, `@rvkang/batch-core/worker`에서 import합니다.
 
 ```text
 src/

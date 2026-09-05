@@ -1,17 +1,17 @@
 # NestJS Example
 
-이 예제는 `@rv-nest-batch/nest`와 `@rv-nest-batch/core`를 함께 사용하는 Nest project
+이 예제는 `@rvkang/batch-nest`와 `@rvkang/batch-core`를 함께 사용하는 Nest project
 구조를 보여줍니다.
 
 외부 Nest application에서는 다음 package를 설치합니다.
 
 ```bash
-npm install @rv-nest-batch/core @rv-nest-batch/nest @rv-nest-batch/inmemory @nestjs/common @nestjs/core reflect-metadata
+npm install @rvkang/batch-core @rvkang/batch-nest @rvkang/batch-inmemory @nestjs/common @nestjs/core reflect-metadata
 ```
 
 queue, scheduler, polling, worker API는 별도 package가 아니라
-`@rv-nest-batch/core/queue`, `@rv-nest-batch/core/scheduler`,
-`@rv-nest-batch/core/polling`, `@rv-nest-batch/core/worker`에서 import합니다.
+`@rvkang/batch-core/queue`, `@rvkang/batch-core/scheduler`,
+`@rvkang/batch-core/polling`, `@rvkang/batch-core/worker`에서 import합니다.
 
 ```text
 src/

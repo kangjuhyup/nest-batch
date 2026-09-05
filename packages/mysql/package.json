@@ -1,5 +1,5 @@
 {
-  "name": "@rv-nest-batch/mysql",
+  "name": "@rvkang/batch-mysql",
   "version": "0.1.0",
   "description": "MySQL persistence adapter for nest-batch.",
   "keywords": ["nestjs", "batch", "mysql", "persistence"],
@@ -36,7 +36,7 @@
     "test": "vitest run --root ../.. --config vitest.config.ts packages/mysql/test"
   },
   "dependencies": {
-    "@rv-nest-batch/core": "workspace:*",
+    "@rvkang/batch-core": "workspace:*",
     "mysql2": "^3.23.0"
   }
 }

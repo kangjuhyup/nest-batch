@@ -1,4 +1,4 @@
-# @rv-nest-batch/mysql
+# @rvkang/batch-mysql
 
 ## 0.1.0
 

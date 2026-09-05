@@ -6,7 +6,7 @@ import { PUBLIC_PACKAGE_SCOPE, PUBLIC_PACKAGES } from "./package-catalog.mjs";
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const RELEASE_CHECK_SCRIPTS = ["typecheck", "test", "build", "release:verify", "release:smoke"];
-const PUBLIC_PACKAGE_NAME = new RegExp(`^${PUBLIC_PACKAGE_SCOPE}/([a-z0-9-]+)$`, "u");
+const PUBLIC_PACKAGE_NAME = new RegExp(`^${PUBLIC_PACKAGE_SCOPE}/batch-([a-z0-9-]+)$`, "u");
 
 const isCanonicalPosixRelativePath = (path) => {
   if (typeof path !== "string" || path.length === 0 || path.includes("\0") || path.includes("\\")) {

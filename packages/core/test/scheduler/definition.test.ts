@@ -3,7 +3,7 @@ import {
   createScheduleOccurrenceId,
   defineSchedule,
   resolveScheduleParameters
-} from "@rv-nest-batch/core/scheduler";
+} from "@rvkang/batch-core/scheduler";
 
 describe("schedule definition / schedule definition을 검증한다", () => {
   it("normalizes schedule defaults and occurrence ids / schedule 기본값과 occurrence id를 정규화한다", () => {

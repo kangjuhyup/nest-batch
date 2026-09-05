@@ -1,4 +1,4 @@
-# @rv-nest-batch/bullmq
+# @rvkang/batch-bullmq
 
 ## 0.1.0
 

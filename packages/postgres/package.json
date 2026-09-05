@@ -1,5 +1,5 @@
 {
-  "name": "@rv-nest-batch/postgres",
+  "name": "@rvkang/batch-postgres",
   "version": "0.1.0",
   "description": "Postgres persistence adapter for nest-batch.",
   "keywords": ["nestjs", "batch", "postgres", "persistence"],
@@ -38,7 +38,7 @@
     "test": "vitest run --root ../.. --config vitest.config.ts packages/postgres/test"
   },
   "dependencies": {
-    "@rv-nest-batch/core": "workspace:*",
+    "@rvkang/batch-core": "workspace:*",
     "pg": "^8.22.0"
   },
   "devDependencies": {

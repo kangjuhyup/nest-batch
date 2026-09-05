@@ -1,4 +1,4 @@
-import { DatabaseBatchStorage } from "@rv-nest-batch/core";
+import { DatabaseBatchStorage } from "@rvkang/batch-core";
 import { MySqlCheckpointStore } from "./checkpoint-store.js";
 import { resolveMySqlPool } from "./driver.js";
 import { MySqlExecutionContextStore } from "./execution-context-store.js";

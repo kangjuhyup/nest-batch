@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import * as schedulerCore from "@rv-nest-batch/core/scheduler";
+import * as schedulerCore from "@rvkang/batch-core/scheduler";
 import type {
   ScheduleDefinition,
   ScheduleDispatcher,
   ScheduleOccurrence,
   ScheduleStore,
   ScheduleTrigger
-} from "@rv-nest-batch/core/scheduler";
+} from "@rvkang/batch-core/scheduler";
 
 describe("scheduler core type exports / scheduler core type export를 검증한다", () => {
   it("exports scheduler contracts / scheduler contract를 export한다", async () => {

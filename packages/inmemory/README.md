@@ -1,4 +1,4 @@
-# @rv-nest-batch/inmemory
+# @rvkang/batch-inmemory
 
 In-memory `DatabaseBatchStorage` implementation for `nest-batch` tests and
 local examples.
@@ -6,13 +6,13 @@ local examples.
 ## Install
 
 ```bash
-pnpm add @rv-nest-batch/inmemory
+pnpm add @rvkang/batch-inmemory
 ```
 
 ## Create storage
 
 ```ts
-import { InMemoryBatchStorage } from "@rv-nest-batch/inmemory";
+import { InMemoryBatchStorage } from "@rvkang/batch-inmemory";
 
 const storage = new InMemoryBatchStorage();
 ```

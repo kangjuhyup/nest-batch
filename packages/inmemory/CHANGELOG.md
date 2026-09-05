@@ -1,4 +1,4 @@
-# @rv-nest-batch/inmemory
+# @rvkang/batch-inmemory
 
 ## 0.1.0
 

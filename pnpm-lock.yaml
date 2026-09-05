@@ -26,11 +26,11 @@ importers:
 
   examples/basic:
     dependencies:
-      '@rv-nest-batch/core':
+      '@rvkang/batch-core':
         specifier: workspace:*
         version: link:../../packages/core
     devDependencies:
-      '@rv-nest-batch/inmemory':
+      '@rvkang/batch-inmemory':
         specifier: workspace:*
         version: link:../../packages/inmemory
       typescript:
@@ -45,13 +45,13 @@ importers:
       '@nestjs/core':
         specifier: ^11.0.0
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@rv-nest-batch/core':
+      '@rvkang/batch-core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@rv-nest-batch/inmemory':
+      '@rvkang/batch-inmemory':
         specifier: workspace:*
         version: link:../../packages/inmemory
-      '@rv-nest-batch/nest':
+      '@rvkang/batch-nest':
         specifier: workspace:*
         version: link:../../packages/nest
       reflect-metadata:
@@ -64,7 +64,7 @@ importers:
 
   packages/bullmq:
     dependencies:
-      '@rv-nest-batch/core':
+      '@rvkang/batch-core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -74,7 +74,7 @@ importers:
 
   packages/cli:
     dependencies:
-      '@rv-nest-batch/core':
+      '@rvkang/batch-core':
         specifier: workspace:*
         version: link:../core
 
@@ -82,13 +82,13 @@ importers:
 
   packages/inmemory:
     dependencies:
-      '@rv-nest-batch/core':
+      '@rvkang/batch-core':
         specifier: workspace:*
         version: link:../core
 
   packages/mariadb:
     dependencies:
-      '@rv-nest-batch/core':
+      '@rvkang/batch-core':
         specifier: workspace:*
         version: link:../core
       mariadb:
@@ -97,7 +97,7 @@ importers:
 
   packages/mysql:
     dependencies:
-      '@rv-nest-batch/core':
+      '@rvkang/batch-core':
         specifier: workspace:*
         version: link:../core
       mysql2:
@@ -106,7 +106,7 @@ importers:
 
   packages/nest:
     dependencies:
-      '@rv-nest-batch/core':
+      '@rvkang/batch-core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -122,7 +122,7 @@ importers:
 
   packages/postgres:
     dependencies:
-      '@rv-nest-batch/core':
+      '@rvkang/batch-core':
         specifier: workspace:*
         version: link:../core
       pg:

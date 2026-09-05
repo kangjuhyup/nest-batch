@@ -1,4 +1,4 @@
-# @rv-nest-batch/mariadb
+# @rvkang/batch-mariadb
 
 ## 0.1.0
 

@@ -1,11 +1,11 @@
-# @rv-nest-batch/cli
+# @rvkang/batch-cli
 
 Operational command parsing and executable entrypoint for `nest-batch` jobs.
 
 ## Install
 
 ```bash
-pnpm add @rv-nest-batch/cli @rv-nest-batch/core @rv-nest-batch/inmemory
+pnpm add @rvkang/batch-cli @rvkang/batch-core @rvkang/batch-inmemory
 ```
 
 The published executable can always print its command summary:
@@ -17,9 +17,9 @@ nest-batch --help
 ## Supply application context
 
 ```ts
-import { defineJob, defineStep } from "@rv-nest-batch/core";
-import { runCli } from "@rv-nest-batch/cli";
-import { InMemoryBatchStorage } from "@rv-nest-batch/inmemory";
+import { defineJob, defineStep } from "@rvkang/batch-core";
+import { runCli } from "@rvkang/batch-cli";
+import { InMemoryBatchStorage } from "@rvkang/batch-inmemory";
 
 const storage = new InMemoryBatchStorage();
 const job = defineJob({

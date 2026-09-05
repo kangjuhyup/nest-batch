@@ -1,14 +1,14 @@
-export const PUBLIC_PACKAGE_SCOPE = "@rv-nest-batch";
+export const PUBLIC_PACKAGE_SCOPE = "@rvkang";
 
 export const PUBLIC_PACKAGES = [
-  { name: `${PUBLIC_PACKAGE_SCOPE}/core`, directory: "packages/core" },
-  { name: `${PUBLIC_PACKAGE_SCOPE}/nest`, directory: "packages/nest" },
-  { name: `${PUBLIC_PACKAGE_SCOPE}/inmemory`, directory: "packages/inmemory" },
-  { name: `${PUBLIC_PACKAGE_SCOPE}/postgres`, directory: "packages/postgres" },
-  { name: `${PUBLIC_PACKAGE_SCOPE}/mysql`, directory: "packages/mysql" },
-  { name: `${PUBLIC_PACKAGE_SCOPE}/mariadb`, directory: "packages/mariadb" },
-  { name: `${PUBLIC_PACKAGE_SCOPE}/bullmq`, directory: "packages/bullmq" },
-  { name: `${PUBLIC_PACKAGE_SCOPE}/cli`, directory: "packages/cli" }
+  { name: `${PUBLIC_PACKAGE_SCOPE}/batch-core`, directory: "packages/core" },
+  { name: `${PUBLIC_PACKAGE_SCOPE}/batch-nest`, directory: "packages/nest" },
+  { name: `${PUBLIC_PACKAGE_SCOPE}/batch-inmemory`, directory: "packages/inmemory" },
+  { name: `${PUBLIC_PACKAGE_SCOPE}/batch-postgres`, directory: "packages/postgres" },
+  { name: `${PUBLIC_PACKAGE_SCOPE}/batch-mysql`, directory: "packages/mysql" },
+  { name: `${PUBLIC_PACKAGE_SCOPE}/batch-mariadb`, directory: "packages/mariadb" },
+  { name: `${PUBLIC_PACKAGE_SCOPE}/batch-bullmq`, directory: "packages/bullmq" },
+  { name: `${PUBLIC_PACKAGE_SCOPE}/batch-cli`, directory: "packages/cli" }
 ];
 
 export const CORE_SUBPATHS = ["queue", "scheduler", "polling", "worker"];

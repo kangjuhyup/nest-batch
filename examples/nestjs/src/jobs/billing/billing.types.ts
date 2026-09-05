@@ -1,4 +1,4 @@
-import type { ChunkStepDefinition, JobParameters } from "@rv-nest-batch/core";
+import type { ChunkStepDefinition, JobParameters } from "@rvkang/batch-core";
 
 export interface BillingAccount {
   readonly id: string;

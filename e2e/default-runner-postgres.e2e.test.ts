@@ -1,6 +1,6 @@
-import { DefaultBatchRunner, defineChunkStep, defineJob, skipItem } from "@rv-nest-batch/core";
-import type { ChunkStepExecutionContext, Processor, Reader, Writer } from "@rv-nest-batch/core";
-import { PostgresBatchStorage } from "@rv-nest-batch/postgres";
+import { DefaultBatchRunner, defineChunkStep, defineJob, skipItem } from "@rvkang/batch-core";
+import type { ChunkStepExecutionContext, Processor, Reader, Writer } from "@rvkang/batch-core";
+import { PostgresBatchStorage } from "@rvkang/batch-postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPostgresE2eDatabase } from "./support/postgres.js";
 

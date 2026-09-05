@@ -33,7 +33,7 @@ const entrypointsFor = (packageInfo: (typeof PUBLIC_PACKAGES)[number]) => {
     ".": { types: "./dist/index.d.ts", import: "./dist/index.js" }
   };
 
-  if (packageInfo.name === "@rv-nest-batch/core") {
+  if (packageInfo.name === "@rvkang/batch-core") {
     for (const subpath of CORE_SUBPATHS) {
       exports[`./${subpath}`] = {
         types: `./dist/${subpath}/index.d.ts`,
@@ -46,13 +46,13 @@ const entrypointsFor = (packageInfo: (typeof PUBLIC_PACKAGES)[number]) => {
     main: "./dist/index.js",
     types: "./dist/index.d.ts",
     exports,
-    ...(packageInfo.name === "@rv-nest-batch/cli" ? { bin: { "nest-batch": "./dist/bin.js" } } : {})
+    ...(packageInfo.name === "@rvkang/batch-cli" ? { bin: { "nest-batch": "./dist/bin.js" } } : {})
   };
 };
 
 const createPackageReadme = (packageInfo: (typeof PUBLIC_PACKAGES)[number]) => {
-  const packageNames = packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/cli`
-    ? [`${PUBLIC_PACKAGE_SCOPE}/cli`, `${PUBLIC_PACKAGE_SCOPE}/core`, `${PUBLIC_PACKAGE_SCOPE}/inmemory`]
+  const packageNames = packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/batch-cli`
+    ? [`${PUBLIC_PACKAGE_SCOPE}/batch-cli`, `${PUBLIC_PACKAGE_SCOPE}/batch-core`, `${PUBLIC_PACKAGE_SCOPE}/batch-inmemory`]
     : [packageInfo.name];
 
   return `# ${packageInfo.name}
@@ -112,7 +112,7 @@ ${ACTIONS_PR_SETTING_CHECKLIST_ITEM}
 
 ## 2. 최초 0.1.0 bootstrap
 
-- [ ] npm에서 \`@rv-nest-batch\` scope 권한 확인
+- [ ] npm에서 \`@rvkang\` scope 권한 확인
   - 모든 catalog package의 identity를 먼저 read-only로 확인합니다.
 
 \`\`\`bash
@@ -131,14 +131,14 @@ ${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} name version maintainers r
 ${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name}@0.1.0 version dist.integrity --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}`).join("\n")}
 \`\`\`
 
-\`@rv-nest-batch/core\`
-\`@rv-nest-batch/nest\`
-\`@rv-nest-batch/inmemory\`
-\`@rv-nest-batch/postgres\`
-\`@rv-nest-batch/mysql\`
-\`@rv-nest-batch/mariadb\`
-\`@rv-nest-batch/bullmq\`
-\`@rv-nest-batch/cli\`
+\`@rvkang/batch-core\`
+\`@rvkang/batch-nest\`
+\`@rvkang/batch-inmemory\`
+\`@rvkang/batch-postgres\`
+\`@rvkang/batch-mysql\`
+\`@rvkang/batch-mariadb\`
+\`@rvkang/batch-bullmq\`
+\`@rvkang/batch-cli\`
 
 ## 3. Trusted Publisher 등록
 
@@ -240,7 +240,7 @@ function createRepository(
     writeFileSync(join(packageDirectory, "dist", "index.js"), "export {};\n", { flag: "w" });
     writeFileSync(join(packageDirectory, "dist", "index.d.ts"), "export {};\n", { flag: "w" });
 
-    if (packageInfo.name === "@rv-nest-batch/core") {
+    if (packageInfo.name === "@rvkang/batch-core") {
       for (const subpath of CORE_SUBPATHS) {
         mkdirSync(join(packageDirectory, "dist", subpath), { recursive: true });
         writeFileSync(join(packageDirectory, "dist", subpath, "index.js"), "export {};\n");
@@ -248,7 +248,7 @@ function createRepository(
       }
     }
 
-    if (packageInfo.name === "@rv-nest-batch/cli") {
+    if (packageInfo.name === "@rvkang/batch-cli") {
       writeFileSync(join(packageDirectory, "dist", "bin.js"), "export {};\n");
     }
   }
@@ -273,24 +273,24 @@ afterEach(() => {
 });
 
 describe("release metadata validation / release metadata 검증", () => {
-  it("defines the rv-nest-batch public scope / rv-nest-batch 공개 scope를 정의한다", () => {
-    expect(PUBLIC_PACKAGE_SCOPE).toBe("@rv-nest-batch");
+  it("defines the rvkang public scope / rvkang 공개 scope를 정의한다", () => {
+    expect(PUBLIC_PACKAGE_SCOPE).toBe("@rvkang");
     expect(PUBLIC_PACKAGES.map(({ name }) => name)).toEqual([
-      "@rv-nest-batch/core",
-      "@rv-nest-batch/nest",
-      "@rv-nest-batch/inmemory",
-      "@rv-nest-batch/postgres",
-      "@rv-nest-batch/mysql",
-      "@rv-nest-batch/mariadb",
-      "@rv-nest-batch/bullmq",
-      "@rv-nest-batch/cli"
+      "@rvkang/batch-core",
+      "@rvkang/batch-nest",
+      "@rvkang/batch-inmemory",
+      "@rvkang/batch-postgres",
+      "@rvkang/batch-mysql",
+      "@rvkang/batch-mariadb",
+      "@rvkang/batch-bullmq",
+      "@rvkang/batch-cli"
     ]);
     expect(CORE_SUBPATHS).toEqual(["queue", "scheduler", "polling", "worker"]);
-    expect(NPM_SCOPE_REGISTRY_ARGUMENT).toBe("--@rv-nest-batch:registry=https://registry.npmjs.org/");
+    expect(NPM_SCOPE_REGISTRY_ARGUMENT).toBe("--@rvkang:registry=https://registry.npmjs.org/");
   });
 
   it("rejects missing public access / public access 누락을 거부한다", () => {
-    expect(() => validateManifest({ name: "@rv-nest-batch/core", version: "0.1.0" }, PUBLIC_PACKAGES[0]))
+    expect(() => validateManifest({ name: "@rvkang/batch-core", version: "0.1.0" }, PUBLIC_PACKAGES[0]))
       .toThrow(/publishConfig\.access/);
   });
 
@@ -314,7 +314,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a package version that differs from root / root와 다른 package version을 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@rv-nest-batch/core") {
+      if (packageInfo.name === "@rvkang/batch-core") {
         manifest.version = "0.1.1";
       }
     });
@@ -324,7 +324,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a mismatched repository directory / repository directory 불일치를 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@rv-nest-batch/core") {
+      if (packageInfo.name === "@rvkang/batch-core") {
         manifest.repository = { type: "git", url: REPOSITORY_URL, directory: "packages/other" };
       }
     });
@@ -334,7 +334,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects non-public package access / public이 아닌 package access를 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@rv-nest-batch/core") {
+      if (packageInfo.name === "@rvkang/batch-core") {
         manifest.publishConfig = { access: "restricted" };
       }
     });
@@ -344,7 +344,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a package private registry / package의 사설 registry를 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@rv-nest-batch/core") {
+      if (packageInfo.name === "@rvkang/batch-core") {
         manifest.publishConfig = { access: "public", registry: "https://registry.example.test/" };
       }
     });
@@ -369,7 +369,7 @@ describe("release metadata validation / release metadata 검증", () => {
     ["traversing root export import", "상위 경로를 가리키는 root export import", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["."].import = "./dist/../outside.js"; }]
   ])("rejects a source manifest with %s / %s source manifest를 거부한다", async (_english, _korean, mutate) => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@rv-nest-batch/nest") {
+      if (packageInfo.name === "@rvkang/batch-nest") {
         mutate(manifest);
       }
     });
@@ -386,7 +386,7 @@ describe("release metadata validation / release metadata 검증", () => {
     ["traversing subpath export import", "상위 경로를 가리키는 subpath export import", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["./worker"].import = "./dist/worker/../../outside.js"; }]
   ])("rejects core with %s / %s core manifest를 거부한다", async (_english, _korean, mutate) => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@rv-nest-batch/core") {
+      if (packageInfo.name === "@rvkang/batch-core") {
         mutate(manifest);
       }
     });
@@ -400,7 +400,7 @@ describe("release metadata validation / release metadata 검증", () => {
     ["traversing CLI bin", "상위 경로를 가리키는 CLI bin", (manifest: Record<string, unknown>) => { manifest.bin = { "nest-batch": "./dist/../outside.js" }; }]
   ])("rejects CLI with %s / %s CLI manifest를 거부한다", async (_english, _korean, mutate) => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@rv-nest-batch/cli") {
+      if (packageInfo.name === "@rvkang/batch-cli") {
         mutate(manifest);
       }
     });
@@ -410,7 +410,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects bin metadata on a non-CLI package / CLI가 아닌 package의 bin metadata를 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@rv-nest-batch/nest") {
+      if (packageInfo.name === "@rvkang/batch-nest") {
         manifest.bin = { unexpected: "./dist/index.js" };
       }
     });
@@ -423,7 +423,7 @@ describe("release metadata validation / release metadata 검증", () => {
     ["an extra export condition", "추가 export condition", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["."].default = "./dist/index.js"; }]
   ])("rejects a source manifest with %s / %s이 있는 source manifest를 거부한다", async (_english, _korean, mutate) => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@rv-nest-batch/nest") {
+      if (packageInfo.name === "@rvkang/batch-nest") {
         mutate(manifest);
       }
     });
@@ -433,7 +433,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects an extra CLI bin command / 추가 CLI bin command를 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@rv-nest-batch/cli") {
+      if (packageInfo.name === "@rvkang/batch-cli") {
         manifest.bin = { "nest-batch": "./dist/bin.js", unexpected: "./dist/bin.js" };
       }
     });
@@ -463,8 +463,8 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a source internal dependency range / source 내부 dependency range를 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@rv-nest-batch/nest") {
-        manifest.dependencies = { "@rv-nest-batch/core": "^0.1.0" };
+      if (packageInfo.name === "@rvkang/batch-nest") {
+        manifest.dependencies = { "@rvkang/batch-core": "^0.1.0" };
       }
     });
 
@@ -497,6 +497,14 @@ describe("release metadata validation / release metadata 검증", () => {
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(previousCore);
   });
 
+  it("rejects the intermediate previous package namespace / 중간 단계의 이전 package namespace를 거부한다", async () => {
+    const root = createRepository();
+    const previousCore = `${["@rv-nest", "batch"].join("-")}/core`;
+    writeFileSync(join(root, "MIGRATION.md"), `Do not import ${previousCore}.\n`);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(previousCore);
+  });
+
   it("rejects NUL-obfuscated previous scope in a package README / package README의 NUL로 숨긴 이전 scope를 거부한다", async () => {
     const root = createRepository();
     const readmePath = join(root, "packages", "core", "README.md");
@@ -518,11 +526,11 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects removed packages in the new scope / 새 scope의 제거된 package를 거부한다", async () => {
     const root = createRepository();
-    const removedPackageName = `${PUBLIC_PACKAGE_SCOPE}/queue-core`;
+    const removedPackageName = `${PUBLIC_PACKAGE_SCOPE}/batch-queue-core`;
     mkdirSync(join(root, "packages", "core", "src"), { recursive: true });
     writeFileSync(join(root, "packages", "core", "src", "legacy.ts"), `export * from "${removedPackageName}";\n`);
 
-    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/@rv-nest-batch\/queue-core/u);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/@rvkang\/batch-queue-core/u);
   });
 
   it("does not skip an active source subtree named dist / dist 이름의 active source subtree를 건너뛰지 않는다", async () => {
@@ -554,7 +562,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a removed package name outside historical docs / 과거 문서 밖의 제거된 package 이름을 거부한다", async () => {
     const root = createRepository();
-    const removedName = `${PUBLIC_PACKAGE_SCOPE}/queue-core`;
+    const removedName = `${PUBLIC_PACKAGE_SCOPE}/batch-queue-core`;
     mkdirSync(join(root, "packages/core/src"), { recursive: true });
     writeFileSync(join(root, "packages/core/src/legacy.ts"), `export * from "${removedName}";\n`);
 
@@ -571,7 +579,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a removed import in root e2e tests / root e2e test의 제거된 import를 거부한다", async () => {
     const root = createRepository();
-    const removedName = `${PUBLIC_PACKAGE_SCOPE}/scheduler-core`;
+    const removedName = `${PUBLIC_PACKAGE_SCOPE}/batch-scheduler-core`;
     mkdirSync(join(root, "e2e"), { recursive: true });
     writeFileSync(join(root, "e2e/legacy.e2e.test.ts"), `import "${removedName}";\n`);
 
@@ -580,7 +588,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a removed package name in a root document / root 문서의 제거된 package 이름을 거부한다", async () => {
     const root = createRepository();
-    const removedName = `${PUBLIC_PACKAGE_SCOPE}/polling-core`;
+    const removedName = `${PUBLIC_PACKAGE_SCOPE}/batch-polling-core`;
     writeFileSync(join(root, "DATABASE.md"), `Do not install ${removedName}.\n`);
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/DATABASE\.md.*removed package name/u);
@@ -588,7 +596,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("allows removed package history only under docs superpowers / docs superpowers 아래의 과거 package 기록만 허용한다", async () => {
     const root = createRepository();
-    const removedName = `${PUBLIC_PACKAGE_SCOPE}/worker-threads`;
+    const removedName = `${PUBLIC_PACKAGE_SCOPE}/batch-worker-threads`;
     const previousCore = `${["@nest", "batch"].join("-")}/core`;
     mkdirSync(join(root, "docs/superpowers/specs"), { recursive: true });
     writeFileSync(join(root, "docs/superpowers/specs/history.md"), `Historical packages: ${previousCore}, ${removedName}.\n`);
@@ -598,7 +606,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a package LICENSE that differs from root / root와 다른 package LICENSE를 거부한다", async () => {
     const root = createRepository(undefined, (packageInfo) =>
-      packageInfo.name === "@rv-nest-batch/core" ? "Different license\n" : LICENSE_TEXT
+      packageInfo.name === "@rvkang/batch-core" ? "Different license\n" : LICENSE_TEXT
     );
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/LICENSE/);
@@ -621,9 +629,9 @@ describe("release metadata validation / release metadata 검증", () => {
   it("rejects a release checklist that drifts from the package catalog / package catalog과 다른 릴리즈 checklist를 거부한다", async () => {
     const root = createRepository();
     const releasingGuide = join(root, "docs", "releasing.md");
-    writeFileSync(releasingGuide, readFileSync(releasingGuide, "utf8").replace("`@rv-nest-batch/cli`\n", ""));
+    writeFileSync(releasingGuide, readFileSync(releasingGuide, "utf8").replace("`@rvkang/batch-cli`\n", ""));
 
-    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*@rv-nest-batch\/cli/);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*@rvkang\/batch-cli/);
   });
 
   it("rejects a release checklist with a different publish workflow / 다른 publish workflow를 적은 릴리즈 checklist를 거부한다", async () => {
@@ -858,12 +866,12 @@ describe("release metadata validation / release metadata 검증", () => {
     writeFileSync(
       releasingGuide,
       readFileSync(releasingGuide, "utf8").replace(
-        `npm view @rv-nest-batch/cli name version maintainers repository dist-tags --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\n`,
+        `npm view @rvkang/batch-cli name version maintainers repository dist-tags --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\n`,
         ""
       )
     );
 
-    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*npm view @rv-nest-batch\/cli/);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*npm view @rvkang\/batch-cli/);
   });
 
   it("rejects an old-scope npm audit command / 이전 scope npm audit 명령을 거부한다", async () => {
@@ -873,13 +881,13 @@ describe("release metadata validation / release metadata 검증", () => {
     writeFileSync(
       guide,
       readFileSync(guide, "utf8").replace(
-        "npm view @rv-nest-batch/core",
+        "npm view @rvkang/batch-core",
         `npm view ${previousCore}`
       )
     );
 
     await expect(release.verifyReleaseRepository(root))
-      .rejects.toThrow(/@rv-nest-batch\/core|@nest-batch\/core/u);
+      .rejects.toThrow(/@rvkang\/batch-core|@nest-batch\/core/u);
   });
 
   it("rejects a release checklist with an ambient npm registry audit / ambient npm registry를 쓰는 릴리즈 audit를 거부한다", async () => {
@@ -901,7 +909,7 @@ describe("release metadata validation / release metadata 검증", () => {
       readFileSync(releasingGuide, "utf8").replace(` ${NPM_SCOPE_REGISTRY_ARGUMENT}`, "")
     );
 
-    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/@rv-nest-batch:registry/u);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/@rvkang:registry/u);
   });
 
   it("rejects a bare code-form npm whoami command / registry가 없는 code 형태 npm whoami 명령을 거부한다", async () => {
@@ -923,8 +931,8 @@ describe("release metadata validation / release metadata 검증", () => {
     ["inline npm whoami", "inline npm whoami", "`npm whoami --json`"],
     ["fenced npm profile get", "fence의 npm profile get", "```sh\nnpm profile get\n```"],
     ["inline npm profile get", "inline npm profile get", "`npm profile get`"],
-    ["fenced npm view", "fence의 npm view", `\`\`\`shell\nnpm view ${PUBLIC_PACKAGE_SCOPE}/core version\n\`\`\``],
-    ["inline npm view", "inline npm view", `\`npm view ${PUBLIC_PACKAGE_SCOPE}/core version\``]
+    ["fenced npm view", "fence의 npm view", `\`\`\`shell\nnpm view ${PUBLIC_PACKAGE_SCOPE}/batch-core version\n\`\`\``],
+    ["inline npm view", "inline npm view", `\`npm view ${PUBLIC_PACKAGE_SCOPE}/batch-core version\``]
   ])("rejects an additional unsafe %s / 추가된 안전하지 않은 %s 명령을 거부한다", async (_english, _korean, unsafeCommand) => {
     const root = createRepository();
     const releasingGuide = join(root, "docs", "releasing.md");
@@ -962,7 +970,7 @@ describe("release metadata validation / release metadata 검증", () => {
     const releasingGuide = join(root, "docs", "releasing.md");
     writeFileSync(
       releasingGuide,
-      `${readFileSync(releasingGuide, "utf8")}\n\`\`\`bash\necho "docs; npm view ${PUBLIC_PACKAGE_SCOPE}/core version"\n\`\`\`\n`
+      `${readFileSync(releasingGuide, "utf8")}\n\`\`\`bash\necho "docs; npm view ${PUBLIC_PACKAGE_SCOPE}/batch-core version"\n\`\`\`\n`
     );
 
     await expect(release.verifyReleaseRepository(root)).resolves.toBeUndefined();
@@ -1046,12 +1054,12 @@ describe("release metadata validation / release metadata 검증", () => {
     writeFileSync(
       releasingGuide,
       readFileSync(releasingGuide, "utf8").replace(
-        `npm view @rv-nest-batch/cli@0.1.0 version dist.integrity --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\n`,
+        `npm view @rvkang/batch-cli@0.1.0 version dist.integrity --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\n`,
         ""
       )
     );
 
-    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/npm view @rv-nest-batch\/cli@0\.1\.0/u);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/npm view @rvkang\/batch-cli@0\.1\.0/u);
   });
 
   it("rejects a release checklist without the bootstrap provenance exception / bootstrap provenance 예외가 없는 릴리즈 checklist를 거부한다", async () => {
@@ -1217,9 +1225,9 @@ describe("package document validation / package 문서 검증", () => {
 
   it("rejects a CLI README missing a directly imported dependency from install / 직접 import한 dependency가 install에서 빠진 CLI README를 거부한다", async () => {
     const root = await mkdtemp(join(tmpdir(), "nest-batch-readme-test-"));
-    const packageInfo = PUBLIC_PACKAGES.find(({ name }) => name === `${PUBLIC_PACKAGE_SCOPE}/cli`)!;
+    const packageInfo = PUBLIC_PACKAGES.find(({ name }) => name === `${PUBLIC_PACKAGE_SCOPE}/batch-cli`)!;
     const packageDirectory = join(root, packageInfo.directory);
-    const fullInstall = `pnpm add ${PUBLIC_PACKAGE_SCOPE}/cli ${PUBLIC_PACKAGE_SCOPE}/core ${PUBLIC_PACKAGE_SCOPE}/inmemory`;
+    const fullInstall = `pnpm add ${PUBLIC_PACKAGE_SCOPE}/batch-cli ${PUBLIC_PACKAGE_SCOPE}/batch-core ${PUBLIC_PACKAGE_SCOPE}/batch-inmemory`;
 
     try {
       await mkdir(packageDirectory, { recursive: true });
@@ -1227,7 +1235,7 @@ describe("package document validation / package 문서 검증", () => {
         join(packageDirectory, "README.md"),
         createPackageReadme(packageInfo).replace(
           fullInstall,
-          `pnpm add ${PUBLIC_PACKAGE_SCOPE}/cli ${PUBLIC_PACKAGE_SCOPE}/core`
+          `pnpm add ${PUBLIC_PACKAGE_SCOPE}/batch-cli ${PUBLIC_PACKAGE_SCOPE}/batch-core`
         )
       );
 

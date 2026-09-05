@@ -1,4 +1,4 @@
-import type { LockAcquireOptions, LockHandle, LockManager } from "@rv-nest-batch/core";
+import type { LockAcquireOptions, LockHandle, LockManager } from "@rvkang/batch-core";
 import { createExpiresAt, createLockHandle, isLockActive } from "./lock-state.js";
 
 export class InMemoryLockManager implements LockManager {

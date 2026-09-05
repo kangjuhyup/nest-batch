@@ -69,15 +69,18 @@ const SEMVER_PATTERN = new RegExp(
   `^${NUMERIC_IDENTIFIER}\\.${NUMERIC_IDENTIFIER}\\.${NUMERIC_IDENTIFIER}(?:-${PRERELEASE_IDENTIFIER}(?:\\.${PRERELEASE_IDENTIFIER})*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$`
 );
 const PUBLIC_PACKAGE_NAMES = new Set(PUBLIC_PACKAGES.map(({ name }) => name));
-const CLI_PACKAGE_NAME = `${PUBLIC_PACKAGE_SCOPE}/cli`;
+const CLI_PACKAGE_NAME = `${PUBLIC_PACKAGE_SCOPE}/batch-cli`;
 const CLI_README_DIRECT_DEPENDENCIES = [
   CLI_PACKAGE_NAME,
-  `${PUBLIC_PACKAGE_SCOPE}/core`,
-  `${PUBLIC_PACKAGE_SCOPE}/inmemory`
+  `${PUBLIC_PACKAGE_SCOPE}/batch-core`,
+  `${PUBLIC_PACKAGE_SCOPE}/batch-inmemory`
 ];
-const PUBLIC_PACKAGE_NAME_PATTERN = new RegExp(`^${PUBLIC_PACKAGE_SCOPE}/[a-z0-9][a-z0-9._-]*$`);
+const PUBLIC_PACKAGE_NAME_PATTERN = new RegExp(`^${PUBLIC_PACKAGE_SCOPE}/batch-[a-z0-9][a-z0-9._-]*$`);
 const DEPENDENCY_FIELDS = ["dependencies", "optionalDependencies", "peerDependencies", "devDependencies"];
-const LEGACY_PACKAGE_PREFIXES = [`${"@nest"}-batch/`];
+const LEGACY_PACKAGE_PREFIXES = [
+  `${"@nest"}-batch/`,
+  `${"@rv-nest"}-batch/`
+];
 const REMOVED_PUBLIC_PACKAGE_SUFFIXES = [
   "queue-core",
   "scheduler-core",
@@ -88,7 +91,7 @@ const REMOVED_PUBLIC_PACKAGE_SUFFIXES = [
   "queue-bullmq"
 ];
 const REMOVED_PUBLIC_PACKAGE_NAMES = REMOVED_PUBLIC_PACKAGE_SUFFIXES
-  .map((suffix) => `${PUBLIC_PACKAGE_SCOPE}/${suffix}`);
+  .map((suffix) => `${PUBLIC_PACKAGE_SCOPE}/batch-${suffix}`);
 const ROOT_GENERATED_SCAN_DIRECTORIES = new Set([".git", ".superpowers", ".worktrees", "coverage", "node_modules"]);
 const ACTIVE_TEXT_EXTENSIONS = new Set([
   ".cjs", ".css", ".csv", ".graphql", ".gql", ".html", ".js", ".json", ".jsx", ".md", ".mjs",

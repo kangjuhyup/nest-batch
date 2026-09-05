@@ -1,5 +1,5 @@
-import { DefaultBatchRunner, DatabaseBatchStorage } from "@rv-nest-batch/core";
-import type { BatchRunner } from "@rv-nest-batch/core";
+import { DefaultBatchRunner, DatabaseBatchStorage } from "@rvkang/batch-core";
+import type { BatchRunner } from "@rvkang/batch-core";
 import type { DynamicModule, Provider } from "@nestjs/common";
 import {
   BATCH_EXECUTION_ENGINE,

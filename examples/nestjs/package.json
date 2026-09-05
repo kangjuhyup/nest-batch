@@ -1,5 +1,5 @@
 {
-  "name": "@rv-nest-batch/example-nestjs",
+  "name": "@rvkang/batch-example-nestjs",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -7,9 +7,9 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@rv-nest-batch/core": "workspace:*",
-    "@rv-nest-batch/inmemory": "workspace:*",
-    "@rv-nest-batch/nest": "workspace:*",
+    "@rvkang/batch-core": "workspace:*",
+    "@rvkang/batch-inmemory": "workspace:*",
+    "@rvkang/batch-nest": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "reflect-metadata": "^0.2.2"

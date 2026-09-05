@@ -1,4 +1,4 @@
-import { DefaultBatchRunner } from "@rv-nest-batch/core";
+import { DefaultBatchRunner } from "@rvkang/batch-core";
 import type {
   BatchRunner,
   DatabaseBatchStorage,
@@ -6,20 +6,20 @@ import type {
   JobExecution,
   JobParameters,
   StepExecution
-} from "@rv-nest-batch/core";
-import { WorkerLoop } from "@rv-nest-batch/core/queue";
-import type { WorkHandler, WorkQueue, WorkUnit } from "@rv-nest-batch/core/queue";
+} from "@rvkang/batch-core";
+import { WorkerLoop } from "@rvkang/batch-core/queue";
+import type { WorkHandler, WorkQueue, WorkUnit } from "@rvkang/batch-core/queue";
 import {
   SchedulerLoop,
   createQueueScheduleDispatcher,
   createRunnerScheduleDispatcher
-} from "@rv-nest-batch/core/scheduler";
+} from "@rvkang/batch-core/scheduler";
 import type {
   ScheduleDefinition,
   ScheduleDispatcher,
   ScheduleOccurrence,
   ScheduleStore
-} from "@rv-nest-batch/core/scheduler";
+} from "@rvkang/batch-core/scheduler";
 
 export interface CliResult {
   readonly exitCode: number;

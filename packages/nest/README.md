@@ -1,12 +1,12 @@
-# @rv-nest-batch/nest
+# @rvkang/batch-nest
 
 NestJS module, decorator discovery, and runtime integration for `nest-batch`.
 
 ## Install
 
 ```bash
-pnpm add @rv-nest-batch/nest
-pnpm add @rv-nest-batch/core @rv-nest-batch/inmemory @nestjs/common @nestjs/core reflect-metadata
+pnpm add @rvkang/batch-nest
+pnpm add @rvkang/batch-core @rvkang/batch-inmemory @nestjs/common @nestjs/core reflect-metadata
 ```
 
 `@nestjs/common`, `@nestjs/core`, and `reflect-metadata` are peer dependencies.
@@ -15,11 +15,11 @@ pnpm add @rv-nest-batch/core @rv-nest-batch/inmemory @nestjs/common @nestjs/core
 
 ```ts
 import "reflect-metadata";
-import { defineStep } from "@rv-nest-batch/core";
+import { defineStep } from "@rvkang/batch-core";
 import { Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import { InMemoryBatchStorage } from "@rv-nest-batch/inmemory";
-import { BatchJob, BatchStep, NestBatchModule } from "@rv-nest-batch/nest";
+import { InMemoryBatchStorage } from "@rvkang/batch-inmemory";
+import { BatchJob, BatchStep, NestBatchModule } from "@rvkang/batch-nest";
 
 @BatchJob("hello")
 class HelloJob {

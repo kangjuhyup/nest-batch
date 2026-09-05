@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DatabaseBatchStorage, DefaultBatchRunner } from "@rv-nest-batch/core";
-import type { ExecutionEngine, WorkerPool } from "@rv-nest-batch/core";
-import type { WorkQueue } from "@rv-nest-batch/core/queue";
+import { DatabaseBatchStorage, DefaultBatchRunner } from "@rvkang/batch-core";
+import type { ExecutionEngine, WorkerPool } from "@rvkang/batch-core";
+import type { WorkQueue } from "@rvkang/batch-core/queue";
 import { DiscoveryModule } from "@nestjs/core";
 import {
   BATCH_CHECKPOINT_STORE,

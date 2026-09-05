@@ -10,7 +10,7 @@ import type {
   PartitionClaimOptions,
   PartitionExecution,
   StepExecution
-} from "@rv-nest-batch/core";
+} from "@rvkang/batch-core";
 import { resolveMariaDbPool } from "../driver.js";
 import { toJobExecution, toJobInstance, toPartitionExecution, toStepExecution } from "./mapper.js";
 import type { MariaDbBatchOptions } from "../options.js";

@@ -1,4 +1,4 @@
-import { DatabaseBatchStorage } from "@rv-nest-batch/core";
+import { DatabaseBatchStorage } from "@rvkang/batch-core";
 import { PostgresCheckpointStore } from "./checkpoint-store.js";
 import { resolvePostgresPool } from "./driver.js";
 import { PostgresExecutionContextStore } from "./execution-context-store.js";

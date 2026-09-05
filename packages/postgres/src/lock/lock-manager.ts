@@ -1,4 +1,4 @@
-import type { LockAcquireOptions, LockHandle, LockManager } from "@rv-nest-batch/core";
+import type { LockAcquireOptions, LockHandle, LockManager } from "@rvkang/batch-core";
 import { resolvePostgresPool } from "../driver.js";
 import type { PostgresBatchOptions } from "../options.js";
 import type { PostgresPoolLike } from "../options.js";

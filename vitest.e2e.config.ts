@@ -6,18 +6,18 @@ const fromRoot = (path: string) => fileURLToPath(new URL(path, import.meta.url))
 export default defineConfig({
   resolve: {
     alias: {
-      "@rv-nest-batch/core/queue": fromRoot("./packages/core/src/queue/index.ts"),
-      "@rv-nest-batch/core/scheduler": fromRoot("./packages/core/src/scheduler/index.ts"),
-      "@rv-nest-batch/core/polling": fromRoot("./packages/core/src/polling/index.ts"),
-      "@rv-nest-batch/core/worker": fromRoot("./packages/core/src/worker/index.ts"),
-      "@rv-nest-batch/core": fromRoot("./packages/core/src/index.ts"),
-      "@rv-nest-batch/nest": fromRoot("./packages/nest/src/index.ts"),
-      "@rv-nest-batch/inmemory": fromRoot("./packages/inmemory/src/index.ts"),
-      "@rv-nest-batch/postgres": fromRoot("./packages/postgres/src/index.ts"),
-      "@rv-nest-batch/mysql": fromRoot("./packages/mysql/src/index.ts"),
-      "@rv-nest-batch/mariadb": fromRoot("./packages/mariadb/src/index.ts"),
-      "@rv-nest-batch/bullmq": fromRoot("./packages/bullmq/src/index.ts"),
-      "@rv-nest-batch/cli": fromRoot("./packages/cli/src/index.ts")
+      "@rvkang/batch-core/queue": fromRoot("./packages/core/src/queue/index.ts"),
+      "@rvkang/batch-core/scheduler": fromRoot("./packages/core/src/scheduler/index.ts"),
+      "@rvkang/batch-core/polling": fromRoot("./packages/core/src/polling/index.ts"),
+      "@rvkang/batch-core/worker": fromRoot("./packages/core/src/worker/index.ts"),
+      "@rvkang/batch-core": fromRoot("./packages/core/src/index.ts"),
+      "@rvkang/batch-nest": fromRoot("./packages/nest/src/index.ts"),
+      "@rvkang/batch-inmemory": fromRoot("./packages/inmemory/src/index.ts"),
+      "@rvkang/batch-postgres": fromRoot("./packages/postgres/src/index.ts"),
+      "@rvkang/batch-mysql": fromRoot("./packages/mysql/src/index.ts"),
+      "@rvkang/batch-mariadb": fromRoot("./packages/mariadb/src/index.ts"),
+      "@rvkang/batch-bullmq": fromRoot("./packages/bullmq/src/index.ts"),
+      "@rvkang/batch-cli": fromRoot("./packages/cli/src/index.ts")
     }
   },
   test: {

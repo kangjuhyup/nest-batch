@@ -1,5 +1,5 @@
 {
-  "name": "@rv-nest-batch/inmemory",
+  "name": "@rvkang/batch-inmemory",
   "version": "0.1.0",
   "description": "In-memory storage adapter for nest-batch tests and examples.",
   "keywords": ["nestjs", "batch", "in-memory", "testing"],
@@ -36,6 +36,6 @@
     "test": "vitest run --root ../.. --config vitest.config.ts packages/inmemory/test/storage.test.ts"
   },
   "dependencies": {
-    "@rv-nest-batch/core": "workspace:*"
+    "@rvkang/batch-core": "workspace:*"
   }
 }

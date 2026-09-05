@@ -7,7 +7,7 @@ description: nest-batch 저장소에서 TypeORM, MikroORM, Prisma 같은 ORM int
 
 ## Overview
 
-ORM integration은 사용자의 application database client를 `nest-batch` persistence 또는 job writer에 연결하는 선택적 adapter입니다. `@rv-nest-batch/core`는 ORM type을 알지 않아야 하며, ORM별 transaction과 lifecycle 차이는 integration package에서 흡수합니다.
+ORM integration은 사용자의 application database client를 `nest-batch` persistence 또는 job writer에 연결하는 선택적 adapter입니다. `@rvkang/batch-core`는 ORM type을 알지 않아야 하며, ORM별 transaction과 lifecycle 차이는 integration package에서 흡수합니다.
 
 ## 확인할 입력
 

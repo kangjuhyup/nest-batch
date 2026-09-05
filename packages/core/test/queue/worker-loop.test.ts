@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { WorkerLoop } from "@rv-nest-batch/core/queue";
-import type { WorkClaimOptions, WorkQueue, WorkUnit } from "@rv-nest-batch/core/queue";
+import { WorkerLoop } from "@rvkang/batch-core/queue";
+import type { WorkClaimOptions, WorkQueue, WorkUnit } from "@rvkang/batch-core/queue";
 
 class InMemoryWorkQueue<TWork extends WorkUnit = WorkUnit> implements WorkQueue<TWork> {
   readonly completed: string[] = [];

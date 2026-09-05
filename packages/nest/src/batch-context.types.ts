@@ -8,7 +8,7 @@ import type {
   JobParameters,
   PartitionExecutionContext,
   TaskletStepExecutionContext
-} from "@rv-nest-batch/core";
+} from "@rvkang/batch-core";
 
 export type NestBatchExecutionContext<Parameters extends JobParameters = JobParameters> =
   | TaskletStepExecutionContext<unknown, Parameters>

@@ -1,4 +1,4 @@
-import type { JobExecution, JobInstance, PartitionExecution, StepExecution } from "@rv-nest-batch/core";
+import type { JobExecution, JobInstance, PartitionExecution, StepExecution } from "@rvkang/batch-core";
 import { describe, expect, it } from "vitest";
 import {
   MariaDbCheckpointStore,

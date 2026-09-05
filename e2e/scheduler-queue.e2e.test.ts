@@ -1,15 +1,15 @@
 import { createRequire } from "node:module";
-import { runCli } from "@rv-nest-batch/cli";
-import { DefaultBatchRunner, defineJob, defineStep } from "@rv-nest-batch/core";
-import { PostgresBatchStorage, PostgresScheduleStore } from "@rv-nest-batch/postgres";
-import { BullMqWorkQueue, type BullMqWorkerLike } from "@rv-nest-batch/bullmq";
-import type { WorkUnit } from "@rv-nest-batch/core/queue";
+import { runCli } from "@rvkang/batch-cli";
+import { DefaultBatchRunner, defineJob, defineStep } from "@rvkang/batch-core";
+import { PostgresBatchStorage, PostgresScheduleStore } from "@rvkang/batch-postgres";
+import { BullMqWorkQueue, type BullMqWorkerLike } from "@rvkang/batch-bullmq";
+import type { WorkUnit } from "@rvkang/batch-core/queue";
 import {
   SchedulerLoop,
   createIntervalTrigger,
   createQueueScheduleDispatcher,
   defineSchedule
-} from "@rv-nest-batch/core/scheduler";
+} from "@rvkang/batch-core/scheduler";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPostgresE2eDatabase } from "./support/postgres.js";
 

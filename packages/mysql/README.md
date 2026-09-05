@@ -1,4 +1,4 @@
-# @rv-nest-batch/mysql
+# @rvkang/batch-mysql
 
 MySQL-backed repository, checkpoint, execution-context, and lock storage for
 `nest-batch`.
@@ -6,13 +6,13 @@ MySQL-backed repository, checkpoint, execution-context, and lock storage for
 ## Install
 
 ```bash
-pnpm add @rv-nest-batch/mysql
+pnpm add @rvkang/batch-mysql
 ```
 
 ## Initialize storage
 
 ```ts
-import { MySqlBatchStorage } from "@rv-nest-batch/mysql";
+import { MySqlBatchStorage } from "@rvkang/batch-mysql";
 
 const storage = new MySqlBatchStorage({
   connectionString: process.env.DATABASE_URL,
