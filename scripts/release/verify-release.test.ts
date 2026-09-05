@@ -1,4 +1,4 @@
-import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -476,6 +476,33 @@ describe("release metadata validation / release metadata 검증", () => {
     writeFileSync(join(root, "packages", "core", "src", "legacy.ts"), `export * from "${removedPackageName}";\n`);
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/@rv-nest-batch\/queue-core/u);
+  });
+
+  it("does not skip an active source subtree named dist / dist 이름의 active source subtree를 건너뛰지 않는다", async () => {
+    const root = createRepository();
+    const previousCore = `${["@nest", "batch"].join("-")}/core`;
+    const legacyPath = join(root, "packages", "core", "src", "dist", "legacy.ts");
+    mkdirSync(dirname(legacyPath), { recursive: true });
+    writeFileSync(legacyPath, `export * from "${previousCore}";\n`);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(previousCore);
+  });
+
+  it("does not exempt a docs superpowers file / docs superpowers 일반 파일을 면제하지 않는다", async () => {
+    const root = createRepository();
+    const previousCore = `${["@nest", "batch"].join("-")}/core`;
+    writeFileSync(join(root, "docs", "superpowers"), `Historical package: ${previousCore}.\n`);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(previousCore);
+  });
+
+  it("rejects a docs superpowers symlink / docs superpowers symlink를 거부한다", async () => {
+    const root = createRepository();
+    const target = join(root, "history.md");
+    writeFileSync(target, "history\n");
+    symlinkSync(target, join(root, "docs", "superpowers"));
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs[\\/]superpowers: symbolic links/u);
   });
 
   it("rejects a removed package name outside historical docs / 과거 문서 밖의 제거된 package 이름을 거부한다", async () => {

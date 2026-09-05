@@ -76,9 +76,24 @@ const REMOVED_PUBLIC_PACKAGE_SUFFIXES = [
 ];
 const REMOVED_PUBLIC_PACKAGE_NAMES = REMOVED_PUBLIC_PACKAGE_SUFFIXES
   .map((suffix) => `${PUBLIC_PACKAGE_SCOPE}/${suffix}`);
-const IGNORED_SCAN_ENTRIES = new Set([".git", ".superpowers", ".tsbuildinfo", ".worktrees", "coverage", "dist", "node_modules"]);
+const ROOT_GENERATED_SCAN_DIRECTORIES = new Set([".git", ".superpowers", ".worktrees", "coverage", "node_modules"]);
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+
+const isHistoricalDocsDirectory = (pathFromRoot) => pathFromRoot === join("docs", "superpowers");
+
+const isGeneratedOrVendorDirectory = (pathFromRoot) => {
+  if (ROOT_GENERATED_SCAN_DIRECTORIES.has(pathFromRoot)) {
+    return true;
+  }
+
+  const segments = pathFromRoot.split(sep);
+  const isWorkspaceOutput = segments.length === 3 &&
+    (segments[0] === "packages" || segments[0] === "examples") &&
+    (segments[2] === "dist" || (segments[0] === "packages" && segments[2] === ".tsbuildinfo"));
+
+  return isWorkspaceOutput || segments.at(-1) === "node_modules";
+};
 
 const hasExactFiles = (files) =>
   Array.isArray(files) && files.length === EXPECTED_FILES.length && files.every((file, index) => file === EXPECTED_FILES[index]);
@@ -394,23 +409,18 @@ const validateSourceInternalDependencies = (manifest, packageInfo) => {
 };
 
 const scanFiles = (root, directory = root) => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    if (IGNORED_SCAN_ENTRIES.has(entry.name)) {
-      return [];
-    }
-
     const path = join(directory, entry.name);
     const pathFromRoot = relative(root, path);
-    const historicalDocs = pathFromRoot === join("docs", "superpowers") || pathFromRoot.startsWith(`docs${sep}superpowers${sep}`);
-
-    if (historicalDocs) {
-      return [];
-    }
 
     if (entry.isSymbolicLink()) {
       throw new Error(`${pathFromRoot}: symbolic links are not allowed in release scan paths`);
     }
 
     if (entry.isDirectory()) {
+      if (isHistoricalDocsDirectory(pathFromRoot) || isGeneratedOrVendorDirectory(pathFromRoot)) {
+        return [];
+      }
+
       return scanFiles(root, path);
     }
 
