@@ -10,7 +10,7 @@ import type {
   PartitionClaimOptions,
   PartitionExecution,
   StepExecution
-} from "@nest-batch/core";
+} from "@rv-nest-batch/core";
 import {
   cloneJobExecution,
   cloneJobInstance,

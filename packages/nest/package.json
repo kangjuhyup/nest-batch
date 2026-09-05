@@ -1,5 +1,5 @@
 {
-  "name": "@nest-batch/nest",
+  "name": "@rv-nest-batch/nest",
   "version": "0.1.0",
   "description": "NestJS integration for nest-batch.",
   "keywords": ["nestjs", "batch", "integration", "decorator"],
@@ -36,7 +36,7 @@
     "test": "vitest run --root ../.. --config vitest.config.ts packages/nest/test"
   },
   "dependencies": {
-    "@nest-batch/core": "workspace:*"
+    "@rv-nest-batch/core": "workspace:*"
   },
   "peerDependencies": {
     "@nestjs/common": "^10.0.0 || ^11.0.0",

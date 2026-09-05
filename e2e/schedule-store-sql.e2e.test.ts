@@ -1,11 +1,11 @@
-import { MariaDbScheduleStore } from "@nest-batch/mariadb";
-import { MySqlScheduleStore } from "@nest-batch/mysql";
-import { PostgresScheduleStore } from "@nest-batch/postgres";
+import { MariaDbScheduleStore } from "@rv-nest-batch/mariadb";
+import { MySqlScheduleStore } from "@rv-nest-batch/mysql";
+import { PostgresScheduleStore } from "@rv-nest-batch/postgres";
 import type {
   ScheduleOccurrence,
   ScheduleOccurrenceCandidate,
   ScheduleStore
-} from "@nest-batch/core/scheduler";
+} from "@rv-nest-batch/core/scheduler";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createMariaDbE2eDatabase } from "./support/mariadb.js";
 import { createMySqlE2eDatabase } from "./support/mysql.js";

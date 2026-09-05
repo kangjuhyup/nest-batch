@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type { JobParameters, StepRuntimeContext } from "@nest-batch/core";
+import type { JobParameters, StepRuntimeContext } from "@rv-nest-batch/core";
 import { BatchContextStorage } from "./batch-context.storage.js";
 import type { NestBatchExecutionContext } from "./batch-context.types.js";
 

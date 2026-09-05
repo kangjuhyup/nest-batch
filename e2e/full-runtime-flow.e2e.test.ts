@@ -1,4 +1,4 @@
-import { runCli } from "@nest-batch/cli";
+import { runCli } from "@rv-nest-batch/cli";
 import {
   DatabaseBatchStorage,
   DefaultBatchRunner,
@@ -6,12 +6,12 @@ import {
   defineJob,
   defineStep,
   skipItem
-} from "@nest-batch/core";
-import type { BatchEvent, ChunkStepExecutionContext } from "@nest-batch/core";
-import { InMemoryBatchStorage } from "@nest-batch/inmemory";
-import { MariaDbBatchStorage } from "@nest-batch/mariadb";
-import { MySqlBatchStorage } from "@nest-batch/mysql";
-import { PostgresBatchStorage } from "@nest-batch/postgres";
+} from "@rv-nest-batch/core";
+import type { BatchEvent, ChunkStepExecutionContext } from "@rv-nest-batch/core";
+import { InMemoryBatchStorage } from "@rv-nest-batch/inmemory";
+import { MariaDbBatchStorage } from "@rv-nest-batch/mariadb";
+import { MySqlBatchStorage } from "@rv-nest-batch/mysql";
+import { PostgresBatchStorage } from "@rv-nest-batch/postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createMariaDbE2eDatabase } from "./support/mariadb.js";
 import { createMySqlE2eDatabase } from "./support/mysql.js";

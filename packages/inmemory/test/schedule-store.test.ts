@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InMemoryScheduleStore } from "@nest-batch/inmemory";
+import { InMemoryScheduleStore } from "@rv-nest-batch/inmemory";
 
 describe("inmemory schedule store / inmemory schedule store를 검증한다", () => {
   it("claims dispatches and fails occurrences / occurrence claim dispatch fail을 저장한다", async () => {

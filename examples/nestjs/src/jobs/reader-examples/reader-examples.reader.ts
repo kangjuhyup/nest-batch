@@ -11,8 +11,8 @@ import type {
   PagingReaderFetchContext,
   SqlReaderDefinition,
   SqlReaderQueryContext
-} from "@nest-batch/core";
-import { BatchReader } from "@nest-batch/nest";
+} from "@rv-nest-batch/core";
+import { BatchReader } from "@rv-nest-batch/nest";
 
 export interface ReaderExampleUser {
   readonly id: string;

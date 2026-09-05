@@ -1,4 +1,4 @@
-import type { LockAcquireOptions, LockHandle, LockManager } from "@nest-batch/core";
+import type { LockAcquireOptions, LockHandle, LockManager } from "@rv-nest-batch/core";
 import { resolveMySqlPool } from "../driver.js";
 import type { MySqlBatchOptions } from "../options.js";
 import type { MySqlPoolLike } from "../options.js";

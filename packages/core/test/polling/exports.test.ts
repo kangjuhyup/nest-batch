@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ContinuousPollingLoop } from "@nest-batch/core/polling";
+import { ContinuousPollingLoop } from "@rv-nest-batch/core/polling";
 
 describe("core polling subpath exports / core polling subpath export를 검증한다", () => {
   it("exports the continuous polling loop / continuous polling loop를 export한다", () => {

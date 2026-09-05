@@ -1,4 +1,4 @@
-import type { LockHandle } from "@nest-batch/core";
+import type { LockHandle } from "@rv-nest-batch/core";
 
 interface LockTimes {
   readonly acquiredAt: Date;

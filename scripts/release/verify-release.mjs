@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT, PUBLIC_PACKAGES, REPOSITORY_URL } from "./package-catalog.mjs";
+import { NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT, PUBLIC_PACKAGE_SCOPE, PUBLIC_PACKAGES, REPOSITORY_URL } from "./package-catalog.mjs";
 import { getPackageEntrypointTargets, validatePackageEntrypoints } from "./package-entrypoints.mjs";
 import { verifyWorkflowFiles } from "./verify-workflows.mjs";
 
@@ -62,6 +62,7 @@ const SEMVER_PATTERN = new RegExp(
   `^${NUMERIC_IDENTIFIER}\\.${NUMERIC_IDENTIFIER}\\.${NUMERIC_IDENTIFIER}(?:-${PRERELEASE_IDENTIFIER}(?:\\.${PRERELEASE_IDENTIFIER})*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$`
 );
 const PUBLIC_PACKAGE_NAMES = new Set(PUBLIC_PACKAGES.map(({ name }) => name));
+const PUBLIC_PACKAGE_NAME_PATTERN = new RegExp(`^${PUBLIC_PACKAGE_SCOPE}/[A-Za-z0-9][A-Za-z0-9._-]*$`);
 const DEPENDENCY_FIELDS = ["dependencies", "optionalDependencies", "peerDependencies", "devDependencies"];
 const LEGACY_PACKAGE_NAMES = [
   "queue-core",
@@ -256,8 +257,8 @@ export function validateManifest(manifest, packageInfo) {
     throw new Error(`${directory}: package manifest must be an object`);
   }
 
-  if (typeof manifest.name !== "string" || !/^@nest-batch\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(manifest.name)) {
-    errors.push("name must be an @nest-batch scoped package name");
+  if (typeof manifest.name !== "string" || !PUBLIC_PACKAGE_NAME_PATTERN.test(manifest.name)) {
+    errors.push(`name must be an ${PUBLIC_PACKAGE_SCOPE} scoped package name`);
   }
 
   if (typeof manifest.version !== "string" || !SEMVER_PATTERN.test(manifest.version)) {

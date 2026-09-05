@@ -1,4 +1,4 @@
-import { InMemoryJobRepository } from "@nest-batch/inmemory";
+import { InMemoryJobRepository } from "@rv-nest-batch/inmemory";
 import { describe, expect, it } from "vitest";
 import type { PartitionExecution } from "../src/index.js";
 

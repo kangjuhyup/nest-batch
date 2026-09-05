@@ -4,9 +4,9 @@ import {
   defineChunkStep,
   defineJob,
   skipItem
-} from "@nest-batch/core";
-import type { StepExecution } from "@nest-batch/core";
-import { InMemoryBatchStorage } from "@nest-batch/inmemory";
+} from "@rv-nest-batch/core";
+import type { StepExecution } from "@rv-nest-batch/core";
+import { InMemoryBatchStorage } from "@rv-nest-batch/inmemory";
 import { describe, expect, it } from "vitest";
 
 const itemCount = readPositiveInteger(process.env.NEST_BATCH_PERF_ITEMS, 10_000, "NEST_BATCH_PERF_ITEMS");

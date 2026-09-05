@@ -1,13 +1,13 @@
-import type { BatchRunOptions, BatchRunner, ExecutionEngine, WorkerPool } from "@nest-batch/core";
-import type { DatabaseBatchStorage } from "@nest-batch/core";
-import type { ContinuousPollingLoopOptions } from "@nest-batch/core/polling";
-import type { WorkQueue } from "@nest-batch/core/queue";
+import type { BatchRunOptions, BatchRunner, ExecutionEngine, WorkerPool } from "@rv-nest-batch/core";
+import type { DatabaseBatchStorage } from "@rv-nest-batch/core";
+import type { ContinuousPollingLoopOptions } from "@rv-nest-batch/core/polling";
+import type { WorkQueue } from "@rv-nest-batch/core/queue";
 import type {
   ScheduleDefinition,
   ScheduleDispatcher,
   ScheduleStore,
   SchedulerLoop
-} from "@nest-batch/core/scheduler";
+} from "@rv-nest-batch/core/scheduler";
 import type { DynamicModule, FactoryProvider } from "@nestjs/common";
 
 export interface NestBatchSchedulerOptions {

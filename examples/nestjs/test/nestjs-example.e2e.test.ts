@@ -3,11 +3,11 @@ import {
   DatabaseBatchStorage,
   getReaderCheckpoint,
   openReader
-} from "@nest-batch/core";
-import type { ChunkReader, ChunkStepDefinition } from "@nest-batch/core";
+} from "@rv-nest-batch/core";
+import type { ChunkReader, ChunkStepDefinition } from "@rv-nest-batch/core";
 import { NestFactory } from "@nestjs/core";
 import { describe, expect, it } from "vitest";
-import { NestBatchRegistry, NestBatchRunner } from "@nest-batch/nest";
+import { NestBatchRegistry, NestBatchRunner } from "@rv-nest-batch/nest";
 import { AppModule } from "../src/app.module.js";
 import { writtenCharges } from "../src/jobs/billing/billing.step.js";
 import type {

@@ -4,14 +4,14 @@
   "commit": false,
   "fixed": [
     [
-      "@nest-batch/core",
-      "@nest-batch/nest",
-      "@nest-batch/inmemory",
-      "@nest-batch/postgres",
-      "@nest-batch/mysql",
-      "@nest-batch/mariadb",
-      "@nest-batch/bullmq",
-      "@nest-batch/cli"
+      "@rv-nest-batch/core",
+      "@rv-nest-batch/nest",
+      "@rv-nest-batch/inmemory",
+      "@rv-nest-batch/postgres",
+      "@rv-nest-batch/mysql",
+      "@rv-nest-batch/mariadb",
+      "@rv-nest-batch/bullmq",
+      "@rv-nest-batch/cli"
     ]
   ],
   "linked": [],

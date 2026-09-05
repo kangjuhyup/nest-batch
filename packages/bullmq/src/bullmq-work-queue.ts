@@ -1,4 +1,4 @@
-import type { WorkClaimOptions, WorkQueue, WorkUnit } from "@nest-batch/core/queue";
+import type { WorkClaimOptions, WorkQueue, WorkUnit } from "@rv-nest-batch/core/queue";
 
 export interface BullMqJobOptions {
   readonly jobId?: string;

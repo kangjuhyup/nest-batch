@@ -1,5 +1,5 @@
 {
-  "name": "@nest-batch/bullmq",
+  "name": "@rv-nest-batch/bullmq",
   "version": "0.1.0",
   "description": "BullMQ-backed WorkQueue adapter for nest-batch distributed workers.",
   "keywords": ["nestjs", "batch", "bullmq", "queue", "worker"],
@@ -36,7 +36,7 @@
     "test": "vitest run --root ../.. --config vitest.config.ts packages/bullmq/test"
   },
   "dependencies": {
-    "@nest-batch/core": "workspace:*"
+    "@rv-nest-batch/core": "workspace:*"
   },
   "peerDependencies": {
     "bullmq": ">=5"

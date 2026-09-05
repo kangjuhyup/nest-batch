@@ -1,4 +1,4 @@
-import type { LockAcquireOptions, LockHandle, LockManager } from "@nest-batch/core";
+import type { LockAcquireOptions, LockHandle, LockManager } from "@rv-nest-batch/core";
 import { resolveMariaDbPool } from "../driver.js";
 import type { MariaDbBatchOptions } from "../options.js";
 import type { MariaDbPoolLike } from "../options.js";

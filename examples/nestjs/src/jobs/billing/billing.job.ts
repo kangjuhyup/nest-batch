@@ -1,5 +1,5 @@
 import { Inject } from "@nestjs/common";
-import { BatchJob, BatchStep } from "@nest-batch/nest";
+import { BatchJob, BatchStep } from "@rv-nest-batch/nest";
 import { BILLING_CHARGE_ACCOUNTS_STEP } from "./billing.tokens.js";
 import type { BillingStepDefinition } from "./billing.types.js";
 

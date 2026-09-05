@@ -1,4 +1,4 @@
-import { DatabaseBatchStorage } from "@nest-batch/core";
+import { DatabaseBatchStorage } from "@rv-nest-batch/core";
 import { describe, expect, it } from "vitest";
 import { MySqlBatchStorage, MySqlCheckpointStore, MySqlJobRepository, MySqlLockManager } from "../src/index.js";
 

@@ -4,7 +4,7 @@ import type {
   JobInstance,
   PartitionExecution,
   StepExecution
-} from "@nest-batch/core";
+} from "@rv-nest-batch/core";
 import { describe, expect, it } from "vitest";
 import {
   MySqlCheckpointStore,

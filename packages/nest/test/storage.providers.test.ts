@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DatabaseBatchStorage } from "@nest-batch/core";
+import { DatabaseBatchStorage } from "@rv-nest-batch/core";
 import {
   BATCH_CHECKPOINT_STORE,
   BATCH_JOB_REPOSITORY,

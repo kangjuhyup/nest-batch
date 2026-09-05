@@ -3,7 +3,7 @@ import {
   createUtcDailyTrigger,
   createUtcMonthlyTrigger,
   createUtcWeeklyTrigger
-} from "@nest-batch/core/scheduler";
+} from "@rv-nest-batch/core/scheduler";
 
 describe("UTC calendar triggers / UTC calendar trigger를 검증한다", () => {
   it("returns daily occurrences after durable state / durable state 이후 daily occurrence를 반환한다", () => {

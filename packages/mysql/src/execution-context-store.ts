@@ -1,4 +1,4 @@
-import type { ExecutionContextKey, ExecutionContextStore } from "@nest-batch/core";
+import type { ExecutionContextKey, ExecutionContextStore } from "@rv-nest-batch/core";
 import { resolveMySqlPool } from "./driver.js";
 import type { MySqlBatchOptions, MySqlPoolLike } from "./options.js";
 import {

@@ -1,4 +1,4 @@
-import type { LockHandle } from "@nest-batch/core";
+import type { LockHandle } from "@rv-nest-batch/core";
 
 export const createExpiresAt = (ttlMs?: number): Date | undefined => {
   if (ttlMs !== undefined && (!Number.isSafeInteger(ttlMs) || ttlMs <= 0)) {

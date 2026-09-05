@@ -5,7 +5,7 @@ import type {
   JobDefinition,
   JobExecution,
   JobParameters
-} from "@nest-batch/core";
+} from "@rv-nest-batch/core";
 import { BATCH_RUNNER, NEST_BATCH_OPTIONS } from "./constants.js";
 import type { NestBatchModuleOptions } from "./module-options.js";
 import { NestBatchRegistry } from "./registry.js";

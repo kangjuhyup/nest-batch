@@ -1,5 +1,5 @@
 import { posix } from "node:path";
-import { CORE_SUBPATHS } from "./package-catalog.mjs";
+import { CORE_SUBPATHS, PUBLIC_PACKAGE_SCOPE } from "./package-catalog.mjs";
 
 const ROOT_EXPORT = {
   types: "./dist/index.d.ts",
@@ -21,7 +21,7 @@ const hasExactKeys = (value, expectedKeys) => {
 const expectedEntrypoints = (packageInfo) => {
   const exports = { ".": { ...ROOT_EXPORT } };
 
-  if (packageInfo.name === "@nest-batch/core") {
+  if (packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/core`) {
     for (const subpath of CORE_SUBPATHS) {
       exports[`./${subpath}`] = {
         types: `./dist/${subpath}/index.d.ts`,
@@ -34,7 +34,7 @@ const expectedEntrypoints = (packageInfo) => {
     main: ROOT_EXPORT.import,
     types: ROOT_EXPORT.types,
     exports,
-    bin: packageInfo.name === "@nest-batch/cli" ? { "nest-batch": "./dist/bin.js" } : undefined
+    bin: packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/cli` ? { "nest-batch": "./dist/bin.js" } : undefined
   };
 };
 

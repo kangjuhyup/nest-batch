@@ -4,7 +4,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { CORE_SUBPATHS, NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT, PUBLIC_PACKAGES } from "./package-catalog.mjs";
+import {
+  CORE_SUBPATHS,
+  NPM_REGISTRY_URL,
+  NPM_SCOPE_REGISTRY_ARGUMENT,
+  PUBLIC_PACKAGE_SCOPE,
+  PUBLIC_PACKAGES
+} from "./package-catalog.mjs";
 import { validateManifest, verifyPackageDocuments } from "./verify-release.mjs";
 import * as release from "./verify-release.mjs";
 
@@ -20,7 +26,7 @@ const entrypointsFor = (packageInfo: (typeof PUBLIC_PACKAGES)[number]) => {
     ".": { types: "./dist/index.d.ts", import: "./dist/index.js" }
   };
 
-  if (packageInfo.name === "@nest-batch/core") {
+  if (packageInfo.name === "@rv-nest-batch/core") {
     for (const subpath of CORE_SUBPATHS) {
       exports[`./${subpath}`] = {
         types: `./dist/${subpath}/index.d.ts`,
@@ -33,7 +39,7 @@ const entrypointsFor = (packageInfo: (typeof PUBLIC_PACKAGES)[number]) => {
     main: "./dist/index.js",
     types: "./dist/index.d.ts",
     exports,
-    ...(packageInfo.name === "@nest-batch/cli" ? { bin: { "nest-batch": "./dist/bin.js" } } : {})
+    ...(packageInfo.name === "@rv-nest-batch/cli" ? { bin: { "nest-batch": "./dist/bin.js" } } : {})
   };
 };
 
@@ -78,7 +84,7 @@ pnpm install --frozen-lockfile
 
 ## 2. 최초 0.1.0 bootstrap
 
-- [ ] npm에서 \`@nest-batch\` scope 권한 확인
+- [ ] npm에서 \`@rv-nest-batch\` scope 권한 확인
   - 모든 catalog package의 identity를 먼저 read-only로 확인합니다.
 
 \`\`\`bash
@@ -97,14 +103,14 @@ ${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} name version maintainers r
 ${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name}@0.1.0 version dist.integrity --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}`).join("\n")}
 \`\`\`
 
-\`@nest-batch/core\`
-\`@nest-batch/nest\`
-\`@nest-batch/inmemory\`
-\`@nest-batch/postgres\`
-\`@nest-batch/mysql\`
-\`@nest-batch/mariadb\`
-\`@nest-batch/bullmq\`
-\`@nest-batch/cli\`
+\`@rv-nest-batch/core\`
+\`@rv-nest-batch/nest\`
+\`@rv-nest-batch/inmemory\`
+\`@rv-nest-batch/postgres\`
+\`@rv-nest-batch/mysql\`
+\`@rv-nest-batch/mariadb\`
+\`@rv-nest-batch/bullmq\`
+\`@rv-nest-batch/cli\`
 
 ## 3. Trusted Publisher 등록
 
@@ -206,7 +212,7 @@ function createRepository(
     writeFileSync(join(packageDirectory, "dist", "index.js"), "export {};\n", { flag: "w" });
     writeFileSync(join(packageDirectory, "dist", "index.d.ts"), "export {};\n", { flag: "w" });
 
-    if (packageInfo.name === "@nest-batch/core") {
+    if (packageInfo.name === "@rv-nest-batch/core") {
       for (const subpath of CORE_SUBPATHS) {
         mkdirSync(join(packageDirectory, "dist", subpath), { recursive: true });
         writeFileSync(join(packageDirectory, "dist", subpath, "index.js"), "export {};\n");
@@ -214,7 +220,7 @@ function createRepository(
       }
     }
 
-    if (packageInfo.name === "@nest-batch/cli") {
+    if (packageInfo.name === "@rv-nest-batch/cli") {
       writeFileSync(join(packageDirectory, "dist", "bin.js"), "export {};\n");
     }
   }
@@ -239,24 +245,24 @@ afterEach(() => {
 });
 
 describe("release metadata validation / release metadata 검증", () => {
-  it("defines exactly eight public packages / 공개 package를 정확히 8개 정의한다", () => {
+  it("defines the rv-nest-batch public scope / rv-nest-batch 공개 scope를 정의한다", () => {
+    expect(PUBLIC_PACKAGE_SCOPE).toBe("@rv-nest-batch");
     expect(PUBLIC_PACKAGES.map(({ name }) => name)).toEqual([
-      "@nest-batch/core",
-      "@nest-batch/nest",
-      "@nest-batch/inmemory",
-      "@nest-batch/postgres",
-      "@nest-batch/mysql",
-      "@nest-batch/mariadb",
-      "@nest-batch/bullmq",
-      "@nest-batch/cli"
+      "@rv-nest-batch/core",
+      "@rv-nest-batch/nest",
+      "@rv-nest-batch/inmemory",
+      "@rv-nest-batch/postgres",
+      "@rv-nest-batch/mysql",
+      "@rv-nest-batch/mariadb",
+      "@rv-nest-batch/bullmq",
+      "@rv-nest-batch/cli"
     ]);
     expect(CORE_SUBPATHS).toEqual(["queue", "scheduler", "polling", "worker"]);
-    expect(NPM_REGISTRY_URL).toBe("https://registry.npmjs.org/");
-    expect(NPM_SCOPE_REGISTRY_ARGUMENT).toBe("--@nest-batch:registry=https://registry.npmjs.org/");
+    expect(NPM_SCOPE_REGISTRY_ARGUMENT).toBe("--@rv-nest-batch:registry=https://registry.npmjs.org/");
   });
 
   it("rejects missing public access / public access 누락을 거부한다", () => {
-    expect(() => validateManifest({ name: "@nest-batch/core", version: "0.1.0" }, PUBLIC_PACKAGES[0]))
+    expect(() => validateManifest({ name: "@rv-nest-batch/core", version: "0.1.0" }, PUBLIC_PACKAGES[0]))
       .toThrow(/publishConfig\.access/);
   });
 
@@ -280,7 +286,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a package version that differs from root / root와 다른 package version을 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@nest-batch/core") {
+      if (packageInfo.name === "@rv-nest-batch/core") {
         manifest.version = "0.1.1";
       }
     });
@@ -290,7 +296,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a mismatched repository directory / repository directory 불일치를 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@nest-batch/core") {
+      if (packageInfo.name === "@rv-nest-batch/core") {
         manifest.repository = { type: "git", url: REPOSITORY_URL, directory: "packages/other" };
       }
     });
@@ -300,7 +306,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects non-public package access / public이 아닌 package access를 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@nest-batch/core") {
+      if (packageInfo.name === "@rv-nest-batch/core") {
         manifest.publishConfig = { access: "restricted" };
       }
     });
@@ -310,7 +316,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a package private registry / package의 사설 registry를 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@nest-batch/core") {
+      if (packageInfo.name === "@rv-nest-batch/core") {
         manifest.publishConfig = { access: "public", registry: "https://registry.example.test/" };
       }
     });
@@ -335,7 +341,7 @@ describe("release metadata validation / release metadata 검증", () => {
     ["traversing root export import", "상위 경로를 가리키는 root export import", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["."].import = "./dist/../outside.js"; }]
   ])("rejects a source manifest with %s / %s source manifest를 거부한다", async (_english, _korean, mutate) => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@nest-batch/nest") {
+      if (packageInfo.name === "@rv-nest-batch/nest") {
         mutate(manifest);
       }
     });
@@ -352,7 +358,7 @@ describe("release metadata validation / release metadata 검증", () => {
     ["traversing subpath export import", "상위 경로를 가리키는 subpath export import", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["./worker"].import = "./dist/worker/../../outside.js"; }]
   ])("rejects core with %s / %s core manifest를 거부한다", async (_english, _korean, mutate) => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@nest-batch/core") {
+      if (packageInfo.name === "@rv-nest-batch/core") {
         mutate(manifest);
       }
     });
@@ -366,7 +372,7 @@ describe("release metadata validation / release metadata 검증", () => {
     ["traversing CLI bin", "상위 경로를 가리키는 CLI bin", (manifest: Record<string, unknown>) => { manifest.bin = { "nest-batch": "./dist/../outside.js" }; }]
   ])("rejects CLI with %s / %s CLI manifest를 거부한다", async (_english, _korean, mutate) => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@nest-batch/cli") {
+      if (packageInfo.name === "@rv-nest-batch/cli") {
         mutate(manifest);
       }
     });
@@ -376,7 +382,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects bin metadata on a non-CLI package / CLI가 아닌 package의 bin metadata를 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@nest-batch/nest") {
+      if (packageInfo.name === "@rv-nest-batch/nest") {
         manifest.bin = { unexpected: "./dist/index.js" };
       }
     });
@@ -389,7 +395,7 @@ describe("release metadata validation / release metadata 검증", () => {
     ["an extra export condition", "추가 export condition", (manifest: Record<string, unknown>) => { (manifest.exports as Record<string, Record<string, unknown>>)["."].default = "./dist/index.js"; }]
   ])("rejects a source manifest with %s / %s이 있는 source manifest를 거부한다", async (_english, _korean, mutate) => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@nest-batch/nest") {
+      if (packageInfo.name === "@rv-nest-batch/nest") {
         mutate(manifest);
       }
     });
@@ -399,7 +405,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects an extra CLI bin command / 추가 CLI bin command를 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@nest-batch/cli") {
+      if (packageInfo.name === "@rv-nest-batch/cli") {
         manifest.bin = { "nest-batch": "./dist/bin.js", unexpected: "./dist/bin.js" };
       }
     });
@@ -429,8 +435,8 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a source internal dependency range / source 내부 dependency range를 거부한다", async () => {
     const root = createRepository((manifest, packageInfo) => {
-      if (packageInfo.name === "@nest-batch/nest") {
-        manifest.dependencies = { "@nest-batch/core": "^0.1.0" };
+      if (packageInfo.name === "@rv-nest-batch/nest") {
+        manifest.dependencies = { "@rv-nest-batch/core": "^0.1.0" };
       }
     });
 
@@ -482,7 +488,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a package LICENSE that differs from root / root와 다른 package LICENSE를 거부한다", async () => {
     const root = createRepository(undefined, (packageInfo) =>
-      packageInfo.name === "@nest-batch/core" ? "Different license\n" : LICENSE_TEXT
+      packageInfo.name === "@rv-nest-batch/core" ? "Different license\n" : LICENSE_TEXT
     );
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/LICENSE/);
@@ -505,9 +511,9 @@ describe("release metadata validation / release metadata 검증", () => {
   it("rejects a release checklist that drifts from the package catalog / package catalog과 다른 릴리즈 checklist를 거부한다", async () => {
     const root = createRepository();
     const releasingGuide = join(root, "docs", "releasing.md");
-    writeFileSync(releasingGuide, readFileSync(releasingGuide, "utf8").replace("`@nest-batch/cli`\n", ""));
+    writeFileSync(releasingGuide, readFileSync(releasingGuide, "utf8").replace("`@rv-nest-batch/cli`\n", ""));
 
-    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*@nest-batch\/cli/);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*@rv-nest-batch\/cli/);
   });
 
   it("rejects a release checklist with a different publish workflow / 다른 publish workflow를 적은 릴리즈 checklist를 거부한다", async () => {
@@ -705,12 +711,12 @@ describe("release metadata validation / release metadata 검증", () => {
     writeFileSync(
       releasingGuide,
       readFileSync(releasingGuide, "utf8").replace(
-        `npm view @nest-batch/cli name version maintainers repository dist-tags --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\n`,
+        `npm view @rv-nest-batch/cli name version maintainers repository dist-tags --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\n`,
         ""
       )
     );
 
-    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*npm view @nest-batch\/cli/);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*npm view @rv-nest-batch\/cli/);
   });
 
   it("rejects a release checklist with an ambient npm registry audit / ambient npm registry를 쓰는 릴리즈 audit를 거부한다", async () => {
@@ -732,7 +738,7 @@ describe("release metadata validation / release metadata 검증", () => {
       readFileSync(releasingGuide, "utf8").replace(` ${NPM_SCOPE_REGISTRY_ARGUMENT}`, "")
     );
 
-    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/@nest-batch:registry/u);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/@rv-nest-batch:registry/u);
   });
 
   it("rejects a release checklist without an explicit profile registry / 명시적인 profile registry가 없는 릴리즈 checklist를 거부한다", async () => {
@@ -755,12 +761,12 @@ describe("release metadata validation / release metadata 검증", () => {
     writeFileSync(
       releasingGuide,
       readFileSync(releasingGuide, "utf8").replace(
-        `npm view @nest-batch/cli@0.1.0 version dist.integrity --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\n`,
+        `npm view @rv-nest-batch/cli@0.1.0 version dist.integrity --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\n`,
         ""
       )
     );
 
-    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/npm view @nest-batch\/cli@0\.1\.0/u);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/npm view @rv-nest-batch\/cli@0\.1\.0/u);
   });
 
   it("rejects a release checklist without the bootstrap provenance exception / bootstrap provenance 예외가 없는 릴리즈 checklist를 거부한다", async () => {

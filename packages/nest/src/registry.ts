@@ -1,7 +1,7 @@
 import { Inject, Injectable, type OnApplicationBootstrap, type Type } from "@nestjs/common";
 import { DiscoveryService } from "@nestjs/core";
-import { defineJob } from "@nest-batch/core";
-import type { AnyStepDefinition, JobDefinition } from "@nest-batch/core";
+import { defineJob } from "@rv-nest-batch/core";
+import type { AnyStepDefinition, JobDefinition } from "@rv-nest-batch/core";
 import {
   BATCH_JOB_METADATA,
   BATCH_PROCESSOR_METADATA,

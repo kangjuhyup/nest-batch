@@ -1,4 +1,4 @@
-import type { JobExecution, JobInstance, PartitionExecution, StepExecution } from "@nest-batch/core";
+import type { JobExecution, JobInstance, PartitionExecution, StepExecution } from "@rv-nest-batch/core";
 import {
   parsePostgresJobParameters,
   parsePostgresJobStatus,

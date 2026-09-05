@@ -1,5 +1,5 @@
 {
-  "name": "@nest-batch/core",
+  "name": "@rv-nest-batch/core",
   "version": "0.1.0",
   "description": "Framework-independent contracts and helpers for nest-batch.",
   "keywords": ["nestjs", "batch", "job", "queue", "scheduler"],

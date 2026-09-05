@@ -1,4 +1,4 @@
-import type { JobExecution, JobInstance } from "@nest-batch/core";
+import type { JobExecution, JobInstance } from "@rv-nest-batch/core";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresBatchStorage } from "../src/index.js";

@@ -10,7 +10,7 @@ import type {
   PartitionClaimOptions,
   PartitionExecution,
   StepExecution
-} from "@nest-batch/core";
+} from "@rv-nest-batch/core";
 import { resolveMySqlPool } from "../driver.js";
 import { toJobExecution, toJobInstance, toPartitionExecution, toStepExecution } from "./mapper.js";
 import type { MySqlBatchOptions } from "../options.js";

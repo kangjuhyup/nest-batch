@@ -1,4 +1,4 @@
-import { getReaderCheckpoint, openReader } from "@nest-batch/core";
+import { getReaderCheckpoint, openReader } from "@rv-nest-batch/core";
 import { describe, expect, it } from "vitest";
 import { createMariaDbCursorReader } from "../src/index.js";
 import type { MariaDbCursorReaderOptions } from "../src/index.js";

@@ -3,7 +3,7 @@ import {
   ContinuousPollingLoop,
   type PollingEvent,
   type PollingTaskContext
-} from "@nest-batch/core/polling";
+} from "@rv-nest-batch/core/polling";
 
 describe("continuous polling loop / continuous polling loop를 검증한다", () => {
   afterEach(() => {

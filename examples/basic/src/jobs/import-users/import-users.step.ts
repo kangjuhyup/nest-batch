@@ -1,5 +1,5 @@
-import { defineChunkStep, skipItem } from "@nest-batch/core";
-import type { ChunkReaderContext, Processor, Reader, ReaderSession, Writer } from "@nest-batch/core";
+import { defineChunkStep, skipItem } from "@rv-nest-batch/core";
+import type { ChunkReaderContext, Processor, Reader, ReaderSession, Writer } from "@rv-nest-batch/core";
 import type { ImportedUser, SourceUser } from "./import-users.types.js";
 
 export const writtenUsers: ImportedUser[] = [];

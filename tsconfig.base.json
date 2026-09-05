@@ -14,18 +14,18 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@nest-batch/core/queue": ["packages/core/src/queue/index.ts"],
-      "@nest-batch/core/scheduler": ["packages/core/src/scheduler/index.ts"],
-      "@nest-batch/core/polling": ["packages/core/src/polling/index.ts"],
-      "@nest-batch/core/worker": ["packages/core/src/worker/index.ts"],
-      "@nest-batch/core": ["packages/core/src/index.ts"],
-      "@nest-batch/nest": ["packages/nest/src/index.ts"],
-      "@nest-batch/inmemory": ["packages/inmemory/src/index.ts"],
-      "@nest-batch/postgres": ["packages/postgres/src/index.ts"],
-      "@nest-batch/mysql": ["packages/mysql/src/index.ts"],
-      "@nest-batch/mariadb": ["packages/mariadb/src/index.ts"],
-      "@nest-batch/bullmq": ["packages/bullmq/src/index.ts"],
-      "@nest-batch/cli": ["packages/cli/src/index.ts"]
+      "@rv-nest-batch/core/queue": ["packages/core/src/queue/index.ts"],
+      "@rv-nest-batch/core/scheduler": ["packages/core/src/scheduler/index.ts"],
+      "@rv-nest-batch/core/polling": ["packages/core/src/polling/index.ts"],
+      "@rv-nest-batch/core/worker": ["packages/core/src/worker/index.ts"],
+      "@rv-nest-batch/core": ["packages/core/src/index.ts"],
+      "@rv-nest-batch/nest": ["packages/nest/src/index.ts"],
+      "@rv-nest-batch/inmemory": ["packages/inmemory/src/index.ts"],
+      "@rv-nest-batch/postgres": ["packages/postgres/src/index.ts"],
+      "@rv-nest-batch/mysql": ["packages/mysql/src/index.ts"],
+      "@rv-nest-batch/mariadb": ["packages/mariadb/src/index.ts"],
+      "@rv-nest-batch/bullmq": ["packages/bullmq/src/index.ts"],
+      "@rv-nest-batch/cli": ["packages/cli/src/index.ts"]
     }
   }
 }

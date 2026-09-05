@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MariaDbScheduleStore } from "@nest-batch/mariadb";
+import { MariaDbScheduleStore } from "@rv-nest-batch/mariadb";
 
 describe("mariadb schedule store / mariadb schedule store를 검증한다", () => {
   it("claims and marks schedule occurrences through mariadb SQL / mariadb SQL로 schedule occurrence를 claim하고 상태를 기록한다", async () => {

@@ -1,4 +1,4 @@
-import type { ExecutionContextKey, ExecutionContextStore } from "@nest-batch/core";
+import type { ExecutionContextKey, ExecutionContextStore } from "@rv-nest-batch/core";
 
 export class InMemoryExecutionContextStore implements ExecutionContextStore {
   private readonly contexts = new Map<string, unknown>();

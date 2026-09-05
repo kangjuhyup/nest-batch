@@ -3,7 +3,7 @@ import {
   createJsonHttpReader,
   createLineFileReader,
   createSqlCursorReader
-} from "@nest-batch/core";
+} from "@rv-nest-batch/core";
 import type {
   CursorReaderDefinition,
   FileReaderDefinition,
@@ -12,7 +12,7 @@ import type {
   IterableReaderDefinition,
   PageReaderDefinition,
   SqlReaderDefinition
-} from "@nest-batch/core";
+} from "@rv-nest-batch/core";
 
 export interface ReaderExampleUser {
   readonly id: string;

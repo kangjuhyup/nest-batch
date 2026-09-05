@@ -1,4 +1,4 @@
-import { DatabaseBatchStorage } from "@nest-batch/core";
+import { DatabaseBatchStorage } from "@rv-nest-batch/core";
 import { MariaDbCheckpointStore } from "./checkpoint-store.js";
 import { resolveMariaDbPool } from "./driver.js";
 import { MariaDbExecutionContextStore } from "./execution-context-store.js";

@@ -10,7 +10,7 @@ import type {
   PartitionClaimOptions,
   PartitionExecution,
   StepExecution
-} from "@nest-batch/core";
+} from "@rv-nest-batch/core";
 import { resolvePostgresPool } from "../driver.js";
 import { toJobExecution, toJobInstance, toPartitionExecution, toStepExecution } from "./mapper.js";
 import type { PostgresBatchOptions } from "../options.js";

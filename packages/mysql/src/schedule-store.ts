@@ -7,7 +7,7 @@ import type {
   ScheduleOccurrence,
   ScheduleOccurrenceCandidate,
   ScheduleStore
-} from "@nest-batch/core/scheduler";
+} from "@rv-nest-batch/core/scheduler";
 import { resolveMySqlPool } from "./driver.js";
 import type { MySqlBatchOptions, MySqlPoolLike } from "./options.js";
 import { ensureMySqlScheduleSchema } from "./schedule-schema.js";
