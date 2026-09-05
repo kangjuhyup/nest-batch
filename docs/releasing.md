@@ -49,7 +49,7 @@ npm view @rv-nest-batch/cli name version maintainers repository dist-tags --json
   - 기존 또는 새 package identity가 승인된 이름, repository, ownership과 다르면 즉시 **STOP**합니다.
   - `E404`는 scope publish 권한을 확인한 뒤에만 bootstrap 후보입니다.
   - 8개 package의 `E404`는 이름의 public 조회 결과일 뿐 scope ownership이나 publish 권한의 증거가 아닙니다. 두 권한을 직접 확인한 뒤에만 bootstrap 후보로 판단합니다.
-- [ ] `npm whoami`와 2FA 상태 확인
+- [ ] npm 계정과 2FA 상태 확인
   - `npm whoami --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/`가 의도한 maintainer를 출력하고, `npm profile get --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/`의 2FA 값이 publish를 보호하는 설정인지 확인합니다.
 - [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행
   - **Manual gate — 실제 npm publish:** 이 명령은 인증된 maintainer가 모든 이전 checkbox를 확인한 뒤 직접 실행합니다. 이 문서 작성·검증 작업에서는 실행하지 않습니다.

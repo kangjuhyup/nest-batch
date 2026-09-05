@@ -416,8 +416,9 @@ it("rejects an old-scope npm audit command / 이전 scope npm audit 명령을 �
 });
 ```
 
-catalog 8개 audit와 `0.1.0` integrity confirmation, `npm whoami`, `npm profile get` 모두
-`--@rv-nest-batch:registry=https://registry.npmjs.org/`를 요구하게 한다.
+catalog 8개 audit와 `0.1.0` integrity confirmation,
+`npm whoami --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/`,
+`npm profile get --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/`를 요구하게 한다.
 
 - [ ] **Step 2: guide test가 기존 공개 문서와 불일치해 실패하는지 확인**
 

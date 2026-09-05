@@ -971,7 +971,7 @@ git commit -m "chore : package release workflow 추가" -m "- Node 호환성과 
 
 ## 2. 최초 0.1.0 bootstrap
 - [ ] npm에서 `@rv-nest-batch` scope 권한 확인
-- [ ] `npm whoami`와 2FA 상태 확인
+- [ ] npm 계정과 2FA 상태 확인
 - [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행
 - [ ] 8개 package의 `0.1.0`과 integrity 확인
 

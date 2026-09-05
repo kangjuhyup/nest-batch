@@ -93,7 +93,7 @@ ${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} name version maintainers r
 
   - 기존 package는 승인된 repository identity와 ownership이 일치하거나 명시적인 transfer/rename 결정이 있어야 합니다. 그렇지 않으면 **STOP**합니다.
   - \`E404\`는 scope publish 권한을 확인한 뒤에만 bootstrap 후보입니다.
-- [ ] \`npm whoami\`와 2FA 상태 확인
+- [ ] npm 계정과 2FA 상태 확인
   - \`npm whoami --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\`와 \`npm profile get --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\`
 - [ ] \`pnpm run release:publish --tag v0.1.0\`을 maintainer가 직접 실행
 - 로컬에서 publish한 \`0.1.0\`은 provenance 예외입니다.
@@ -818,6 +818,20 @@ describe("release metadata validation / release metadata 검증", () => {
     );
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/@rv-nest-batch:registry/u);
+  });
+
+  it("rejects a bare code-form npm whoami command / registry가 없는 code 형태 npm whoami 명령을 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      readFileSync(releasingGuide, "utf8").replace(
+        "npm 계정과 2FA 상태 확인",
+        "`npm whoami`와 2FA 상태 확인"
+      )
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/bare.*npm whoami|npm whoami.*registry/u);
   });
 
   it("rejects a release checklist without an explicit profile registry / 명시적인 profile registry가 없는 릴리즈 checklist를 거부한다", async () => {

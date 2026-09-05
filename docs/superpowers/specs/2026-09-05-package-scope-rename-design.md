@@ -103,7 +103,9 @@ README와 운영 문서에서 한 건이라도 발견되면 `release:verify`가 
 ### 문서와 release automation
 
 설치 및 import 예제는 모두 `@rv-nest-batch/*`를 사용한다. release checklist의 8개 identity
-audit, bootstrap integrity confirmation, `npm whoami`, `npm profile get`은 새 scoped registry
+audit, bootstrap integrity confirmation,
+`npm whoami --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/`,
+`npm profile get --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/`는 새 scoped registry
 override를 명시한다. Trusted Publisher는 새 package 8개 각각에 등록하도록 설명한다.
 
 Changesets Version PR, Node 20/24 CI, local release gate, signed tag, OIDC publish, GitHub Release,

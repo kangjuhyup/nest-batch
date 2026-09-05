@@ -18,6 +18,7 @@ const BOOTSTRAP_PUBLISH_CHECKLIST_ITEM = `- [ ] \`${BOOTSTRAP_PUBLISH_COMMAND}\`
 const BOOTSTRAP_VERSION = "0.1.0";
 const IDENTITY_AUDIT_ARGUMENTS = "name version maintainers repository dist-tags --json";
 const INTEGRITY_CONFIRMATION_ARGUMENTS = "version dist.integrity --json";
+const BARE_NPM_WHOAMI_COMMAND = "`npm whoami`";
 const IDENTITY_AUDIT_STOP_RULE = "기존 package는 승인된 repository identity와 ownership이 일치하거나 명시적인 transfer/rename 결정이 있어야 합니다. 그렇지 않으면 **STOP**합니다.";
 const E404_BOOTSTRAP_RULE = "`E404`는 scope publish 권한을 확인한 뒤에만 bootstrap 후보입니다.";
 const TOKEN_PUBLISHING_ACCESS_PATH = "Settings → Publishing access";
@@ -128,6 +129,10 @@ const validateReleasingGuide = (root) => {
     guide = readFileSync(releasingGuidePath, "utf8");
   } catch (error) {
     throw new Error(`${RELEASING_GUIDE_PATH} is required: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  if (guide.includes(BARE_NPM_WHOAMI_COMMAND)) {
+    throw new Error(`${RELEASING_GUIDE_PATH} must not contain a bare npm whoami command without explicit registry arguments`);
   }
 
   const expectedChecklistLines = [
