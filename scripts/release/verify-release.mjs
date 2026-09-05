@@ -152,30 +152,185 @@ const hasMarkdownLinkTarget = (readme, target) => {
 };
 
 const SHELL_FENCE_LANGUAGES = new Set(["", "bash", "console", "sh", "shell", "zsh"]);
-const SHELL_FENCE_PATTERN = /^(`{3,}|~{3,})[ \t]*([A-Za-z0-9_-]*)[^\r\n]*\r?\n([\s\S]*?)^\1[ \t]*$/gmu;
-const INLINE_CODE_SPAN_PATTERN = /(?<!`)`([^`\r\n]+)`(?!`)/gu;
+const SHELL_FENCE_OPENING_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})[ \t]*([A-Za-z0-9_-]*)[^\r\n]*$/u;
 const REGISTRY_NPM_COMMAND_PATTERN = /^npm\s+(?:whoami(?:\s|$)|profile\s+get(?:\s|$)|view(?:\s|$))/u;
 
-const extractShellCommandSegments = (source) => source
-  .replace(/\\\r?\n[ \t]*/gu, " ")
-  .split(/\r?\n/gu)
-  .flatMap((line) => line.split(/\s*(?:&&|\|\||;|\|)\s*/u))
-  .map((line) => line.trim().replace(/^(?:\$|>)\s+/u, ""))
-  .filter((line) => line.length > 0);
+const extractMarkdownCode = (markdown) => {
+  const lines = markdown.split(/\r?\n/u);
+  const outsideFences = [...lines];
+  const shellFenceBodies = [];
 
-const extractRegistryNpmCommands = (markdown) => {
-  const commands = [];
-  const withoutFences = markdown.replace(SHELL_FENCE_PATTERN, (fence, _marker, language, body) => {
-    if (SHELL_FENCE_LANGUAGES.has(language.toLowerCase())) {
-      commands.push(...extractShellCommandSegments(body));
+  for (let openingIndex = 0; openingIndex < lines.length; openingIndex += 1) {
+    const opening = SHELL_FENCE_OPENING_PATTERN.exec(lines[openingIndex]);
+    if (!opening) {
+      continue;
     }
 
-    return fence.replace(/[^\r\n]/gu, " ");
-  });
+    const marker = opening[1];
+    const closingPattern = new RegExp(
+      `^[ \\t]{0,3}${escapeRegularExpression(marker[0])}{${marker.length},}[ \\t]*$`,
+      "u"
+    );
+    let closingIndex = openingIndex + 1;
+    while (closingIndex < lines.length && !closingPattern.test(lines[closingIndex])) {
+      closingIndex += 1;
+    }
 
-  for (const match of withoutFences.matchAll(INLINE_CODE_SPAN_PATTERN)) {
-    commands.push(...extractShellCommandSegments(match[1]));
+    if (SHELL_FENCE_LANGUAGES.has(opening[2].toLowerCase())) {
+      shellFenceBodies.push(lines.slice(openingIndex + 1, closingIndex).join("\n"));
+    }
+
+    const maskedThrough = Math.min(closingIndex, lines.length - 1);
+    for (let index = openingIndex; index <= maskedThrough; index += 1) {
+      outsideFences[index] = "";
+    }
+    openingIndex = closingIndex;
   }
+
+  const inlineCodeSpans = [];
+  const outsideMarkdown = outsideFences.join("\n");
+  let index = 0;
+  while (index < outsideMarkdown.length) {
+    if (outsideMarkdown[index] !== "`") {
+      index += 1;
+      continue;
+    }
+
+    let openingLength = 1;
+    while (outsideMarkdown[index + openingLength] === "`") {
+      openingLength += 1;
+    }
+
+    let candidateIndex = index + openingLength;
+    let closingIndex = -1;
+    while (candidateIndex < outsideMarkdown.length) {
+      candidateIndex = outsideMarkdown.indexOf("`", candidateIndex);
+      if (candidateIndex === -1) {
+        break;
+      }
+
+      let candidateLength = 1;
+      while (outsideMarkdown[candidateIndex + candidateLength] === "`") {
+        candidateLength += 1;
+      }
+      if (candidateLength === openingLength) {
+        closingIndex = candidateIndex;
+        break;
+      }
+      candidateIndex += candidateLength;
+    }
+
+    if (closingIndex === -1) {
+      index += openingLength;
+      continue;
+    }
+
+    let content = outsideMarkdown
+      .slice(index + openingLength, closingIndex)
+      .replace(/\r?\n/gu, " ");
+    if (content.startsWith(" ") && content.endsWith(" ") && /\S/u.test(content.slice(1, -1))) {
+      content = content.slice(1, -1);
+    }
+    inlineCodeSpans.push(content);
+    index = closingIndex + openingLength;
+  }
+
+  return { inlineCodeSpans, shellFenceBodies };
+};
+
+const extractShellCommandSegments = (source) => {
+  const segments = [];
+  let current = "";
+  let quote;
+  let inComment = false;
+
+  const pushCurrent = () => {
+    const command = current.trim().replace(/^(?:\$|>)\s+/u, "");
+    if (command.length > 0) {
+      segments.push(command);
+    }
+    current = "";
+  };
+
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+
+    if (inComment) {
+      if (character === "\n" || character === "\r") {
+        inComment = false;
+        pushCurrent();
+        if (character === "\r" && source[index + 1] === "\n") {
+          index += 1;
+        }
+      }
+      continue;
+    }
+
+    if (quote) {
+      current += character;
+      if (character === quote) {
+        quote = undefined;
+      } else if (quote === '"' && character === "\\" && index + 1 < source.length) {
+        current += source[index + 1];
+        index += 1;
+      }
+      continue;
+    }
+
+    if (character === "'" || character === '"') {
+      quote = character;
+      current += character;
+      continue;
+    }
+
+    if (character === "\\") {
+      const newlineLength = source[index + 1] === "\r" && source[index + 2] === "\n"
+        ? 2
+        : source[index + 1] === "\n" ? 1 : 0;
+      if (newlineLength > 0) {
+        index += newlineLength;
+        while (source[index + 1] === " " || source[index + 1] === "\t") {
+          index += 1;
+        }
+        if (current.length > 0 && !/\s/u.test(current.at(-1))) {
+          current += " ";
+        }
+      } else {
+        current += character;
+        if (index + 1 < source.length) {
+          current += source[index + 1];
+          index += 1;
+        }
+      }
+      continue;
+    }
+
+    if (character === "#" && (current.length === 0 || /\s/u.test(current.at(-1)))) {
+      inComment = true;
+      continue;
+    }
+
+    if (character === "\n" || character === "\r" || character === ";" || character === "|" || character === "&") {
+      pushCurrent();
+      if ((character === "|" || character === "&") && source[index + 1] === character) {
+        index += 1;
+      } else if (character === "\r" && source[index + 1] === "\n") {
+        index += 1;
+      }
+      continue;
+    }
+
+    current += character;
+  }
+
+  pushCurrent();
+  return segments;
+};
+
+const extractRegistryNpmCommands = (markdown) => {
+  const { inlineCodeSpans, shellFenceBodies } = extractMarkdownCode(markdown);
+  const commands = [...shellFenceBodies, ...inlineCodeSpans]
+    .flatMap((source) => extractShellCommandSegments(source));
 
   return commands.filter((command) => REGISTRY_NPM_COMMAND_PATTERN.test(command));
 };

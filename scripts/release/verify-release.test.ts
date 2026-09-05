@@ -933,6 +933,41 @@ describe("release metadata validation / release metadata 검증", () => {
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/registry-touching.*npm (?:whoami|profile get|view)|npm (?:whoami|profile get|view).*registry/u);
   });
 
+  it.each([
+    [
+      "a fence with a longer closing delimiter",
+      "더 긴 closing delimiter를 가진 fence",
+      "```bash\nnpm whoami\n````"
+    ],
+    [
+      "a multi-backtick inline code span",
+      "여러 backtick을 사용한 inline code span",
+      "``npm profile get``"
+    ],
+    [
+      "canonical arguments hidden behind a shell comment",
+      "shell comment 뒤에 숨긴 canonical argument",
+      `\`npm whoami # --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\``
+    ]
+  ])("rejects an unsafe registry command in %s / %s의 안전하지 않은 registry 명령을 거부한다", async (_english, _korean, unsafeCommand) => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(releasingGuide, `${readFileSync(releasingGuide, "utf8")}\n${unsafeCommand}\n`);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/registry-touching.*npm (?:whoami|profile get|view)|npm (?:whoami|profile get|view).*registry/u);
+  });
+
+  it("accepts registry text behind a quoted shell separator / 인용한 shell separator 뒤 registry text를 허용한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      `${readFileSync(releasingGuide, "utf8")}\n\`\`\`bash\necho "docs; npm view ${PUBLIC_PACKAGE_SCOPE}/core version"\n\`\`\`\n`
+    );
+
+    await expect(release.verifyReleaseRepository(root)).resolves.toBeUndefined();
+  });
+
   it("rejects a release checklist without an explicit profile registry / 명시적인 profile registry가 없는 릴리즈 checklist를 거부한다", async () => {
     const root = createRepository();
     const releasingGuide = join(root, "docs", "releasing.md");
