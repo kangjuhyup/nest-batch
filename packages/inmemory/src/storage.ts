@@ -1,4 +1,4 @@
-import { DatabaseBatchStorage } from "@nest-batch/core";
+import { DatabaseBatchStorage } from "@rvkang/batch-core";
 import { InMemoryCheckpointStore } from "./checkpoint-store.js";
 import { InMemoryExecutionContextStore } from "./execution-context-store.js";
 import { InMemoryLockManager } from "./lock/lock-manager.js";

@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
-import { NestBatchRunner } from "@nest-batch/nest";
+import { NestBatchRunner } from "@rvkang/batch-nest";
 import { AppModule } from "./app.module.js";
 
 const app = await NestFactory.createApplicationContext(AppModule);

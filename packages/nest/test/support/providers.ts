@@ -1,5 +1,5 @@
-import { DatabaseBatchStorage } from "@nest-batch/core";
-import type { CheckpointStore, JobRepository, LockManager } from "@nest-batch/core";
+import { DatabaseBatchStorage } from "@rvkang/batch-core";
+import type { CheckpointStore, JobRepository, LockManager } from "@rvkang/batch-core";
 import type { FactoryProvider, Provider, ValueProvider } from "@nestjs/common";
 
 export class FakeDatabaseBatchStorage extends DatabaseBatchStorage {

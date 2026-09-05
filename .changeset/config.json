@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@4.0.0/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [
+    [
+      "@rvkang/batch-core",
+      "@rvkang/batch-nest",
+      "@rvkang/batch-inmemory",
+      "@rvkang/batch-postgres",
+      "@rvkang/batch-mysql",
+      "@rvkang/batch-mariadb",
+      "@rvkang/batch-bullmq",
+      "@rvkang/batch-cli"
+    ]
+  ],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "develop",
+  "updateInternalDependencies": "patch",
+  "ignore": []
+}

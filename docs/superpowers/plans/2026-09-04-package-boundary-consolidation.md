@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 14개의 workspace package를 8개의 공개 npm package와 4개의 `@nest-batch/core` subpath API로 통합한다.
+**Goal:** 14개의 workspace package를 8개의 공개 npm package와 4개의 `@rv-nest-batch/core` subpath API로 통합한다.
 
 **Architecture:** 외부 dependency가 없는 queue, scheduler, polling, worker 구현은 `packages/core/src/` 아래의 독립 module로 이동하고 `exports` subpath로 노출한다. Nest, SQL adapter, in-memory adapter, BullMQ adapter, CLI는 별도 package로 유지하며 모든 consumer import와 project reference를 새 경계에 맞춘다.
 
@@ -15,7 +15,7 @@
 - 공개 package는 `core`, `nest`, `inmemory`, `postgres`, `mysql`, `mariadb`, `bullmq`, `cli` 8개다.
 - `core`는 NestJS, database driver, BullMQ, CLI framework에 의존하지 않는다.
 - `core` root entrypoint는 subpath symbol을 재수출하지 않는다.
-- 새 import 경로는 `@nest-batch/core/queue`, `@nest-batch/core/scheduler`, `@nest-batch/core/polling`, `@nest-batch/core/worker`다.
+- 새 import 경로는 `@rv-nest-batch/core/queue`, `@rv-nest-batch/core/scheduler`, `@rv-nest-batch/core/polling`, `@rv-nest-batch/core/worker`다.
 - 기존 미공개 package를 compatibility package로 남기지 않는다.
 - runtime 동작과 public type 의미를 바꾸지 않는다.
 - 테스트 설명은 `English / 한국어` 형식을 유지한다.
@@ -53,14 +53,14 @@
 
 **Interfaces:**
 - Consumes: 기존 `WorkUnit`, `WorkClaimOptions`, `WorkQueue`, `WorkerLoop` 의미
-- Produces: `@nest-batch/core/queue`의 동일 이름 runtime/type export
+- Produces: `@rv-nest-batch/core/queue`의 동일 이름 runtime/type export
 
 - [ ] **Step 1: 새 queue subpath의 실패하는 export test 작성**
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { WorkerLoop } from "@nest-batch/core/queue";
-import type { WorkQueue, WorkUnit } from "@nest-batch/core/queue";
+import { WorkerLoop } from "@rv-nest-batch/core/queue";
+import type { WorkQueue, WorkUnit } from "@rv-nest-batch/core/queue";
 
 describe("core queue subpath exports / core queue subpath export를 검증한다", () => {
   it("exports queue contracts and worker loop / queue contract와 worker loop를 export한다", () => {
@@ -81,7 +81,7 @@ describe("core queue subpath exports / core queue subpath export를 검증한다
 
 Run: `pnpm exec vitest run --config vitest.config.ts packages/core/test/queue/exports.test.ts`
 
-Expected: FAIL with `Failed to resolve import "@nest-batch/core/queue"`.
+Expected: FAIL with `Failed to resolve import "@rv-nest-batch/core/queue"`.
 
 - [ ] **Step 3: queue source/test를 이동하고 core subpath export 추가**
 
@@ -107,16 +107,16 @@ export type { WorkClaimOptions, WorkQueue, WorkUnit } from "./work-queue.js";
 }
 ```
 
-`tsconfig.base.json`과 두 Vitest config에는 `@nest-batch/core/queue`를
+`tsconfig.base.json`과 두 Vitest config에는 `@rv-nest-batch/core/queue`를
 `packages/core/src/queue/index.ts`로 resolve하는 exact alias를 추가한다. 이동한 test의
-import를 `@nest-batch/core/queue`로 변경한다.
+import를 `@rv-nest-batch/core/queue`로 변경한다.
 
 - [ ] **Step 4: 기존 queue-core를 임시 compatibility wrapper로 전환**
 
 `packages/queue-core/src/index.ts`:
 
 ```ts
-export { WorkerLoop } from "@nest-batch/core/queue";
+export { WorkerLoop } from "@rv-nest-batch/core/queue";
 export type {
   WorkerLoopContext,
   WorkerLoopOptions,
@@ -125,10 +125,10 @@ export type {
   WorkHandler,
   WorkQueue,
   WorkUnit
-} from "@nest-batch/core/queue";
+} from "@rv-nest-batch/core/queue";
 ```
 
-`packages/queue-core/package.json`에 `"@nest-batch/core": "workspace:*"` dependency를
+`packages/queue-core/package.json`에 `"@rv-nest-batch/core": "workspace:*"` dependency를
 추가하고 `packages/queue-core/tsconfig.json`에 `../core` reference를 추가한다. 이
 wrapper는 다음 consumer migration task까지만 존재한다.
 
@@ -169,8 +169,8 @@ git commit -m "refactor : queue runtime을 core subpath로 통합" -m "- WorkQue
 - Test: `packages/core/test/scheduler/exports.test.ts`
 
 **Interfaces:**
-- Consumes: `@nest-batch/core` execution contracts와 Task 1의 `@nest-batch/core/queue`
-- Produces: `@nest-batch/core/scheduler`의 schedule definition, trigger, store, dispatcher, loop API
+- Consumes: `@rv-nest-batch/core` execution contracts와 Task 1의 `@rv-nest-batch/core/queue`
+- Produces: `@rv-nest-batch/core/scheduler`의 schedule definition, trigger, store, dispatcher, loop API
 
 - [ ] **Step 1: scheduler subpath export test 작성**
 
@@ -181,7 +181,7 @@ import {
   createIntervalTrigger,
   createUtcDailyTrigger,
   defineSchedule
-} from "@nest-batch/core/scheduler";
+} from "@rv-nest-batch/core/scheduler";
 
 describe("core scheduler subpath exports / core scheduler subpath export를 검증한다", () => {
   it("exports scheduler and calendar APIs / scheduler와 calendar API를 export한다", () => {
@@ -197,7 +197,7 @@ describe("core scheduler subpath exports / core scheduler subpath export를 검�
 
 Run: `pnpm exec vitest run --config vitest.config.ts packages/core/test/scheduler/exports.test.ts`
 
-Expected: FAIL resolving `@nest-batch/core/scheduler`.
+Expected: FAIL resolving `@rv-nest-batch/core/scheduler`.
 
 - [ ] **Step 3: scheduler source/test 이동과 내부 import 정리**
 
@@ -233,7 +233,7 @@ export type * from "./types.js";
 `packages/core/package.json`에 `./scheduler` export를 추가한다. TypeScript와 Vitest에
 exact alias를 추가한다. 기존 `scheduler-core/src/index.ts`는 새 scheduler subpath의
 schedule API를 재수출하고, `scheduler-calendar/src/index.ts`는 네 calendar export만
-재수출한다. 두 wrapper package는 dependency를 `@nest-batch/core` 하나로 바꾸고
+재수출한다. 두 wrapper package는 dependency를 `@rv-nest-batch/core` 하나로 바꾸고
 tsconfig reference도 `../core`만 유지한다.
 
 - [ ] **Step 5: scheduler test와 typecheck 실행**
@@ -269,13 +269,13 @@ git commit -m "refactor : scheduler runtime을 core subpath로 통합" -m "- sch
 
 **Interfaces:**
 - Consumes: Node `AbortSignal`과 timer API
-- Produces: `@nest-batch/core/polling`의 `ContinuousPollingLoop`와 polling contract
+- Produces: `@rv-nest-batch/core/polling`의 `ContinuousPollingLoop`와 polling contract
 
 - [ ] **Step 1: polling subpath export test 작성 후 실패 확인**
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { ContinuousPollingLoop } from "@nest-batch/core/polling";
+import { ContinuousPollingLoop } from "@rv-nest-batch/core/polling";
 
 describe("core polling subpath exports / core polling subpath export를 검증한다", () => {
   it("exports the continuous polling loop / continuous polling loop를 export한다", () => {
@@ -286,7 +286,7 @@ describe("core polling subpath exports / core polling subpath export를 검증�
 
 Run: `pnpm exec vitest run --config vitest.config.ts packages/core/test/polling/exports.test.ts`
 
-Expected: FAIL resolving `@nest-batch/core/polling`.
+Expected: FAIL resolving `@rv-nest-batch/core/polling`.
 
 - [ ] **Step 2: source/test 이동, subpath export와 wrapper 추가**
 
@@ -295,8 +295,8 @@ export를 그대로 가진다. core package export와 TypeScript/Vitest alias를
 기존 polling-core index는 다음처럼 임시 wrapper가 된다.
 
 ```ts
-export { ContinuousPollingLoop } from "@nest-batch/core/polling";
-export type * from "@nest-batch/core/polling";
+export { ContinuousPollingLoop } from "@rv-nest-batch/core/polling";
+export type * from "@rv-nest-batch/core/polling";
 ```
 
 polling-core manifest와 tsconfig에 core dependency/reference를 추가한다.
@@ -340,13 +340,13 @@ git commit -m "refactor : polling runtime을 core subpath로 통합" -m "- conti
 
 **Interfaces:**
 - Consumes: `WorkerPool`, `WorkerTask` from `packages/core/src/types/index.ts`
-- Produces: `@nest-batch/core/worker`의 `LocalWorkerPool`, `WorkerThreadPool`과 option/task type
+- Produces: `@rv-nest-batch/core/worker`의 `LocalWorkerPool`, `WorkerThreadPool`과 option/task type
 
 - [ ] **Step 1: worker subpath export test 작성 후 실패 확인**
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { LocalWorkerPool, WorkerThreadPool } from "@nest-batch/core/worker";
+import { LocalWorkerPool, WorkerThreadPool } from "@rv-nest-batch/core/worker";
 
 describe("core worker subpath exports / core worker subpath export를 검증한다", () => {
   it("exports local and thread worker pools / local과 thread worker pool을 export한다", () => {
@@ -358,11 +358,11 @@ describe("core worker subpath exports / core worker subpath export를 검증한�
 
 Run: `pnpm exec vitest run --config vitest.config.ts packages/core/test/worker/exports.test.ts`
 
-Expected: FAIL resolving `@nest-batch/core/worker`.
+Expected: FAIL resolving `@rv-nest-batch/core/worker`.
 
 - [ ] **Step 2: worker source/test 이동과 internal type import 정리**
 
-두 pool implementation은 기존 `@nest-batch/core` self-import 대신 worker directory
+두 pool implementation은 기존 `@rv-nest-batch/core` self-import 대신 worker directory
 기준 `../types/index.js`에서 `WorkerPool`, `WorkerTask`를 import한다. fixture URL 계산은
 새 test directory를 기준으로 동일하게 동작하도록 fixture도 함께 이동한다.
 
@@ -379,7 +379,7 @@ export type { WorkerThreadPoolOptions, WorkerThreadTask } from "./worker-thread-
 
 core package에 `./worker` export를 추가하고 TypeScript/Vitest alias를 추가한다.
 worker-local과 worker-threads index는 각각 자신이 소유하던 symbol만
-`@nest-batch/core/worker`에서 재수출한다. 두 manifest/tsconfig는 core
+`@rv-nest-batch/core/worker`에서 재수출한다. 두 manifest/tsconfig는 core
 dependency/reference를 갖는다.
 
 - [ ] **Step 4: worker test와 typecheck 실행**
@@ -417,7 +417,7 @@ git commit -m "refactor : worker pool을 core subpath로 통합" -m "- local과 
 
 **Interfaces:**
 - Consumes: Tasks 1–4의 네 core subpath
-- Produces: 8개 workspace package만 남은 build graph와 `@nest-batch/bullmq`
+- Produces: 8개 workspace package만 남은 build graph와 `@rv-nest-batch/bullmq`
 
 - [ ] **Step 1: 이전 import 목록을 snapshot으로 확인**
 
@@ -434,17 +434,17 @@ Expected: migration 대상 import/config가 출력된다.
 정확한 mapping:
 
 ```text
-@nest-batch/queue-core       -> @nest-batch/core/queue
-@nest-batch/scheduler-core   -> @nest-batch/core/scheduler
-@nest-batch/scheduler-calendar -> @nest-batch/core/scheduler
-@nest-batch/polling-core     -> @nest-batch/core/polling
-@nest-batch/worker-local     -> @nest-batch/core/worker
-@nest-batch/worker-threads   -> @nest-batch/core/worker
-@nest-batch/queue-bullmq     -> @nest-batch/bullmq
+@nest-batch/queue-core       -> @rv-nest-batch/core/queue
+@nest-batch/scheduler-core   -> @rv-nest-batch/core/scheduler
+@nest-batch/scheduler-calendar -> @rv-nest-batch/core/scheduler
+@nest-batch/polling-core     -> @rv-nest-batch/core/polling
+@nest-batch/worker-local     -> @rv-nest-batch/core/worker
+@nest-batch/worker-threads   -> @rv-nest-batch/core/worker
+@nest-batch/queue-bullmq     -> @rv-nest-batch/bullmq
 ```
 
 CLI, Nest, storage adapter, in-memory adapter의 manifest에서 제거된 package dependency를
-지우고 필요한 경우 `@nest-batch/core: workspace:*` 하나만 남긴다. 각 tsconfig
+지우고 필요한 경우 `@rv-nest-batch/core: workspace:*` 하나만 남긴다. 각 tsconfig
 reference도 `../core`로 수렴시킨다.
 
 - [ ] **Step 3: BullMQ package directory/name 변경**
@@ -453,9 +453,9 @@ reference도 `../core`로 수렴시킨다.
 
 ```json
 {
-  "name": "@nest-batch/bullmq",
+  "name": "@rv-nest-batch/bullmq",
   "dependencies": {
-    "@nest-batch/core": "workspace:*"
+    "@rv-nest-batch/core": "workspace:*"
   },
   "peerDependencies": {
     "bullmq": ">=5"
@@ -463,7 +463,7 @@ reference도 `../core`로 수렴시킨다.
 }
 ```
 
-source/test에서는 queue type을 `@nest-batch/core/queue`에서 import한다. package test
+source/test에서는 queue type을 `@rv-nest-batch/core/queue`에서 import한다. package test
 script와 root E2E script의 path를 `packages/bullmq`로 바꾼다.
 
 - [ ] **Step 4: root build/test resolution을 8개 package 기준으로 변경**
@@ -527,17 +527,17 @@ git commit -m "refactor : 공개 package 경계를 8개로 단순화" -m "- runt
 문서의 package 목록은 아래 8개만 public package로 표시한다.
 
 ```text
-@nest-batch/core
-@nest-batch/nest
-@nest-batch/inmemory
-@nest-batch/postgres
-@nest-batch/mysql
-@nest-batch/mariadb
-@nest-batch/bullmq
-@nest-batch/cli
+@rv-nest-batch/core
+@rv-nest-batch/nest
+@rv-nest-batch/inmemory
+@rv-nest-batch/postgres
+@rv-nest-batch/mysql
+@rv-nest-batch/mariadb
+@rv-nest-batch/bullmq
+@rv-nest-batch/cli
 ```
 
-queue/scheduler/polling/worker는 `@nest-batch/core`의 subpath API로 설명하고 모든 code
+queue/scheduler/polling/worker는 `@rv-nest-batch/core`의 subpath API로 설명하고 모든 code
 snippet을 Task 5 mapping으로 변경한다. `docs/architecture.md`에는 source module
 경계와 npm 배포 단위가 다르다는 이유를 추가한다.
 

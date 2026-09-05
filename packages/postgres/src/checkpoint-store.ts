@@ -1,4 +1,4 @@
-import type { BatchExecutionId, CheckpointStore } from "@nest-batch/core";
+import type { BatchExecutionId, CheckpointStore } from "@rvkang/batch-core";
 import { resolvePostgresPool } from "./driver.js";
 import type { PostgresBatchOptions } from "./options.js";
 import type { PostgresPoolLike } from "./options.js";

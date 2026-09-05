@@ -1,6 +1,6 @@
 # Reader 예제
 
-`@nest-batch/core`의 chunk step reader는 실행마다 `ReaderSession`을 엽니다.
+`@rvkang/batch-core`의 chunk step reader는 실행마다 `ReaderSession`을 엽니다.
 Nest provider는 singleton으로 재사용될 수 있으므로 cursor, page, offset 같은
 실행 상태는 reader instance field가 아니라 session 안에 둡니다.
 
@@ -21,8 +21,8 @@ reader가 item을 읽는 중 실패하면 step과 job의 `failureReason`은
 작은 고정 목록이나 테스트 fixture처럼 전체 item이 이미 준비된 경우 사용합니다.
 
 ```ts
-import { defineChunkStep } from "@nest-batch/core";
-import type { IterableReaderDefinition, Writer } from "@nest-batch/core";
+import { defineChunkStep } from "@rvkang/batch-core";
+import type { IterableReaderDefinition, Writer } from "@rvkang/batch-core";
 
 interface SourceUser {
   readonly id: string;
@@ -54,7 +54,7 @@ export const importUsersStep = defineChunkStep({
 실행 context를 보고 source를 만들 수도 있습니다.
 
 ```ts
-import type { IterableReaderDefinition } from "@nest-batch/core";
+import type { IterableReaderDefinition } from "@rvkang/batch-core";
 
 interface UserCheckpoint {
   readonly start?: number;
@@ -75,7 +75,7 @@ const reader: IterableReaderDefinition<number, UserCheckpoint> = {
 `ReaderSession`을 반환하면 `close()`나 `checkpoint()`도 사용할 수 있습니다.
 
 ```ts
-import type { FunctionReaderDefinition } from "@nest-batch/core";
+import type { FunctionReaderDefinition } from "@rvkang/batch-core";
 
 interface SourceUser {
   readonly id: string;
@@ -101,7 +101,7 @@ const reader: FunctionReaderDefinition<SourceUser, UserCheckpoint> = {
 resource 정리가 필요하면 session을 반환합니다.
 
 ```ts
-import type { FunctionReaderDefinition } from "@nest-batch/core";
+import type { FunctionReaderDefinition } from "@rvkang/batch-core";
 
 interface LogRow {
   readonly id: string;
@@ -135,7 +135,7 @@ mutable data나 중간 삽입이 있는 source는 page 기반 reader보다 curso
 재시작에 유리합니다.
 
 ```ts
-import type { CursorReaderDefinition } from "@nest-batch/core";
+import type { CursorReaderDefinition } from "@rvkang/batch-core";
 
 interface SourceUser {
   readonly id: string;
@@ -171,7 +171,7 @@ yield된 item의 cursor를 `{ cursor }` 형태로 반환합니다.
 page 번호와 page 안의 offset으로 재시작 위치를 저장하는 reader입니다.
 
 ```ts
-import type { PageReaderDefinition } from "@nest-batch/core";
+import type { PageReaderDefinition } from "@rvkang/batch-core";
 
 interface Invoice {
   readonly id: string;
@@ -212,7 +212,7 @@ SQL client는 사용자가 주입하고, reader는 `pageSize`와 `offset` 계산
 Postgres, MySQL, MariaDB client type은 core에 들어오지 않습니다.
 
 ```ts
-import type { SqlReaderDefinition } from "@nest-batch/core";
+import type { SqlReaderDefinition } from "@rvkang/batch-core";
 
 interface UserRow {
   readonly id: string;
@@ -242,7 +242,7 @@ cursor 기반 SQL 조회는 `createSqlCursorReader()`를 사용합니다. core�
 driver type을 만들지 않고, query 함수만 호출합니다.
 
 ```ts
-import { createSqlCursorReader } from "@nest-batch/core";
+import { createSqlCursorReader } from "@rvkang/batch-core";
 
 const reader = createSqlCursorReader<UserRow, string>({
   pageSize: 100,
@@ -270,7 +270,7 @@ adapter 패키지를 사용하면 기본 cursor SQL 생성과 driver result row 
 Postgres는 `$1`, `$2` placeholder를 사용합니다.
 
 ```ts
-import { createPostgresCursorReader } from "@nest-batch/postgres";
+import { createPostgresCursorReader } from "@rvkang/batch-postgres";
 
 const reader = createPostgresCursorReader<UserRow, string>({
   pool,
@@ -289,7 +289,7 @@ const reader = createPostgresCursorReader<UserRow, string>({
 MySQL과 MariaDB는 `?` placeholder를 사용합니다.
 
 ```ts
-import { createMySqlCursorReader } from "@nest-batch/mysql";
+import { createMySqlCursorReader } from "@rvkang/batch-mysql";
 
 const reader = createMySqlCursorReader<UserRow, string>({
   pool,
@@ -306,7 +306,7 @@ const reader = createMySqlCursorReader<UserRow, string>({
 ```
 
 ```ts
-import { createMariaDbCursorReader } from "@nest-batch/mariadb";
+import { createMariaDbCursorReader } from "@rvkang/batch-mariadb";
 
 const reader = createMariaDbCursorReader<UserRow, string>({
   pool,
@@ -341,7 +341,7 @@ HTTP API가 page token 또는 next URL을 반환할 때 사용합니다. `reques
 다음 page token을 반환합니다.
 
 ```ts
-import type { HttpReaderDefinition } from "@nest-batch/core";
+import type { HttpReaderDefinition } from "@rvkang/batch-core";
 
 interface ApiUser {
   readonly id: string;
@@ -378,7 +378,7 @@ JSON API는 `createJsonHttpReader()`로 response status 확인과 `json()` parsi
 helper에 맡길 수 있습니다.
 
 ```ts
-import { createJsonHttpReader } from "@nest-batch/core";
+import { createJsonHttpReader } from "@rvkang/batch-core";
 
 interface ApiResponse {
   readonly data: readonly ApiUser[];
@@ -406,7 +406,7 @@ const reader = createJsonHttpReader<ApiUser, string, ApiResponse>({
 기본적으로 checkpoint의 `offset`만큼 앞 item을 건너뛰고 다시 시작합니다.
 
 ```ts
-import type { FileReaderDefinition } from "@nest-batch/core";
+import type { FileReaderDefinition } from "@rvkang/batch-core";
 
 interface LogLine {
   readonly line: string;
@@ -430,7 +430,7 @@ const reader: FileReaderDefinition<LogLine> = {
 line 단위 파일은 `createLineFileReader()`를 사용합니다.
 
 ```ts
-import { createLineFileReader } from "@nest-batch/core";
+import { createLineFileReader } from "@rvkang/batch-core";
 
 const reader = createLineFileReader({
   path: "/var/log/app.log",
@@ -444,7 +444,7 @@ JSONL 파일은 `createJsonlFileReader()`를 사용합니다. 각 줄을 `JSON.p
 parse 실패는 reader read phase 실패로 기록됩니다.
 
 ```ts
-import { createJsonlFileReader } from "@nest-batch/core";
+import { createJsonlFileReader } from "@rvkang/batch-core";
 
 interface UserEvent {
   readonly id: string;
@@ -462,7 +462,7 @@ Nest provider나 class 기반 reader가 필요하면 `Reader.open()`에서 sessi
 실제 Nest provider 예제는 `examples/nestjs/src/jobs/reader-examples`에 있습니다.
 
 ```ts
-import type { ChunkStepExecutionContext, Reader, ReaderSession } from "@nest-batch/core";
+import type { ChunkStepExecutionContext, Reader, ReaderSession } from "@rvkang/batch-core";
 
 interface SourceUser {
   readonly id: string;

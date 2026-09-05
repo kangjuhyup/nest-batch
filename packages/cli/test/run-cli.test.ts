@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { defineJob, defineStep } from "@nest-batch/core";
-import { InMemoryBatchStorage } from "@nest-batch/inmemory";
-import type { WorkClaimOptions, WorkQueue, WorkUnit } from "@nest-batch/queue-core";
-import type { ScheduleDefinition, ScheduleOccurrence } from "@nest-batch/scheduler-core";
+import { defineJob, defineStep } from "@rvkang/batch-core";
+import { InMemoryBatchStorage } from "@rvkang/batch-inmemory";
+import type { WorkClaimOptions, WorkQueue, WorkUnit } from "@rvkang/batch-core/queue";
+import type { ScheduleDefinition, ScheduleOccurrence } from "@rvkang/batch-core/scheduler";
 import { runCli } from "../src/index.js";
 
 class InMemoryWorkQueue implements WorkQueue {

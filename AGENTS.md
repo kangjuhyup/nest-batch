@@ -26,7 +26,7 @@
 ## Core Principles
 
 - Node-native 설계를 우선합니다. `AsyncIterable`, stream/backpressure, `AbortSignal`, graceful shutdown, worker process, queue adapter를 1급 개념으로 둡니다.
-- `@nest-batch/core`는 NestJS에 의존하지 않습니다.
+- `@rvkang/batch-core`는 NestJS에 의존하지 않습니다.
 - NestJS 통합은 별도 패키지에서 처리합니다.
 - Job 실행은 durable해야 하며, 실패와 재시작을 정상 시나리오로 다룹니다.
 - 분산 실행은 at-least-once를 기본 전제로 두고 idempotency를 명시적으로 지원합니다.
@@ -99,7 +99,7 @@ docs/
 - 설계 문서와 `docs/superpowers/specs/` 아래 spec 문서는 한국어로 작성합니다. 코드, public API 이름, npm package 이름, 타입 이름은 영어를 유지합니다.
 - 테스트는 정상 경로보다 실패, 재시작, 중복 실행, 취소, 부분 성공을 더 중요하게 봅니다.
 - 테스트 설명(`describe`, `it`, `test`)은 `English / 한국어` 형식으로 작성합니다.
-- 커밋 메시지는 `feat|fix|refactor|chore|docs : 제목` 형식을 쓰고, 제목과 작업내용은 한국어로 작성합니다.
+- 커밋 메시지 첫 줄은 반드시 `<type>/<제목> -내용` 형식을 사용합니다. 제목은 변경 대상을 짧게 쓰고, 내용은 변경 이유나 핵심 결과를 한 문장으로 작성합니다.
 
 ## Output Rules
 

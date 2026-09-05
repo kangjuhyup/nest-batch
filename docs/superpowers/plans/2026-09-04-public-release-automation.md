@@ -6,7 +6,7 @@
 
 **Architecture:** 하나의 package catalog를 release 검사의 source of truth로 사용하고 metadata, tarball, consumer install, version/tag를 자동 검증한다. Changesets는 고정 버전과 package별 changelog를 관리하고, `vX.Y.Z` tag workflow는 npm publish와 GitHub Release를 분리된 최소 권한 job으로 실행한다.
 
-**Tech Stack:** Node.js ESM scripts, TypeScript 5.7, pnpm 9, Vitest, Changesets 3, GitHub Actions, npm Trusted Publishing OIDC
+**Tech Stack:** Node.js ESM scripts, TypeScript 5.7, pnpm 10.34.5, Vitest, Changesets 3, GitHub Actions, npm Trusted Publishing OIDC
 
 **Spec:** `docs/superpowers/specs/2026-09-03-package-release-readiness-design.md`
 
@@ -16,6 +16,9 @@
 
 - 공개 package는 `core`, `nest`, `inmemory`, `postgres`, `mysql`, `mariadb`, `bullmq`, `cli` 8개다.
 - root와 모든 공개 package의 최초 version은 정확히 `0.1.0`이다.
+- 최초 `0.1.0`은 검토된 package-release-readiness merge commit을 release candidate로 삼는 일회성 예외이며 새 Changeset이나 Version PR을 만들지 않는다.
+- 최초 `0.1.0` 이후 모든 release에는 Changesets Version PR이 필수다.
+- 첫 post-bootstrap Version PR 전에 maintainer가 GitHub의 **Settings → Actions → General → Workflow permissions**에서 **Allow GitHub Actions to create and approve pull requests**를 수동 활성화한다. 2026-09-05 read-only audit의 `can_approve_pull_request_reviews=false` 상태를 PAT나 장기 credential로 우회하지 않는다.
 - 8개 package는 Changesets fixed group으로 항상 같은 version을 사용한다.
 - package runtime은 Node `>=20.18.0`, publish workflow는 Node 24와 npm `12.0.2`를 사용한다.
 - package는 ESM-only이며 CommonJS export를 추가하지 않는다.
@@ -23,6 +26,9 @@
 - repository URL은 `https://github.com/kangjuhyup/nest-batch.git`과 일치해야 한다.
 - 실제 npm publish, npm 설정 변경, Git tag push는 이 계획에서 실행하지 않는다.
 - credential이나 `NPM_TOKEN`을 repository 또는 workflow에 저장하지 않는다.
+- 로컬 bootstrap `0.1.0`은 provenance 예외이고 처음으로 OIDC publish되는 후속
+  version부터 provenance를 필수로 확인한다.
+- 모든 npm 조회와 publish는 `https://registry.npmjs.org/`를 명시한다.
 - 테스트 설명은 `English / 한국어` 형식을 유지한다.
 
 ## File Structure
@@ -32,6 +38,7 @@
 - `scripts/release/pack-packages.mjs`: 재사용 가능한 deterministic pack orchestration
 - `scripts/release/smoke-packages.mjs`: tarball contents와 clean consumer 설치/compile 검사
 - `scripts/release/sync-root-version.mjs`: Changesets version 이후 private root version 동기화
+- `scripts/release/version-packages.mjs`: pending Changesets version과 idempotent root version 동기화
 - `scripts/release/publish-packages.mjs`: tag 검증, registry 조회, integrity 비교, idempotent publish
 - `scripts/release/*.test.ts`: pure validation/publish decision unit test
 - `.changeset/config.json`: 8개 package fixed group과 `develop` base branch
@@ -75,20 +82,20 @@ import { validateManifest } from "./verify-release.mjs";
 describe("release metadata validation / release metadata 검증", () => {
   it("defines exactly eight public packages / 공개 package를 정확히 8개 정의한다", () => {
     expect(PUBLIC_PACKAGES.map(({ name }) => name)).toEqual([
-      "@nest-batch/core",
-      "@nest-batch/nest",
-      "@nest-batch/inmemory",
-      "@nest-batch/postgres",
-      "@nest-batch/mysql",
-      "@nest-batch/mariadb",
-      "@nest-batch/bullmq",
-      "@nest-batch/cli"
+      "@rv-nest-batch/core",
+      "@rv-nest-batch/nest",
+      "@rv-nest-batch/inmemory",
+      "@rv-nest-batch/postgres",
+      "@rv-nest-batch/mysql",
+      "@rv-nest-batch/mariadb",
+      "@rv-nest-batch/bullmq",
+      "@rv-nest-batch/cli"
     ]);
     expect(CORE_SUBPATHS).toEqual(["queue", "scheduler", "polling", "worker"]);
   });
 
   it("rejects missing public access / public access 누락을 거부한다", () => {
-    expect(() => validateManifest({ name: "@nest-batch/core", version: "0.1.0" }, "packages/core"))
+    expect(() => validateManifest({ name: "@rv-nest-batch/core", version: "0.1.0" }, "packages/core"))
       .toThrow(/publishConfig\.access/);
   });
 });
@@ -108,14 +115,14 @@ Expected: FAIL resolving `package-catalog.mjs`.
 
 ```js
 export const PUBLIC_PACKAGES = [
-  { name: "@nest-batch/core", directory: "packages/core" },
-  { name: "@nest-batch/nest", directory: "packages/nest" },
-  { name: "@nest-batch/inmemory", directory: "packages/inmemory" },
-  { name: "@nest-batch/postgres", directory: "packages/postgres" },
-  { name: "@nest-batch/mysql", directory: "packages/mysql" },
-  { name: "@nest-batch/mariadb", directory: "packages/mariadb" },
-  { name: "@nest-batch/bullmq", directory: "packages/bullmq" },
-  { name: "@nest-batch/cli", directory: "packages/cli" }
+  { name: "@rv-nest-batch/core", directory: "packages/core" },
+  { name: "@rv-nest-batch/nest", directory: "packages/nest" },
+  { name: "@rv-nest-batch/inmemory", directory: "packages/inmemory" },
+  { name: "@rv-nest-batch/postgres", directory: "packages/postgres" },
+  { name: "@rv-nest-batch/mysql", directory: "packages/mysql" },
+  { name: "@rv-nest-batch/mariadb", directory: "packages/mariadb" },
+  { name: "@rv-nest-batch/bullmq", directory: "packages/bullmq" },
+  { name: "@rv-nest-batch/cli", directory: "packages/cli" }
 ];
 
 export const CORE_SUBPATHS = ["queue", "scheduler", "polling", "worker"];
@@ -124,8 +131,9 @@ export const REPOSITORY_URL = "https://github.com/kangjuhyup/nest-batch.git";
 
 - [ ] **Step 4: pure manifest validation과 repository runner 구현**
 
-`validateManifest(manifest, directory)`는 name/version/type/license/author/repository,
-homepage, bugs, engines, files, publishConfig를 검사한다. version은 strict SemVer인지
+`validateManifest(manifest, packageInfo)`는 name/version/type/license/author/repository,
+homepage, bugs, engines, files, publishConfig와 exact package entrypoint 계약을 검사한다.
+version은 strict SemVer인지
 검사하되 `0.1.0`을 상수로 고정하지 않는다. `verifyReleaseRepository(root)`는 root와
 catalog의 manifest 및 LICENSE를 읽고 모든 package가 현재 root version과 같은지,
 license text가 같은지 검사한다. direct execution은 오류를 stderr에 출력하고 exit
@@ -153,7 +161,8 @@ code 1을 설정한다.
   },
   "files": ["dist", "src", "README.md", "LICENSE"],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }
 ```
@@ -161,6 +170,13 @@ code 1을 설정한다.
 각 package의 `description`과 `keywords`는 역할에 맞게 유지/보강하고
 `repository.directory`만 실제 directory로 바꾼다. root package도 version `0.1.0`,
 author/repository/homepage/bugs/engines를 가지되 `private: true`를 유지한다.
+
+모든 public package는 exact `main: ./dist/index.js`, `types: ./dist/index.d.ts`와 root
+`exports`의 `{ types: "./dist/index.d.ts", import: "./dist/index.js" }`를 가진다. `core`는
+`CORE_SUBPATHS`의 네 subpath pair만 추가하고 CLI는 exact
+`bin: { "nest-batch": "./dist/bin.js" }`만 추가한다. non-CLI package의 `bin`은 금지한다.
+각 target은 canonical package-relative `./dist/...` 경로인지 확인하고 source build 및
+packed file list에서 실제 존재 여부를 검사한다.
 
 - [ ] **Step 5: MIT LICENSE와 build metadata 위치 변경**
 
@@ -286,7 +302,7 @@ option 이름만 사용한다. 모든 README 하단에는 MIT license와 issue U
 ```text
 Requirements: Node.js >=20.18.0, ESM
 Initial release line: 0.x APIs can change before 1.0.0
-Install: pnpm add @nest-batch/core
+Install: pnpm add @rv-nest-batch/core
 ```
 
 8개 공개 package와 네 core subpath를 구분해 나열하고 maintainer release 문서는 Task 7에서
@@ -332,14 +348,14 @@ import { validatePackedFiles } from "./pack-packages.mjs";
 describe("package tarball validation / package tarball 검증", () => {
   it("rejects build metadata / build metadata 포함을 거부한다", () => {
     expect(() => validatePackedFiles({
-      name: "@nest-batch/core",
+      name: "@rv-nest-batch/core",
       files: ["dist/index.js", "dist/.tsbuildinfo", "README.md", "LICENSE", "package.json"]
     })).toThrow(/tsbuildinfo/);
   });
 
   it("accepts release files / 배포 대상 파일만 허용한다", () => {
     expect(() => validatePackedFiles({
-      name: "@nest-batch/core",
+      name: "@rv-nest-batch/core",
       files: ["dist/index.js", "dist/index.d.ts", "src/index.ts", "README.md", "LICENSE", "package.json"]
     })).not.toThrow();
   });
@@ -373,8 +389,9 @@ package.json
 ```
 
 `.tsbuildinfo`, `test/`, `.env`, npmrc, key/certificate 확장자는 prefix와 무관하게
-거부한다. core artifact는 root entrypoint와 네 subpath의 `.js`/`.d.ts`를 검사하고 CLI
-artifact는 `dist/bin.js`를 검사한다.
+거부한다. packed manifest의 `main`, top-level `types`, root/subpath `exports`, CLI `bin`이
+source와 같은 exact shape인지 검사한다. manifest가 참조하는 모든 canonical
+package-relative target이 packed file list에 실제 존재해야 한다.
 
 - [ ] **Step 4: clean consumer smoke script 구현**
 
@@ -385,18 +402,18 @@ dependency로 `npm install --ignore-scripts --no-audit --no-fund`하고 다음 �
 `consumer.ts` 핵심 import:
 
 ```ts
-import { DefaultBatchRunner, defineJob } from "@nest-batch/core";
-import { WorkerLoop } from "@nest-batch/core/queue";
-import { SchedulerLoop } from "@nest-batch/core/scheduler";
-import { ContinuousPollingLoop } from "@nest-batch/core/polling";
-import { LocalWorkerPool, WorkerThreadPool } from "@nest-batch/core/worker";
-import { NestBatchModule } from "@nest-batch/nest";
-import { InMemoryBatchStorage } from "@nest-batch/inmemory";
-import { PostgresBatchStorage } from "@nest-batch/postgres";
-import { MySqlBatchStorage } from "@nest-batch/mysql";
-import { MariaDbBatchStorage } from "@nest-batch/mariadb";
-import { BullMqWorkQueue } from "@nest-batch/bullmq";
-import { runCli } from "@nest-batch/cli";
+import { DefaultBatchRunner, defineJob } from "@rv-nest-batch/core";
+import { WorkerLoop } from "@rv-nest-batch/core/queue";
+import { SchedulerLoop } from "@rv-nest-batch/core/scheduler";
+import { ContinuousPollingLoop } from "@rv-nest-batch/core/polling";
+import { LocalWorkerPool, WorkerThreadPool } from "@rv-nest-batch/core/worker";
+import { NestBatchModule } from "@rv-nest-batch/nest";
+import { InMemoryBatchStorage } from "@rv-nest-batch/inmemory";
+import { PostgresBatchStorage } from "@rv-nest-batch/postgres";
+import { MySqlBatchStorage } from "@rv-nest-batch/mysql";
+import { MariaDbBatchStorage } from "@rv-nest-batch/mariadb";
+import { BullMqWorkQueue } from "@rv-nest-batch/bullmq";
+import { runCli } from "@rv-nest-batch/cli";
 
 void [DefaultBatchRunner, defineJob, WorkerLoop, SchedulerLoop, ContinuousPollingLoop,
   LocalWorkerPool, WorkerThreadPool, NestBatchModule, InMemoryBatchStorage,
@@ -443,6 +460,8 @@ git commit -m "chore : package tarball smoke test 추가" -m "- 배포 파일 al
 - Create: `.changeset/README.md`
 - Create: `scripts/release/sync-root-version.mjs`
 - Test: `scripts/release/sync-root-version.test.ts`
+- Create: `scripts/release/version-packages.mjs`
+- Test: `scripts/release/version-packages.test.ts`
 - Create: `packages/{core,nest,inmemory,postgres,mysql,mariadb,bullmq,cli}/CHANGELOG.md`
 - Modify: `package.json`
 - Modify: `pnpm-lock.yaml`
@@ -450,6 +469,7 @@ git commit -m "chore : package tarball smoke test 추가" -m "- 배포 파일 al
 **Interfaces:**
 - Consumes: 8개 package version과 `PUBLIC_PACKAGES`
 - Produces: `syncRootVersion(root): Promise<string>`
+- Produces: `versionPackages(root): Promise<string>`
 - Produces: `pnpm changeset`, `pnpm release:version`
 
 - [ ] **Step 1: root version sync failing test 작성**
@@ -525,14 +545,14 @@ version만 같은 값으로 갱신한다. JSON은 기존 2-space formatting과 t
   "changelog": "@changesets/cli/changelog",
   "commit": false,
   "fixed": [[
-    "@nest-batch/core",
-    "@nest-batch/nest",
-    "@nest-batch/inmemory",
-    "@nest-batch/postgres",
-    "@nest-batch/mysql",
-    "@nest-batch/mariadb",
-    "@nest-batch/bullmq",
-    "@nest-batch/cli"
+    "@rv-nest-batch/core",
+    "@rv-nest-batch/nest",
+    "@rv-nest-batch/inmemory",
+    "@rv-nest-batch/postgres",
+    "@rv-nest-batch/mysql",
+    "@rv-nest-batch/mariadb",
+    "@rv-nest-batch/bullmq",
+    "@rv-nest-batch/cli"
   ]],
   "linked": [],
   "access": "public",
@@ -552,14 +572,14 @@ version만 같은 값으로 갱신한다. JSON은 기존 2-space formatting과 t
 ```json
 {
   "changeset": "changeset",
-  "release:version": "changeset version && node scripts/release/sync-root-version.mjs"
+  "release:version": "node scripts/release/version-packages.mjs"
 }
 ```
 
 각 package CHANGELOG는 다음 형식을 사용하고 package 역할에 맞는 첫 bullet을 쓴다.
 
 ```markdown
-# @nest-batch/core
+# @rv-nest-batch/core
 
 ## 0.1.0
 
@@ -575,7 +595,7 @@ worktree 원본을 바꾸지 않도록 `mktemp -d`에 repository를 복사하고
 
 ```markdown
 ---
-"@nest-batch/core": minor
+"@rv-nest-batch/core": minor
 ---
 
 고정 버전 계산 검증
@@ -642,11 +662,15 @@ remote integrity가 없으면 publish, local과 같으면 skip, 다르면 error�
 기본 adapter가 실행할 명령:
 
 ```text
-npm view <name>@<version> dist.integrity --json
-npm publish <tarball> --access public
+npm view <name>@<version> dist.integrity --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm publish <tarball> --access public --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
 ```
 
 `npm view`의 404만 unpublished로 처리하고 network/auth 오류는 실패시킨다.
+generic registry와 `@rv-nest-batch` scope registry를 모두 CLI에서 고정하여 ambient
+`.npmrc`의 hostile scope mapping이 lookup/publish destination을 바꾸지 못하게 한다.
+`dist.integrity --json` parser는 npm 11의 JSON scalar와 npm 12의 정확한 단일 원소 배열을
+정규화한다. 빈 배열, 복수 원소, non-string, malformed SHA-512 integrity는 모두 실패시킨다.
 `publishRelease`는 catalog 순서로 publish/skip하고, 완료 후 최대 6회·5초 간격으로 8개
 remote integrity를 재조회한다. test에서는 lookup/publish/sleep을 주입해 실제 registry를
 호출하지 않고 `missing -> publish`, `same -> skip`, `different -> fail`, partial retry를
@@ -662,7 +686,7 @@ tag는 `--tag v0.1.0` 또는 `GITHUB_REF_NAME`에서 읽으며 둘 다 없으면
 }
 ```
 
-로컬 bootstrap 명령은 `pnpm release:publish -- --tag v0.1.0`이다. 이 명령은 test에서
+로컬 bootstrap 명령은 `pnpm run release:publish --tag v0.1.0`이다. 이 명령은 test에서
 mock adapter로만 검증하고 실제로 실행하지 않는다.
 
 - [ ] **Step 6: publish unit test와 전체 release check 실행**
@@ -706,8 +730,8 @@ git commit -m "chore : 멱등 npm publish script 추가" -m "- tag와 package ve
 ```text
 actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803        # v6
 actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38      # v6
-pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996       # v6
-changesets/action@0977fd99725f1db4007ccb2928dbb4e90d06cc86       # v2
+pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86       # v6.0.10
+changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1         # v2.1.1
 ```
 
 `ci.yml`은 `pull_request`와 `develop` push에 실행한다. `quality` job은 Node
@@ -761,9 +785,20 @@ E2E step은 `pnpm test:e2e`를 실행한다.
 - [ ] **Step 2: Changesets Version PR workflow 작성**
 
 `release-pr.yml`은 `develop` push에서 `contents: write`, `pull-requests: write`만 갖는다.
-frozen install 후 pinned Changesets action에 아래 input을 준다.
+frozen install 후 official root `changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1`
+(`v2.1.1` commit)을 사용한다. 2026-09-04 upstream `action.yml` 검증에서 root action의
+공식 입력은 `version-script`, `commit-message`, `pr-title`, `pr-base-branch`,
+`create-github-releases`, `push-git-tags`이고 공식 output은 `pr-number`임을 확인했다.
+`GITHUB_TOKEN: ${{ github.token }}`을 제공한다. upstream implementation은 pending changeset이
+없거나 changeset이 모두 empty이면 publish script 없이 no-op으로 반환하므로, root action에서
+`create-github-releases: false`, `push-git-tags: false`를 명시해 Version PR만 관리한다.
+`pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86`의 공식 metadata는 기본
+`package_json_file: package.json`에서 `packageManager` pin을 읽어 설치한다.
 
 ```yaml
+uses: changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1
+env:
+  GITHUB_TOKEN: ${{ github.token }}
 with:
   version-script: pnpm release:version
   commit-message: "chore : package version 업데이트"
@@ -775,6 +810,23 @@ with:
 
 action output `pr-number`가 있으면 `gh label create release --force` 후 해당 PR에
 `release` label을 붙인다. step은 repository `GITHUB_TOKEN`만 사용한다.
+
+최초 `0.1.0`에는 pending Changeset이나 기존 Version PR이 없고 새 minor Changeset은 fixed
+group을 `0.2.0`으로 올리므로, 검토된 package-release-readiness merge commit을 release
+candidate로 지정한다. 이 예외는 한 번만 적용하며 새 Changeset이나 Version PR을 만들지
+않는다. 이후 모든 release에는 Version PR이 필수다.
+
+첫 post-bootstrap Version PR 전에 maintainer는 GitHub repository의 **Settings → Actions →
+General → Workflow permissions**에서 **Allow GitHub Actions to create and approve pull
+requests**를 수동으로 활성화한다. 2026-09-05 read-only audit 결과는
+`can_approve_pull_request_reviews=false`였으며 PAT나 장기 credential로 우회하지 않는다.
+
+후속 Version PR의 token topology에서는 Changesets Version PR이 생성되거나 갱신될 때 write 권한
+maintainer가 PR merge box에서 **Approve workflows to run**을 눌러야 한다. 매 갱신마다
+**Quality (Node 20.18.3)**, **Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한
+뒤에만 Version PR을 merge한다. merge commit을 release candidate로 정하고 local
+`release:check`와 E2E를 통과한 뒤에만 release tag를 생성한다. PAT나 장기 credential은
+추가하지 않는다.
 
 - [ ] **Step 3: tag-gated publish workflow 작성**
 
@@ -799,13 +851,26 @@ jobs:
 ```
 
 publish job은 cache 없이 Node 24를 설정하고 `npm install --global npm@12.0.2`, frozen
-pnpm install, `pnpm release:check`, `pnpm release:publish -- --tag "$GITHUB_REF_NAME"`을
+pnpm install, `pnpm release:check`, `pnpm run release:publish --tag "$GITHUB_REF_NAME"`을
 실행한다. `NODE_AUTH_TOKEN`이나 npm secret을 설정하지 않는다.
 
-GitHub Release job은 source checkout 없이 아래 명령만 실행한다.
+GitHub Release job은 tag source를 checkout하고 `HEAD`와 tag ref가 모두
+`GITHUB_SHA`로 resolve되는지 검사한 뒤 explicit repository를 `gh api graphql`의
+`repository.release(tagName:)`로 조회한다. GraphQL selection은 schema-valid
+`databaseId`만 요청하고 positive safe integer를 검증하여 published와 draft를 함께 찾는다.
+`data.repository.release`가 `null`인 경우에만 아래 create 명령을 실행한다. object가 있으면
+REST `GET repos/{owner}/{repo}/releases/{databaseId}`로 full metadata를 조회하고, response
+`id`가 있으면 GraphQL ID와 일치하는지 확인한다. 기존 release는 exact tag, non-draft,
+non-prerelease를 검증하고 건너뛴다.
+`target_commitish`가 40자리 SHA이면 workflow SHA와 일치해야 하며, branch 이름이면
+검증된 tag ref를 authoritative source로 삼는다. GraphQL `errors`, GraphQL/REST
+인증/network/malformed 응답은 그대로 실패시켜 create를 실행하지 않는다. create가
+실패하면 같은 GraphQL-ID → REST-by-ID 경로로 정확히 한 번 재조회하여 exact release가
+생성된 경합만 성공으로 복구한다. 여전히 absent이거나 재조회가 실패하면 원래 create
+오류를 보존하고, conflicting release이면 충돌 오류로 실패한다.
 
 ```bash
-gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
+gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
 ```
 
 `GH_TOKEN: ${{ github.token }}`만 환경에 제공한다.
@@ -837,20 +902,29 @@ changelog:
 - [ ] **Step 5: workflow syntax와 보안 설정 자동 검증**
 
 root devDependency에 `yaml@2.9.0`을 추가한다. `verifyWorkflowFiles(root)`는 YAML 1.2로
-세 workflow와 release config를 parse하고 다음을 검사한다.
+세 workflow와 release config를 parse하고 duplicate key, anchor, alias를 거부한다. 승인된
+workflow의 root/job permission, trigger, job/step 순서, action owner/SHA allowlist, YAML parser가
+보존한 `run` scalar와 block scalar의 마지막 줄바꿈, cache, Node matrix, Node 24 release-only
+condition, E2E service image/env/port/healthcheck, release category를 전체 exact schema로 비교한다.
+`release:check` 뒤에만 publish를
+허용하며 `always()`·`continue-on-error`·추가 privileged job을 거부한다.
 
 ```text
 publish trigger: v*.*.*
 publish environment: npm
 publish permission: id-token write, contents read
 github-release permission: contents write, id-token 없음
-금지 문자열: NPM_TOKEN, NODE_AUTH_TOKEN
-모든 uses 값: @ 뒤에 40자리 commit SHA
-필수 command: release:check, release:publish, gh release create --generate-notes
+금지 설정: secrets.*, NPM_TOKEN, NODE_AUTH_TOKEN, registry auth/.npmrc
+모든 uses 값: 검토한 owner/action의 exact 40자리 commit SHA
+필수 command: release:check, pnpm run release:publish --tag "$GITHUB_REF_NAME",
+  node scripts/release/create-github-release.mjs
 ```
 
-`verify-workflows.test.ts`는 valid minimal workflow가 통과하고 token env, major-tag
-action, 빠진 `id-token: write`가 각각 실패하는 `English / 한국어` test를 작성한다.
+`verify-workflows.test.ts`는 exact valid workflow가 통과하고 trigger, permission, root action
+input, cache, command 순서, GitHub Release tag checkout, service, release category,
+secret/registry auth, YAML type/duplicate/
+anchor/alias 및 shell-significant Unicode whitespace/마지막 줄바꿈 변이가 각각 실패하는
+`English / 한국어` mutation test를 작성한다.
 `verify-release.mjs`의 repository runner가 `verifyWorkflowFiles`를 호출하게 한다.
 
 - [ ] **Step 6: workflow 정적 점검**
@@ -861,8 +935,8 @@ Run:
 pnpm install
 pnpm exec vitest run --config vitest.config.ts scripts/release/verify-workflows.test.ts
 node scripts/release/verify-release.mjs
-rg -n 'NPM_TOKEN|NODE_AUTH_TOKEN' .github/workflows
-rg -n 'id-token: write|environment: npm|release:check|release:publish' .github/workflows/publish.yml
+rg -n 'NPM_TOKEN|NODE_AUTH_TOKEN|secrets\.|registry-url|always-auth|_auth' .github/workflows
+rg -n 'id-token: write|environment: npm|release:check|pnpm run release:publish --tag|--repo "\$GITHUB_REPOSITORY"' .github/workflows/publish.yml
 git diff --check
 ```
 
@@ -899,15 +973,25 @@ git commit -m "chore : package release workflow 추가" -m "- Node 호환성과 
 
 ```markdown
 ## 1. Release candidate 준비
+- [ ] 최초 `0.1.0` release candidate로 검토된 package-release-readiness merge commit 지정
+  - 이 예외는 최초 `0.1.0`에 한 번만 적용하며, 새 Changeset이나 Version PR을 만들지 않습니다.
+- [ ] 첫 post-bootstrap Version PR 전에 GitHub Actions의 pull request 생성 권한 수동 활성화
+  - **Settings → Actions → General → Workflow permissions**에서 **Allow GitHub Actions to create and approve pull requests**를 활성화합니다.
+  - 2026-09-05 read-only audit의 `can_approve_pull_request_reviews=false` 상태를 확인했고 PAT나 장기 credential로 우회하지 않습니다.
+- [ ] Changesets Version PR workflow 승인과 CI 성공 확인 후 merge
+  - 최초 `0.1.0` 이후 모든 release에는 Changesets Version PR이 필수입니다.
+  - 각 Changesets Version PR이 생성되거나 갱신될 때마다 write 권한 maintainer가 PR merge box에서 **Approve workflows to run**을 클릭합니다.
+  - **Quality (Node 20.18.3)**, **Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한 뒤에만 Version PR을 merge합니다.
+  - Version PR merge commit을 release candidate로 정하고 아래 local 검증을 마친 뒤에만 release tag를 생성합니다.
 - [ ] worktree가 clean이고 release commit이 `develop`에 포함됨
 - [ ] 8개 package와 root version이 동일함
 - [ ] `pnpm release:check` 성공
 - [ ] `pnpm test:e2e` 성공
 
 ## 2. 최초 0.1.0 bootstrap
-- [ ] npm에서 `@nest-batch` scope 권한 확인
-- [ ] `npm whoami`와 2FA 상태 확인
-- [ ] `pnpm release:publish -- --tag v0.1.0`을 maintainer가 직접 실행
+- [ ] npm에서 `@rv-nest-batch` scope 권한 확인
+- [ ] npm 계정과 2FA 상태 확인
+- [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행
 - [ ] 8개 package의 `0.1.0`과 integrity 확인
 
 ## 3. Trusted Publisher 등록
@@ -921,6 +1005,8 @@ git commit -m "chore : package release workflow 추가" -m "- Node 호환성과 
 - [ ] `git push origin vX.Y.Z`
 - [ ] publish workflow 성공 확인
 - [ ] npm provenance와 GitHub generated release notes 확인
+  - 로컬 bootstrap `0.1.0`은 provenance 예외로 두고, 처음으로 OIDC publish되는 후속
+    version부터 provenance를 필수로 확인한다.
 
 ## 5. 실패 복구
 - [ ] 같은 tag workflow 재실행으로 동일 integrity package를 skip
@@ -951,8 +1037,13 @@ root README/README-kr의 Development section에는 `pnpm changeset`과
 - [ ] **Step 3: checklist와 catalog 일치 검증 추가**
 
 `verify-release.mjs`는 `docs/releasing.md`에 8개 package name, `publish.yml`, `npm`
-environment, `pnpm release:check`, bootstrap command가 있는지 확인한다. 문서가 workflow
-filename이나 package catalog와 달라지면 release check가 실패해야 한다.
+environment, 최초 `0.1.0`의 검토된 merge candidate와 일회성 예외, 후속 Version PR 필수,
+GitHub Actions pull request 생성 설정과 read-only audit 결과, Version PR 승인과 세 CI check,
+`pnpm release:check`, bootstrap command가 있는지 확인한다. 이름 있는 exact checklist
+constant의 위치를 조회하여 bootstrap candidate 또는 후속 Version PR 승인 → CI 성공 → merge
+→ local candidate 검증, catalog identity audit/STOP → bootstrap publish → Trusted Publisher →
+tag → provenance 순서를 검사한다. 필요한 위치를 찾지 못하거나 문서가 workflow
+filename/package catalog와 달라지면 release check가 실패해야 한다.
 
 - [ ] **Step 4: 전체 local verification**
 
@@ -972,7 +1063,7 @@ Task 7에서 의도한 문서와 validator 변경만 나타난다.
 
 - [ ] **Step 5: npm registry read-only availability audit**
 
-각 catalog name에 `npm view <name> version --json`을 실행한다. 404는 최초 bootstrap
+각 catalog name에 `npm view <name> version --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/`을 실행한다. 404는 최초 bootstrap
 대상으로 checklist에 기록하고, 이미 존재하면 owner/version을 확인하되 publish나 access
 변경은 하지 않는다.
 

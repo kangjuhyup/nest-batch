@@ -1,4 +1,4 @@
-import type { JobExecution, JobInstance, PartitionExecution, StepExecution } from "@nest-batch/core";
+import type { JobExecution, JobInstance, PartitionExecution, StepExecution } from "@rvkang/batch-core";
 
 export const cloneJobInstance = (instance: JobInstance): JobInstance => ({
   ...instance,

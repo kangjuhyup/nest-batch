@@ -1,4 +1,4 @@
-import { DatabaseBatchStorage } from "@nest-batch/core";
+import { DatabaseBatchStorage } from "@rvkang/batch-core";
 import type { Provider } from "@nestjs/common";
 import {
   BATCH_CHECKPOINT_STORE,

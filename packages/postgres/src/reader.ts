@@ -1,4 +1,4 @@
-import { createSqlCursorReader, type SqlCursorReader } from "@nest-batch/core";
+import { createSqlCursorReader, type SqlCursorReader } from "@rvkang/batch-core";
 import type { PostgresPoolLike } from "./options.js";
 import { rowsFromPostgresResult } from "./sql.js";
 

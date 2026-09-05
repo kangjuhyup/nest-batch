@@ -1,20 +1,18 @@
 ---
 name: commit-messages
-description: nest-batch 저장소에서 git commit message를 작성하거나 commit template을 사용할 때 feat/fix/refactor/chore/docs prefix, 한글 제목, 한글 작업내용 bullet 규칙을 적용해야 할 때 사용한다.
+description: nest-batch 저장소에서 git commit message를 작성하거나 commit template을 사용할 때 <type>/<제목> -내용 형식, 한글 제목과 내용 규칙을 적용해야 할 때 사용한다.
 ---
 
 # Commit Messages
 
 ## Overview
 
-`nest-batch`의 commit message는 변경 유형을 짧게 드러내고, 제목과 작업내용은 한국어로 작성합니다. 제목만으로 부족한 변경은 body에 bullet list로 실제 작업내용을 적습니다.
+`nest-batch`의 commit message는 변경 유형, 변경 대상, 핵심 결과를 첫 줄에 짧게 드러냅니다. 제목과 내용은 한국어로 작성하고, 상세 설명이 필요하면 첫 줄 아래에 적습니다.
 
 ## Format
 
 ```text
-feat|fix|refactor|chore|docs : 제목
-- 작업내용1
-- 작업내용2
+<type>/<제목> -내용
 ```
 
 ## Type
@@ -24,36 +22,37 @@ feat|fix|refactor|chore|docs : 제목
 | `feat` | 새로운 기능, 공개 API, 사용자 동작 추가 |
 | `fix` | 버그 수정, 잘못된 동작 교정 |
 | `refactor` | 동작 변화 없는 구조 개선 |
-| `chore` | 빌드, 설정, 의존성, 내부 작업 |
+| `test` | 테스트 추가 또는 수정 |
 | `docs` | README, 문서, 예제, 주석 중심 변경 |
+| `chore` | 빌드, 설정, 의존성, 내부 작업 |
 
 ## Writing Rules
 
-- 제목과 작업내용은 한국어로 작성합니다.
-- 제목은 명령형보다 변경 결과 중심으로 짧게 씁니다.
-- prefix 뒤에는 공백, 콜론, 공백을 둡니다. 예: `feat : 배치 실행 상태 타입 추가`
-- body가 있으면 각 줄을 `- ` bullet로 시작합니다.
-- body에는 변경한 파일 나열보다 사용자가 이해할 작업 단위를 적습니다.
-- 여러 성격이 섞이면 사용자 영향이 가장 큰 type을 선택합니다.
+- 첫 줄은 반드시 `<type>/<제목> -내용` 형식을 사용합니다.
+- 제목은 변경 대상을 짧게 적습니다.
+- 내용은 변경 이유나 핵심 결과를 한 문장으로 적습니다.
+- author 정보는 메시지에 작성하지 않습니다.
+- 여러 변경이 섞이면 가능한 한 커밋을 나눕니다.
+- 상세 설명이 필요하면 첫 줄 아래에 적습니다.
 
 ## Examples
 
 ```text
-feat : MySQL adapter 경계 추가
-- MySQL 전용 package boundary를 정의
-- checkpoint와 lock 설계 기준을 문서화
+feat/알림 채널 추가 -슬랙과 디스코드 알림 채널을 추가
 ```
 
 ```text
-docs : 커밋 메시지 규칙 추가
-- 한글 제목과 작업내용 작성 규칙을 정리
-- git commit template을 추가
+fix/요청 로그 마스킹 -쿼리 토큰이 로그에 남지 않도록 수정
+```
+
+```text
+test/알림 실패 검증 -채널별 실패 상태 테스트 추가
 ```
 
 ## Checklist
 
-- type이 `feat`, `fix`, `refactor`, `chore`, `docs` 중 하나인가
-- 제목 앞뒤 형식이 `type : 제목`인가
-- 제목이 한국어인가
-- body를 썼다면 모든 작업내용이 `- `로 시작하는가
-- body 작업내용이 한국어인가
+- type이 `feat`, `fix`, `refactor`, `test`, `docs`, `chore` 중 하나인가
+- 첫 줄 형식이 `<type>/<제목> -내용`인가
+- 제목이 변경 대상을 짧게 설명하는가
+- 내용이 변경 이유나 핵심 결과를 한 문장으로 설명하는가
+- author 정보가 메시지에 포함되지 않았는가

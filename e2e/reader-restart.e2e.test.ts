@@ -1,11 +1,11 @@
-import { DefaultBatchRunner, defineChunkStep, defineJob } from "@nest-batch/core";
+import { DefaultBatchRunner, defineChunkStep, defineJob } from "@rvkang/batch-core";
 import type {
   ChunkReader,
   FileReaderDefinition,
   HttpReaderDefinition,
   SqlReaderDefinition
-} from "@nest-batch/core";
-import { InMemoryBatchStorage } from "@nest-batch/inmemory";
+} from "@rvkang/batch-core";
+import { InMemoryBatchStorage } from "@rvkang/batch-inmemory";
 import { describe, expect, it } from "vitest";
 
 interface SourceUser {

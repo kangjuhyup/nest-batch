@@ -1,7 +1,7 @@
 import "reflect-metadata";
-import { defineStep } from "@nest-batch/core";
-import type { JobParameters, StepExecutionContext } from "@nest-batch/core";
-import { InMemoryBatchStorage } from "@nest-batch/inmemory";
+import { defineStep } from "@rvkang/batch-core";
+import type { JobParameters, StepExecutionContext } from "@rvkang/batch-core";
+import { InMemoryBatchStorage } from "@rvkang/batch-inmemory";
 import { Inject, Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { describe, expect, it } from "vitest";

@@ -3,7 +3,7 @@ import type {
   JobParameters,
   PartitionExecutionStatus,
   StepExecutionStatus
-} from "@nest-batch/core";
+} from "@rvkang/batch-core";
 import type { PostgresBatchOptions } from "./options.js";
 
 const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;

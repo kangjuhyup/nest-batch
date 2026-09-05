@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  pull_request: {}
+  push:
+    branches:
+      - develop
+
+permissions: {}
+
+jobs:
+  quality:
+    name: Quality (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["20.18.3", "24"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit test
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+      - name: Verify release artifacts
+        if: matrix.node == '24'
+        run: |
+          pnpm release:verify
+          pnpm release:smoke
+
+  e2e:
+    name: E2E (Node 24)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: nest_batch
+          POSTGRES_USER: nest_batch
+          POSTGRES_PASSWORD: nest_batch
+        ports: [15432:5432]
+        options: >-
+          --health-cmd "pg_isready -U nest_batch -d nest_batch"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: nest_batch
+          MYSQL_USER: nest_batch
+          MYSQL_PASSWORD: nest_batch
+          MYSQL_ROOT_PASSWORD: nest_batch_root
+        ports: [13306:3306]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -unest_batch -pnest_batch --silent"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_DATABASE: nest_batch
+          MARIADB_USER: nest_batch
+          MARIADB_PASSWORD: nest_batch
+          MARIADB_ROOT_PASSWORD: nest_batch_root
+        ports: [13307:3306]
+        options: >-
+          --health-cmd "mariadb-admin ping -h 127.0.0.1 -unest_batch -pnest_batch --silent"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: [16379:6379]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s
+          --health-timeout 5s --health-retries 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: "24"
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: E2E test
+        run: pnpm test:e2e

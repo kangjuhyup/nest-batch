@@ -1,4 +1,4 @@
-import type { JobExecution, JobInstance } from "@nest-batch/core";
+import type { JobExecution, JobInstance } from "@rvkang/batch-core";
 import { performance } from "node:perf_hooks";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

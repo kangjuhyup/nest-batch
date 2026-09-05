@@ -1,15 +1,15 @@
 import { createRequire } from "node:module";
-import { runCli } from "@nest-batch/cli";
-import { DefaultBatchRunner, defineJob, defineStep } from "@nest-batch/core";
-import { PostgresBatchStorage, PostgresScheduleStore } from "@nest-batch/postgres";
-import { BullMqWorkQueue, type BullMqWorkerLike } from "@nest-batch/queue-bullmq";
-import type { WorkUnit } from "@nest-batch/queue-core";
+import { runCli } from "@rvkang/batch-cli";
+import { DefaultBatchRunner, defineJob, defineStep } from "@rvkang/batch-core";
+import { PostgresBatchStorage, PostgresScheduleStore } from "@rvkang/batch-postgres";
+import { BullMqWorkQueue, type BullMqWorkerLike } from "@rvkang/batch-bullmq";
+import type { WorkUnit } from "@rvkang/batch-core/queue";
 import {
   SchedulerLoop,
   createIntervalTrigger,
   createQueueScheduleDispatcher,
   defineSchedule
-} from "@nest-batch/scheduler-core";
+} from "@rvkang/batch-core/scheduler";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPostgresE2eDatabase } from "./support/postgres.js";
 
@@ -61,7 +61,7 @@ interface BullMqModule {
 type ScheduledWorkUnit = WorkUnit;
 
 const queueBullMqRequire = createRequire(
-  new URL("../packages/queue-bullmq/package.json", import.meta.url)
+  new URL("../packages/bullmq/package.json", import.meta.url)
 );
 const { Queue, Worker } = queueBullMqRequire("bullmq") as BullMqModule;
 const DEFAULT_POSTGRES_URL = "postgresql://nest_batch:nest_batch@127.0.0.1:15432/nest_batch";

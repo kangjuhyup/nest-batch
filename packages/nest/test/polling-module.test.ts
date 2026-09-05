@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { describe, expect, it } from "vitest";
-import { DatabaseBatchStorage } from "@nest-batch/core";
+import { DatabaseBatchStorage } from "@rvkang/batch-core";
 import {
   BATCH_CHECKPOINT_STORE,
   BATCH_JOB_REPOSITORY,
