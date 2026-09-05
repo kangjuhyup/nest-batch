@@ -1,4 +1,4 @@
-# @nest-batch/postgres
+# @rv-nest-batch/postgres
 
 ## 0.1.0
 

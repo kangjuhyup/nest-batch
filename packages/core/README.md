@@ -1,4 +1,4 @@
-# @nest-batch/core
+# @rv-nest-batch/core
 
 Framework-independent job and step definitions, execution contracts, and the
 Node-native runtime for `nest-batch`.
@@ -6,15 +6,15 @@ Node-native runtime for `nest-batch`.
 ## Install
 
 ```bash
-pnpm add @nest-batch/core
-pnpm add @nest-batch/inmemory
+pnpm add @rv-nest-batch/core
+pnpm add @rv-nest-batch/inmemory
 ```
 
 ## Run a job
 
 ```ts
-import { DefaultBatchRunner, defineJob, defineStep } from "@nest-batch/core";
-import { InMemoryBatchStorage } from "@nest-batch/inmemory";
+import { DefaultBatchRunner, defineJob, defineStep } from "@rv-nest-batch/core";
+import { InMemoryBatchStorage } from "@rv-nest-batch/inmemory";
 
 const storage = new InMemoryBatchStorage();
 const runner = new DefaultBatchRunner(storage);
@@ -26,7 +26,7 @@ const job = defineJob({
 await runner.run(job, {});
 ```
 
-`@nest-batch/inmemory` is appropriate for tests and local examples only. Use a
+`@rv-nest-batch/inmemory` is appropriate for tests and local examples only. Use a
 durable storage adapter for restartable or multi-process work. Writers and
 external side effects must be idempotent because distributed execution is
 at-least-once.
@@ -35,10 +35,10 @@ at-least-once.
 
 Install one package and import the focused API surface that you need:
 
-- [`@nest-batch/core/queue`](https://github.com/kangjuhyup/nest-batch/tree/main/packages/core/src/queue)
-- [`@nest-batch/core/scheduler`](https://github.com/kangjuhyup/nest-batch/tree/main/packages/core/src/scheduler)
-- [`@nest-batch/core/polling`](https://github.com/kangjuhyup/nest-batch/tree/main/packages/core/src/polling)
-- [`@nest-batch/core/worker`](https://github.com/kangjuhyup/nest-batch/tree/main/packages/core/src/worker)
+- [`@rv-nest-batch/core/queue`](https://github.com/kangjuhyup/nest-batch/tree/main/packages/core/src/queue)
+- [`@rv-nest-batch/core/scheduler`](https://github.com/kangjuhyup/nest-batch/tree/main/packages/core/src/scheduler)
+- [`@rv-nest-batch/core/polling`](https://github.com/kangjuhyup/nest-batch/tree/main/packages/core/src/polling)
+- [`@rv-nest-batch/core/worker`](https://github.com/kangjuhyup/nest-batch/tree/main/packages/core/src/worker)
 
 ## Links
 

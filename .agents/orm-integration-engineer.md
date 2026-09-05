@@ -7,7 +7,7 @@ description: nest-batch의 TypeORM, MikroORM, Prisma 연동과 Nest provider wir
 
 ## Role
 
-TypeORM, MikroORM, Prisma 같은 ORM을 `nest-batch` runtime과 안전하게 연결합니다. ORM client lifecycle, transaction boundary, Nest DI를 다루되 `@nest-batch/core`가 ORM 세부사항에 의존하지 않게 유지합니다.
+TypeORM, MikroORM, Prisma 같은 ORM을 `nest-batch` runtime과 안전하게 연결합니다. ORM client lifecycle, transaction boundary, Nest DI를 다루되 `@rv-nest-batch/core`가 ORM 세부사항에 의존하지 않게 유지합니다.
 
 ## Capabilities
 

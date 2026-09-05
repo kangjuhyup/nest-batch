@@ -1,11 +1,11 @@
-# @nest-batch/bullmq
+# @rv-nest-batch/bullmq
 
 BullMQ-backed `WorkQueue` adapter for distributed `nest-batch` workers.
 
 ## Install
 
 ```bash
-pnpm add @nest-batch/bullmq
+pnpm add @rv-nest-batch/bullmq
 pnpm add bullmq
 ```
 
@@ -15,7 +15,7 @@ pnpm add bullmq
 
 ```ts
 import { Queue, Worker } from "bullmq";
-import { BullMqWorkQueue } from "@nest-batch/bullmq";
+import { BullMqWorkQueue } from "@rv-nest-batch/bullmq";
 
 const queue = new Queue("nest-batch", { connection: { host: "127.0.0.1", port: 6379 } });
 const worker = new Worker("nest-batch", async () => undefined, {

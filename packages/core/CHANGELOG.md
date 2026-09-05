@@ -1,4 +1,4 @@
-# @nest-batch/core
+# @rv-nest-batch/core
 
 ## 0.1.0
 

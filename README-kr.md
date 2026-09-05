@@ -13,7 +13,7 @@ driver-backed repository, checkpoint, lock storage의 초기 구현을 제공합
 checkpoint부터 재개합니다. chunk step은 processor/writer retry policy,
 processor skip policy, `BatchObserver` lifecycle event를 지원합니다. CLI는
 application이 storage와 job registry를 주입할 때 job 실행, 재시도, 상태 확인,
-목록 출력을 처리할 수 있습니다. `@nest-batch/nest`는 decorator가 붙은 job과
+목록 출력을 처리할 수 있습니다. `@rv-nest-batch/nest`는 decorator가 붙은 job과
 batch component provider를 발견하고, `BATCH_RUNNER` provider와
 `NestBatchRunner`를 통해 발견한 job을 실행할 수 있습니다. distributed worker
 contract, BullMQ queue adapter 경계, continuous polling worker, production
@@ -21,18 +21,18 @@ scheduling 1차 구현을 제공합니다.
 
 ## Public packages
 
-- `@nest-batch/core`: framework에 독립적인 job/step contract와 `queue`, `scheduler`, `polling`, `worker` subpath API.
-- `@nest-batch/nest`: NestJS module과 decorator integration.
-- `@nest-batch/inmemory`: test와 example용 비영속 in-memory repository, lock, checkpoint storage.
-- `@nest-batch/postgres`: Postgres driver-backed repository, lock, checkpoint storage.
-- `@nest-batch/mysql`: MySQL driver-backed repository, lock, checkpoint storage.
-- `@nest-batch/mariadb`: MariaDB driver-backed repository, lock, checkpoint storage.
-- `@nest-batch/bullmq`: BullMQ-compatible `WorkQueue` adapter 경계.
-- `@nest-batch/cli`: 운영 CLI 경계.
+- `@rv-nest-batch/core`: framework에 독립적인 job/step contract와 `queue`, `scheduler`, `polling`, `worker` subpath API.
+- `@rv-nest-batch/nest`: NestJS module과 decorator integration.
+- `@rv-nest-batch/inmemory`: test와 example용 비영속 in-memory repository, lock, checkpoint storage.
+- `@rv-nest-batch/postgres`: Postgres driver-backed repository, lock, checkpoint storage.
+- `@rv-nest-batch/mysql`: MySQL driver-backed repository, lock, checkpoint storage.
+- `@rv-nest-batch/mariadb`: MariaDB driver-backed repository, lock, checkpoint storage.
+- `@rv-nest-batch/bullmq`: BullMQ-compatible `WorkQueue` adapter 경계.
+- `@rv-nest-batch/cli`: 운영 CLI 경계.
 
-`@nest-batch/core/queue`, `@nest-batch/core/scheduler`,
-`@nest-batch/core/polling`, `@nest-batch/core/worker`는 별도 npm package가 아니라
-명시적인 core subpath API입니다. root `@nest-batch/core` entrypoint는 이 symbol을
+`@rv-nest-batch/core/queue`, `@rv-nest-batch/core/scheduler`,
+`@rv-nest-batch/core/polling`, `@rv-nest-batch/core/worker`는 별도 npm package가 아니라
+명시적인 core subpath API입니다. root `@rv-nest-batch/core` entrypoint는 이 symbol을
 다시 export하지 않습니다.
 
 ## Requirements and compatibility
@@ -46,13 +46,13 @@ scheduling 1차 구현을 제공합니다.
 runtime과 환경에 맞는 storage adapter를 설치합니다.
 
 ```bash
-pnpm add @nest-batch/core
-pnpm add @nest-batch/inmemory
+pnpm add @rv-nest-batch/core
+pnpm add @rv-nest-batch/inmemory
 ```
 
 ```ts
-import { DefaultBatchRunner, defineJob, defineStep } from "@nest-batch/core";
-import { InMemoryBatchStorage } from "@nest-batch/inmemory";
+import { DefaultBatchRunner, defineJob, defineStep } from "@rv-nest-batch/core";
+import { InMemoryBatchStorage } from "@rv-nest-batch/inmemory";
 
 const storage = new InMemoryBatchStorage();
 const runner = new DefaultBatchRunner(storage);
@@ -64,18 +64,18 @@ const job = defineJob({
 await runner.run(job, {});
 ```
 
-NestJS integration에는 `@nest-batch/nest`, durable storage에는 SQL adapter,
-BullMQ-backed work queue가 필요할 때만 `@nest-batch/bullmq`를 사용합니다. public
+NestJS integration에는 `@rv-nest-batch/nest`, durable storage에는 SQL adapter,
+BullMQ-backed work queue가 필요할 때만 `@rv-nest-batch/bullmq`를 사용합니다. public
 API는 pre-1.0 상태이므로 호환되는 `0.x` version을 함께 올립니다.
 
 ## Distributed Workers
 
-`@nest-batch/core/queue`는 pull 기반 `WorkQueue` contract와 `WorkerLoop`를
+`@rv-nest-batch/core/queue`는 pull 기반 `WorkQueue` contract와 `WorkerLoop`를
 정의합니다. queue adapter는 work 전달만 담당하고, job/step/checkpoint/partition
 상태의 source of truth는 repository입니다. distributed execution은
 at-least-once를 전제로 하므로 writer와 외부 side effect는 idempotent해야 합니다.
 
-`@nest-batch/bullmq`는 각 `WorkUnit.id`를 안정적인 BullMQ job id로
+`@rv-nest-batch/bullmq`는 각 `WorkUnit.id`를 안정적인 BullMQ job id로
 매핑하고, batch runtime이 retry policy를 소유하도록 BullMQ retry를 기본
 비활성화합니다(`attempts: 1`). application은 실제 BullMQ `Queue`/worker
 instance를 감싼 뒤 `BullMqWorkQueue`에 주입할 수 있습니다. work id에 `:`가 들어
@@ -84,7 +84,7 @@ instance를 감싼 뒤 `BullMqWorkQueue`에 주입할 수 있습니다. work id�
 
 ## Continuous Polling Workers
 
-`@nest-batch/core/polling`은 Transactional Outbox dispatcher처럼 polling tick마다
+`@rv-nest-batch/core/polling`은 Transactional Outbox dispatcher처럼 polling tick마다
 batch metadata를 만들면 안 되는 long-lived task loop를 제공합니다. 이 loop는
 `JobExecution`, `StepExecution`, checkpoint row, scheduler occurrence를 생성하지
 않습니다. outbox message claim, lease, retry/backoff, DEAD 처리, aggregate ordering은
@@ -92,7 +92,7 @@ task 저장소와 dispatcher가 소유하고, nest-batch는 worker lifecycle, id
 worker/system error backoff, observer event, graceful shutdown만 담당합니다.
 
 ```ts
-import { ContinuousPollingLoop } from "@nest-batch/core/polling";
+import { ContinuousPollingLoop } from "@rv-nest-batch/core/polling";
 
 const loop = new ContinuousPollingLoop({
   workerId: "vote-outbox-worker-1",
@@ -157,19 +157,19 @@ I/O를 영구히 기다리지 않게 해야 합니다.
 
 ## Production Scheduling
 
-`@nest-batch/core/scheduler`는 code-defined schedule을 평가하고, `ScheduleStore`로
+`@rv-nest-batch/core/scheduler`는 code-defined schedule을 평가하고, `ScheduleStore`로
 durable occurrence를 claim한 뒤 `BatchRunner` 또는 `WorkQueue`로 dispatch합니다.
 schedule definition은 application code가 소유하고, database는 중복 dispatch를
 줄이고 catch-up 판단을 하기 위한 occurrence state만 저장합니다.
 
 ```ts
-import { PostgresScheduleStore } from "@nest-batch/postgres";
+import { PostgresScheduleStore } from "@rv-nest-batch/postgres";
 import {
   SchedulerLoop,
   createIntervalTrigger,
   createQueueScheduleDispatcher,
   defineSchedule
-} from "@nest-batch/core/scheduler";
+} from "@rv-nest-batch/core/scheduler";
 
 const scheduleStore = new PostgresScheduleStore({
   connectionString: process.env.NEST_BATCH_POSTGRES_URL,
@@ -209,10 +209,10 @@ scheduler는 최신 terminal occurrence(`dispatched` 또는 `failed`)를 trigger
 회수될 수 있고, 영구히 건너뛰지 않습니다.
 
 UTC calendar schedule의 기본 daily, weekly, monthly rule은
-`@nest-batch/core/scheduler`가 export하는 helper를 사용합니다.
+`@rv-nest-batch/core/scheduler`가 export하는 helper를 사용합니다.
 
 ```ts
-import { createUtcDailyTrigger } from "@nest-batch/core/scheduler";
+import { createUtcDailyTrigger } from "@rv-nest-batch/core/scheduler";
 
 const trigger = createUtcDailyTrigger({
   startAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -362,14 +362,14 @@ custom performance schema는 cleanup이 shared schema를 지우지 않도록
 
 ## In-Memory Storage
 
-`@nest-batch/inmemory`는 `JobRepository`, `CheckpointStore`, `LockManager`의
+`@rv-nest-batch/inmemory`는 `JobRepository`, `CheckpointStore`, `LockManager`의
 비영속 구현을 제공합니다. process memory에만 state를 저장하므로 restart,
 multi-process worker, 운영 durability 검증에는 사용하지 않습니다. example e2e,
 runner unit test, 빠른 local smoke test처럼 database fixture가 핵심이 아닌
 경우에 사용합니다.
 
 ```ts
-import { InMemoryBatchStorage } from "@nest-batch/inmemory";
+import { InMemoryBatchStorage } from "@rv-nest-batch/inmemory";
 
 const storage = new InMemoryBatchStorage();
 ```
@@ -387,9 +387,9 @@ transaction 안에서 instance 생성, active execution 확인, execution 생성
 처리합니다. `initialize()`는 필요한 schema와 table을 idempotent하게 준비합니다.
 
 ```ts
-import { PostgresBatchStorage } from "@nest-batch/postgres";
-import { MySqlBatchStorage } from "@nest-batch/mysql";
-import { createJobInstanceId, hashJobParameters } from "@nest-batch/core";
+import { PostgresBatchStorage } from "@rv-nest-batch/postgres";
+import { MySqlBatchStorage } from "@rv-nest-batch/mysql";
+import { createJobInstanceId, hashJobParameters } from "@rv-nest-batch/core";
 
 const postgresStorage = new PostgresBatchStorage({
   connectionString: process.env.NEST_BATCH_POSTGRES_URL,
@@ -436,8 +436,8 @@ true`를 넘기면 같은 instance의 최신 failed execution에서 checkpoint�
 checkpoint를 다시 저장합니다.
 
 ```ts
-import { DefaultBatchRunner, defineJob, defineStep } from "@nest-batch/core";
-import { PostgresBatchStorage } from "@nest-batch/postgres";
+import { DefaultBatchRunner, defineJob, defineStep } from "@rv-nest-batch/core";
+import { PostgresBatchStorage } from "@rv-nest-batch/postgres";
 
 const storage = new PostgresBatchStorage({
   connectionString: process.env.NEST_BATCH_POSTGRES_URL,
@@ -580,8 +580,8 @@ lock, 기본 `BATCH_RUNNER`, `BatchContextAccessor`, `NestBatchRegistry`,
 
 ```ts
 import { Module } from "@nestjs/common";
-import { NestBatchModule, BatchJob, BatchStep, NestBatchRunner } from "@nest-batch/nest";
-import { defineStep } from "@nest-batch/core";
+import { NestBatchModule, BatchJob, BatchStep, NestBatchRunner } from "@rv-nest-batch/nest";
+import { defineStep } from "@rv-nest-batch/core";
 
 @BatchJob("daily-billing")
 class BillingJob {
@@ -612,7 +612,7 @@ Nest provider에서는 모든 method signature로 runtime context를 전달하�
 
 ```ts
 import { Injectable } from "@nestjs/common";
-import { BatchContextAccessor } from "@nest-batch/nest";
+import { BatchContextAccessor } from "@rv-nest-batch/nest";
 
 @Injectable()
 class BillingService {
@@ -635,14 +635,14 @@ custom runner가 필요하면 `forRoot()` 또는 `forRootAsync()`에 `batchRunne
 
 ## Operational CLI
 
-`@nest-batch/cli`는 application이 직접 CLI bootstrap을 구성할 수 있도록
+`@rv-nest-batch/cli`는 application이 직접 CLI bootstrap을 구성할 수 있도록
 `runCli(args, { storage, jobs })`를 제공합니다. package-level `nest-batch`
 binary는 아직 database 설정이나 job 등록을 스스로 알 수 없으므로, config loading이
 추가되기 전까지 production app은 자체 bootstrap에서 `runCli`를 감싸는 방식이
 명확합니다.
 
 ```ts
-import { runCli } from "@nest-batch/cli";
+import { runCli } from "@rv-nest-batch/cli";
 
 const result = await runCli(
   [
@@ -666,7 +666,7 @@ registry에 대상 job이 있어야 합니다. 운영 command output은 JSON입�
 ## Core Example
 
 ```ts
-import { defineJob, defineStep } from "@nest-batch/core";
+import { defineJob, defineStep } from "@rv-nest-batch/core";
 
 const step = defineStep({
   name: "load-users",
@@ -696,8 +696,8 @@ processor 실패 item을 건너뛰는 데만 적용됩니다. writer 실패 skip
 `docs/readers-kr.md`를 참고하세요.
 
 ```ts
-import { defineChunkStep, skipItem } from "@nest-batch/core";
-import type { ChunkReaderContext, Processor, Reader, ReaderSession, Writer } from "@nest-batch/core";
+import { defineChunkStep, skipItem } from "@rv-nest-batch/core";
+import type { ChunkReaderContext, Processor, Reader, ReaderSession, Writer } from "@rv-nest-batch/core";
 
 interface SourceUser {
   readonly id: string;

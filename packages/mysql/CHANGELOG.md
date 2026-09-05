@@ -1,4 +1,4 @@
-# @nest-batch/mysql
+# @rv-nest-batch/mysql
 
 ## 0.1.0
 

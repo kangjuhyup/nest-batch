@@ -2,11 +2,11 @@
 
 **Goal:** job 실행 정보와 job parameters를 tasklet, chunk reader, processor, writer, retry/skip policy, checkpoint callback, partition handler까지 일관되게 전달한다. checkpoint와 durable execution context는 역할을 분리해 restart 의미를 명확히 유지한다.
 
-**Architecture:** `@nest-batch/core`에 framework-independent context contract를 둔다. NestJS decorator나 DI 정보는 `@nest-batch/nest`에서만 다룬다. SQL adapter는 context 저장이 필요한 단계에서 core repository contract를 구현한다.
+**Architecture:** `@rv-nest-batch/core`에 framework-independent context contract를 둔다. NestJS decorator나 DI 정보는 `@rv-nest-batch/nest`에서만 다룬다. SQL adapter는 context 저장이 필요한 단계에서 core repository contract를 구현한다.
 
 ## Global Constraints
 
-- `@nest-batch/core`는 NestJS, database client, queue client에 의존하지 않는다.
+- `@rv-nest-batch/core`는 NestJS, database client, queue client에 의존하지 않는다.
 - 기존 `input`, `signal`, `checkpoint` 기반 callback은 가능한 한 source-compatible하게 유지한다.
 - `checkpoint`는 reader cursor와 chunk safety boundary를 위한 값으로 유지한다.
 - durable execution context는 JSON-serializable 값만 저장한다.

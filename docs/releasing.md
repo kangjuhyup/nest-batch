@@ -1,6 +1,6 @@
 # nest-batch 공개 배포
 
-이 문서는 `@nest-batch/*` package의 maintainer용 공개 배포 절차입니다. 모든 checkbox는
+이 문서는 `@rv-nest-batch/*` package의 maintainer용 공개 배포 절차입니다. 모든 checkbox는
 수동 확인 항목이므로 이 저장소의 자동 검증이나 문서 작성으로 완료 처리하지 않습니다.
 
 로컬 명령은 Node `24`와 root의 `pnpm@10.34.5` pin을 사용합니다. 먼저 `nvm`이
@@ -22,7 +22,7 @@ pnpm install --frozen-lockfile
 - [ ] worktree가 clean이고 release commit이 `develop`에 포함됨
   - `git status --short`의 출력이 없어야 하며, `git fetch origin develop` 후 `git merge-base --is-ancestor <release-commit> origin/develop`가 성공해야 합니다.
 - [ ] 8개 package와 root version이 동일함
-  - `pnpm release:check`가 root와 아래 공개 package의 고정 version을 함께 검사합니다: `@nest-batch/core`, `@nest-batch/nest`, `@nest-batch/inmemory`, `@nest-batch/postgres`, `@nest-batch/mysql`, `@nest-batch/mariadb`, `@nest-batch/bullmq`, `@nest-batch/cli`.
+  - `pnpm release:check`가 root와 아래 공개 package의 고정 version을 함께 검사합니다: `@rv-nest-batch/core`, `@rv-nest-batch/nest`, `@rv-nest-batch/inmemory`, `@rv-nest-batch/postgres`, `@rv-nest-batch/mysql`, `@rv-nest-batch/mariadb`, `@rv-nest-batch/bullmq`, `@rv-nest-batch/cli`.
 - [ ] `pnpm release:check` 성공
   - `pnpm release:check`는 catalog가 소유한 8개 package의 `dist`만 안전하게 비운 뒤 typecheck, unit test, fresh build, release metadata/tarball, consumer smoke test를 실행합니다.
 - [ ] `pnpm test:e2e` 성공
@@ -30,25 +30,27 @@ pnpm install --frozen-lockfile
 
 ## 2. 최초 0.1.0 bootstrap
 
-- [ ] npm에서 `@nest-batch` scope 권한 확인
-  - npm web UI에서 `@nest-batch` scope의 Members/Teams 설정을 열어 실행 maintainer에게 public package publish 권한이 있는지 확인합니다.
+- [ ] npm에서 `rv-nest-batch` scope ownership과 publish 권한 확인
+  - npm web UI에서 `rv-nest-batch` scope의 Members/Teams 설정을 열어 실행 maintainer의 ownership과 public package publish 권한을 직접 확인합니다.
   - scope 권한을 확인한 뒤 아래의 read-only identity audit를 8개 catalog package 모두에 실행합니다.
 
 ```bash
-npm view @nest-batch/core name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm view @nest-batch/nest name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm view @nest-batch/inmemory name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm view @nest-batch/postgres name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm view @nest-batch/mysql name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm view @nest-batch/mariadb name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm view @nest-batch/bullmq name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm view @nest-batch/cli name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/core name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/nest name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/inmemory name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/postgres name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/mysql name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/mariadb name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/bullmq name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/cli name version maintainers repository dist-tags --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
 ```
 
   - 기존 package는 승인된 repository identity와 ownership이 일치하거나 명시적인 transfer/rename 결정이 있어야 합니다. 그렇지 않으면 **STOP**합니다.
+  - 기존 또는 새 package identity가 승인된 이름, repository, ownership과 다르면 즉시 **STOP**합니다.
   - `E404`는 scope publish 권한을 확인한 뒤에만 bootstrap 후보입니다.
+  - 8개 package의 `E404`는 이름의 public 조회 결과일 뿐 scope ownership이나 publish 권한의 증거가 아닙니다. 두 권한을 직접 확인한 뒤에만 bootstrap 후보로 판단합니다.
 - [ ] `npm whoami`와 2FA 상태 확인
-  - `npm whoami --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/`가 의도한 maintainer를 출력하고, `npm profile get --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/`의 2FA 값이 publish를 보호하는 설정인지 확인합니다.
+  - `npm whoami --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/`가 의도한 maintainer를 출력하고, `npm profile get --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/`의 2FA 값이 publish를 보호하는 설정인지 확인합니다.
 - [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행
   - **Manual gate — 실제 npm publish:** 이 명령은 인증된 maintainer가 모든 이전 checkbox를 확인한 뒤 직접 실행합니다. 이 문서 작성·검증 작업에서는 실행하지 않습니다.
   - 실행 명령: `pnpm run release:publish --tag v0.1.0`
@@ -59,14 +61,14 @@ npm view @nest-batch/cli name version maintainers repository dist-tags --json --
   - workflow의 npm 12는 `dist.integrity --json`을 단일 원소 배열로 반환합니다. publish script는 npm 11의 JSON scalar와 npm 12의 정확한 단일 원소 배열만 허용하고, 빈 배열·복수 값·잘못된 integrity는 실패시킵니다.
 
 ```bash
-npm view @nest-batch/core@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm view @nest-batch/nest@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm view @nest-batch/inmemory@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm view @nest-batch/postgres@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm view @nest-batch/mysql@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm view @nest-batch/mariadb@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm view @nest-batch/bullmq@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm view @nest-batch/cli@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/core@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/nest@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/inmemory@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/postgres@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/mysql@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/mariadb@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/bullmq@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm view @rv-nest-batch/cli@0.1.0 version dist.integrity --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
 ```
 
 ## 3. Trusted Publisher 등록
@@ -74,7 +76,7 @@ npm view @nest-batch/cli@0.1.0 version dist.integrity --json --registry https://
 - [ ] owner `kangjuhyup`, repository `nest-batch`, workflow `publish.yml`, environment `npm` 등록
   - npm package web UI의 **Settings → Trusted Publisher → GitHub Actions**에서 8개 package 각각에 GitHub owner `kangjuhyup`, repository `nest-batch`, workflow filename `publish.yml`, GitHub environment `npm`을 입력합니다.
 - [ ] 8개 package 모두 Allowed action `npm publish` 설정
-  - `@nest-batch/core`, `@nest-batch/nest`, `@nest-batch/inmemory`, `@nest-batch/postgres`, `@nest-batch/mysql`, `@nest-batch/mariadb`, `@nest-batch/bullmq`, `@nest-batch/cli` 각각의 Trusted Publisher UI에서 **Allowed action** 값을 `npm publish`로 설정합니다.
+  - `@rv-nest-batch/core`, `@rv-nest-batch/nest`, `@rv-nest-batch/inmemory`, `@rv-nest-batch/postgres`, `@rv-nest-batch/mysql`, `@rv-nest-batch/mariadb`, `@rv-nest-batch/bullmq`, `@rv-nest-batch/cli` 각각의 Trusted Publisher UI에서 **Allowed action** 값을 `npm publish`로 설정합니다.
 - [ ] GitHub `npm` environment와 required reviewer 설정
   - GitHub repository **Settings → Environments → npm**에서 environment name을 `npm`으로 만들고, **Required reviewers**에 release approver를 추가합니다.
 - [ ] npm token publish 제한 설정
@@ -103,6 +105,6 @@ npm view @nest-batch/cli@0.1.0 version dist.integrity --json --registry https://
 - [ ] 같은 tag workflow 재실행으로 동일 integrity package를 skip
   - GitHub **Actions → Publish packages → Re-run failed jobs**에서 같은 `vX.Y.Z` tag workflow를 재실행합니다. `release:publish`는 registry의 같은 version과 integrity가 일치하는 package를 skip하고 남은 package만 처리합니다.
 - [ ] integrity가 다르면 즉시 중단하고 원인 조사
-  - `npm view <package>@X.Y.Z version dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/`과 release artifact 결과가 다르면 재실행이나 강제 publish를 하지 말고 중단합니다. package manifest, tag commit, tarball hash를 조사합니다.
+  - `npm view <package>@X.Y.Z version dist.integrity --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/`과 release artifact 결과가 다르면 재실행이나 강제 publish를 하지 말고 중단합니다. package manifest, tag commit, tarball hash를 조사합니다.
 - [ ] publish된 version은 덮어쓰지 않고 필요 시 다음 patch version 준비
   - npm의 publish된 version은 덮어쓸 수 없습니다. recovery가 불가능하면 Changeset을 추가하고 Version PR로 다음 patch version을 만든 뒤 1번부터 다시 확인합니다.

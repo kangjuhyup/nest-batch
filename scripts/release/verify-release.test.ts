@@ -782,6 +782,22 @@ describe("release metadata validation / release metadata 검증", () => {
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*npm view @rv-nest-batch\/cli/);
   });
 
+  it("rejects an old-scope npm audit command / 이전 scope npm audit 명령을 거부한다", async () => {
+    const root = createRepository();
+    const guide = join(root, "docs", "releasing.md");
+    const previousCore = `${["@nest", "batch"].join("-")}/core`;
+    writeFileSync(
+      guide,
+      readFileSync(guide, "utf8").replace(
+        "npm view @rv-nest-batch/core",
+        `npm view ${previousCore}`
+      )
+    );
+
+    await expect(release.verifyReleaseRepository(root))
+      .rejects.toThrow(/@rv-nest-batch\/core|@nest-batch\/core/u);
+  });
+
   it("rejects a release checklist with an ambient npm registry audit / ambient npm registry를 쓰는 릴리즈 audit를 거부한다", async () => {
     const root = createRepository();
     const releasingGuide = join(root, "docs", "releasing.md");

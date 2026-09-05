@@ -29,14 +29,14 @@ tarball을 별도 임시 프로젝트에 설치해 runtime import와 CLI 실행�
 
 공개 대상 package는 다음과 같다.
 
-- `@nest-batch/core`
-- `@nest-batch/nest`
-- `@nest-batch/inmemory`
-- `@nest-batch/postgres`
-- `@nest-batch/mysql`
-- `@nest-batch/mariadb`
-- `@nest-batch/bullmq`
-- `@nest-batch/cli`
+- `@rv-nest-batch/core`
+- `@rv-nest-batch/nest`
+- `@rv-nest-batch/inmemory`
+- `@rv-nest-batch/postgres`
+- `@rv-nest-batch/mysql`
+- `@rv-nest-batch/mariadb`
+- `@rv-nest-batch/bullmq`
+- `@rv-nest-batch/cli`
 
 ## 비목표
 
@@ -54,15 +54,15 @@ tarball을 별도 임시 프로젝트에 설치해 runtime import와 CLI 실행�
 ### npm package 경계 통합
 
 공개 npm package와 source module을 같은 단위로 강제하지 않는다. 외부 dependency가
-없고 framework-independent인 기능은 `@nest-batch/core` 안에서 다음 subpath로
+없고 framework-independent인 기능은 `@rv-nest-batch/core` 안에서 다음 subpath로
 노출한다.
 
 | 기존 package | 공개 import 경로 |
 | --- | --- |
-| `@nest-batch/queue-core` | `@nest-batch/core/queue` |
-| `@nest-batch/scheduler-core`, `@nest-batch/scheduler-calendar` | `@nest-batch/core/scheduler` |
-| `@nest-batch/polling-core` | `@nest-batch/core/polling` |
-| `@nest-batch/worker-local`, `@nest-batch/worker-threads` | `@nest-batch/core/worker` |
+| `@nest-batch/queue-core` | `@rv-nest-batch/core/queue` |
+| `@nest-batch/scheduler-core`, `@nest-batch/scheduler-calendar` | `@rv-nest-batch/core/scheduler` |
+| `@nest-batch/polling-core` | `@rv-nest-batch/core/polling` |
+| `@nest-batch/worker-local`, `@nest-batch/worker-threads` | `@rv-nest-batch/core/worker` |
 
 각 subpath는 `packages/core/src/` 아래의 독립 directory와 barrel을 가지며 root
 entrypoint가 모든 symbol을 다시 export하지 않는다. 사용자는 package 하나만
@@ -71,17 +71,17 @@ entrypoint가 모든 symbol을 다시 export하지 않는다. 사용자는 packa
 외부 framework, database driver, queue client 또는 process entrypoint가 있는 경계는
 별도 package로 유지한다.
 
-- `@nest-batch/nest`: NestJS peer dependency와 DI/lifecycle 통합
-- `@nest-batch/inmemory`: 비영속 adapter임을 명확히 분리
-- `@nest-batch/postgres`, `@nest-batch/mysql`, `@nest-batch/mariadb`: 서로 다른 SQL
+- `@rv-nest-batch/nest`: NestJS peer dependency와 DI/lifecycle 통합
+- `@rv-nest-batch/inmemory`: 비영속 adapter임을 명확히 분리
+- `@rv-nest-batch/postgres`, `@rv-nest-batch/mysql`, `@rv-nest-batch/mariadb`: 서로 다른 SQL
   driver와 dialect
-- `@nest-batch/bullmq`: BullMQ peer dependency와 queue adapter
-- `@nest-batch/cli`: executable entrypoint와 운영 command
+- `@rv-nest-batch/bullmq`: BullMQ peer dependency와 queue adapter
+- `@rv-nest-batch/cli`: executable entrypoint와 운영 command
 
-기존 `@nest-batch/queue-bullmq`는 공개 전에 `@nest-batch/bullmq`로 이름을 단순화한다.
+기존 `@nest-batch/queue-bullmq`는 공개 전에 `@rv-nest-batch/bullmq`로 이름을 단순화한다.
 기존 6개 core 성격 package는 source와 test를 `core`로 이동한 뒤 workspace package를
 제거한다. `nest`, storage adapter, `inmemory`, `bullmq`, `cli`의 내부 dependency는
-가능한 한 `@nest-batch/core` 하나로 수렴한다. README, example, test, TypeScript path와
+가능한 한 `@rv-nest-batch/core` 하나로 수렴한다. README, example, test, TypeScript path와
 project reference도 새 import 경로를 사용한다.
 
 ### Changesets 고정 버전

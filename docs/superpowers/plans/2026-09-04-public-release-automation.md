@@ -79,20 +79,20 @@ import { validateManifest } from "./verify-release.mjs";
 describe("release metadata validation / release metadata 검증", () => {
   it("defines exactly eight public packages / 공개 package를 정확히 8개 정의한다", () => {
     expect(PUBLIC_PACKAGES.map(({ name }) => name)).toEqual([
-      "@nest-batch/core",
-      "@nest-batch/nest",
-      "@nest-batch/inmemory",
-      "@nest-batch/postgres",
-      "@nest-batch/mysql",
-      "@nest-batch/mariadb",
-      "@nest-batch/bullmq",
-      "@nest-batch/cli"
+      "@rv-nest-batch/core",
+      "@rv-nest-batch/nest",
+      "@rv-nest-batch/inmemory",
+      "@rv-nest-batch/postgres",
+      "@rv-nest-batch/mysql",
+      "@rv-nest-batch/mariadb",
+      "@rv-nest-batch/bullmq",
+      "@rv-nest-batch/cli"
     ]);
     expect(CORE_SUBPATHS).toEqual(["queue", "scheduler", "polling", "worker"]);
   });
 
   it("rejects missing public access / public access 누락을 거부한다", () => {
-    expect(() => validateManifest({ name: "@nest-batch/core", version: "0.1.0" }, "packages/core"))
+    expect(() => validateManifest({ name: "@rv-nest-batch/core", version: "0.1.0" }, "packages/core"))
       .toThrow(/publishConfig\.access/);
   });
 });
@@ -112,14 +112,14 @@ Expected: FAIL resolving `package-catalog.mjs`.
 
 ```js
 export const PUBLIC_PACKAGES = [
-  { name: "@nest-batch/core", directory: "packages/core" },
-  { name: "@nest-batch/nest", directory: "packages/nest" },
-  { name: "@nest-batch/inmemory", directory: "packages/inmemory" },
-  { name: "@nest-batch/postgres", directory: "packages/postgres" },
-  { name: "@nest-batch/mysql", directory: "packages/mysql" },
-  { name: "@nest-batch/mariadb", directory: "packages/mariadb" },
-  { name: "@nest-batch/bullmq", directory: "packages/bullmq" },
-  { name: "@nest-batch/cli", directory: "packages/cli" }
+  { name: "@rv-nest-batch/core", directory: "packages/core" },
+  { name: "@rv-nest-batch/nest", directory: "packages/nest" },
+  { name: "@rv-nest-batch/inmemory", directory: "packages/inmemory" },
+  { name: "@rv-nest-batch/postgres", directory: "packages/postgres" },
+  { name: "@rv-nest-batch/mysql", directory: "packages/mysql" },
+  { name: "@rv-nest-batch/mariadb", directory: "packages/mariadb" },
+  { name: "@rv-nest-batch/bullmq", directory: "packages/bullmq" },
+  { name: "@rv-nest-batch/cli", directory: "packages/cli" }
 ];
 
 export const CORE_SUBPATHS = ["queue", "scheduler", "polling", "worker"];
@@ -299,7 +299,7 @@ option 이름만 사용한다. 모든 README 하단에는 MIT license와 issue U
 ```text
 Requirements: Node.js >=20.18.0, ESM
 Initial release line: 0.x APIs can change before 1.0.0
-Install: pnpm add @nest-batch/core
+Install: pnpm add @rv-nest-batch/core
 ```
 
 8개 공개 package와 네 core subpath를 구분해 나열하고 maintainer release 문서는 Task 7에서
@@ -345,14 +345,14 @@ import { validatePackedFiles } from "./pack-packages.mjs";
 describe("package tarball validation / package tarball 검증", () => {
   it("rejects build metadata / build metadata 포함을 거부한다", () => {
     expect(() => validatePackedFiles({
-      name: "@nest-batch/core",
+      name: "@rv-nest-batch/core",
       files: ["dist/index.js", "dist/.tsbuildinfo", "README.md", "LICENSE", "package.json"]
     })).toThrow(/tsbuildinfo/);
   });
 
   it("accepts release files / 배포 대상 파일만 허용한다", () => {
     expect(() => validatePackedFiles({
-      name: "@nest-batch/core",
+      name: "@rv-nest-batch/core",
       files: ["dist/index.js", "dist/index.d.ts", "src/index.ts", "README.md", "LICENSE", "package.json"]
     })).not.toThrow();
   });
@@ -399,18 +399,18 @@ dependency로 `npm install --ignore-scripts --no-audit --no-fund`하고 다음 �
 `consumer.ts` 핵심 import:
 
 ```ts
-import { DefaultBatchRunner, defineJob } from "@nest-batch/core";
-import { WorkerLoop } from "@nest-batch/core/queue";
-import { SchedulerLoop } from "@nest-batch/core/scheduler";
-import { ContinuousPollingLoop } from "@nest-batch/core/polling";
-import { LocalWorkerPool, WorkerThreadPool } from "@nest-batch/core/worker";
-import { NestBatchModule } from "@nest-batch/nest";
-import { InMemoryBatchStorage } from "@nest-batch/inmemory";
-import { PostgresBatchStorage } from "@nest-batch/postgres";
-import { MySqlBatchStorage } from "@nest-batch/mysql";
-import { MariaDbBatchStorage } from "@nest-batch/mariadb";
-import { BullMqWorkQueue } from "@nest-batch/bullmq";
-import { runCli } from "@nest-batch/cli";
+import { DefaultBatchRunner, defineJob } from "@rv-nest-batch/core";
+import { WorkerLoop } from "@rv-nest-batch/core/queue";
+import { SchedulerLoop } from "@rv-nest-batch/core/scheduler";
+import { ContinuousPollingLoop } from "@rv-nest-batch/core/polling";
+import { LocalWorkerPool, WorkerThreadPool } from "@rv-nest-batch/core/worker";
+import { NestBatchModule } from "@rv-nest-batch/nest";
+import { InMemoryBatchStorage } from "@rv-nest-batch/inmemory";
+import { PostgresBatchStorage } from "@rv-nest-batch/postgres";
+import { MySqlBatchStorage } from "@rv-nest-batch/mysql";
+import { MariaDbBatchStorage } from "@rv-nest-batch/mariadb";
+import { BullMqWorkQueue } from "@rv-nest-batch/bullmq";
+import { runCli } from "@rv-nest-batch/cli";
 
 void [DefaultBatchRunner, defineJob, WorkerLoop, SchedulerLoop, ContinuousPollingLoop,
   LocalWorkerPool, WorkerThreadPool, NestBatchModule, InMemoryBatchStorage,
@@ -542,14 +542,14 @@ version만 같은 값으로 갱신한다. JSON은 기존 2-space formatting과 t
   "changelog": "@changesets/cli/changelog",
   "commit": false,
   "fixed": [[
-    "@nest-batch/core",
-    "@nest-batch/nest",
-    "@nest-batch/inmemory",
-    "@nest-batch/postgres",
-    "@nest-batch/mysql",
-    "@nest-batch/mariadb",
-    "@nest-batch/bullmq",
-    "@nest-batch/cli"
+    "@rv-nest-batch/core",
+    "@rv-nest-batch/nest",
+    "@rv-nest-batch/inmemory",
+    "@rv-nest-batch/postgres",
+    "@rv-nest-batch/mysql",
+    "@rv-nest-batch/mariadb",
+    "@rv-nest-batch/bullmq",
+    "@rv-nest-batch/cli"
   ]],
   "linked": [],
   "access": "public",
@@ -576,7 +576,7 @@ version만 같은 값으로 갱신한다. JSON은 기존 2-space formatting과 t
 각 package CHANGELOG는 다음 형식을 사용하고 package 역할에 맞는 첫 bullet을 쓴다.
 
 ```markdown
-# @nest-batch/core
+# @rv-nest-batch/core
 
 ## 0.1.0
 
@@ -592,7 +592,7 @@ worktree 원본을 바꾸지 않도록 `mktemp -d`에 repository를 복사하고
 
 ```markdown
 ---
-"@nest-batch/core": minor
+"@rv-nest-batch/core": minor
 ---
 
 고정 버전 계산 검증
@@ -659,12 +659,12 @@ remote integrity가 없으면 publish, local과 같으면 skip, 다르면 error�
 기본 adapter가 실행할 명령:
 
 ```text
-npm view <name>@<version> dist.integrity --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
-npm publish <tarball> --access public --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/
+npm view <name>@<version> dist.integrity --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
+npm publish <tarball> --access public --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/
 ```
 
 `npm view`의 404만 unpublished로 처리하고 network/auth 오류는 실패시킨다.
-generic registry와 `@nest-batch` scope registry를 모두 CLI에서 고정하여 ambient
+generic registry와 `@rv-nest-batch` scope registry를 모두 CLI에서 고정하여 ambient
 `.npmrc`의 hostile scope mapping이 lookup/publish destination을 바꾸지 못하게 한다.
 `dist.integrity --json` parser는 npm 11의 JSON scalar와 npm 12의 정확한 단일 원소 배열을
 정규화한다. 빈 배열, 복수 원소, non-string, malformed SHA-512 integrity는 모두 실패시킨다.
@@ -970,7 +970,7 @@ git commit -m "chore : package release workflow 추가" -m "- Node 호환성과 
 - [ ] `pnpm test:e2e` 성공
 
 ## 2. 최초 0.1.0 bootstrap
-- [ ] npm에서 `@nest-batch` scope 권한 확인
+- [ ] npm에서 `@rv-nest-batch` scope 권한 확인
 - [ ] `npm whoami`와 2FA 상태 확인
 - [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행
 - [ ] 8개 package의 `0.1.0`과 integrity 확인
@@ -1042,7 +1042,7 @@ Task 7에서 의도한 문서와 validator 변경만 나타난다.
 
 - [ ] **Step 5: npm registry read-only availability audit**
 
-각 catalog name에 `npm view <name> version --json --registry https://registry.npmjs.org/ --@nest-batch:registry=https://registry.npmjs.org/`을 실행한다. 404는 최초 bootstrap
+각 catalog name에 `npm view <name> version --json --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/`을 실행한다. 404는 최초 bootstrap
 대상으로 checklist에 기록하고, 이미 존재하면 owner/version을 확인하되 publish나 access
 변경은 하지 않는다.
 

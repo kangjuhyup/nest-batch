@@ -1,4 +1,4 @@
-# @nest-batch/postgres
+# @rv-nest-batch/postgres
 
 Postgres-backed repository, checkpoint, execution-context, and lock storage
 for `nest-batch`.
@@ -6,13 +6,13 @@ for `nest-batch`.
 ## Install
 
 ```bash
-pnpm add @nest-batch/postgres
+pnpm add @rv-nest-batch/postgres
 ```
 
 ## Initialize storage
 
 ```ts
-import { PostgresBatchStorage } from "@nest-batch/postgres";
+import { PostgresBatchStorage } from "@rv-nest-batch/postgres";
 
 const storage = new PostgresBatchStorage({
   connectionString: process.env.DATABASE_URL,

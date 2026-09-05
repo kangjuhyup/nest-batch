@@ -1,4 +1,4 @@
-# @nest-batch/inmemory
+# @rv-nest-batch/inmemory
 
 ## 0.1.0
 
