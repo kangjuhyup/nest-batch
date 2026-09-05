@@ -123,7 +123,7 @@ ${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name} name version maintainers r
   - \`E404\`는 scope publish 권한을 확인한 뒤에만 bootstrap 후보입니다.
 - [ ] npm 계정과 2FA 상태 확인
   - \`npm whoami --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\`와 \`npm profile get --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}\`
-- [ ] \`pnpm run release:publish --tag v0.1.0\`을 maintainer가 직접 실행
+- [ ] \`pnpm release:start --tag v0.1.0 --bootstrap\` 자동화 명령 실행
 - 로컬에서 publish한 \`0.1.0\`은 provenance 예외입니다.
 - [ ] 8개 package의 \`0.1.0\`과 integrity 확인
 
@@ -151,7 +151,7 @@ ${PUBLIC_PACKAGES.map(({ name }) => `npm view ${name}@0.1.0 version dist.integri
 
 ## 4. Tag release
 
-- [ ] \`git tag -s vX.Y.Z <release-commit>\`
+- [ ] \`pnpm release:start --tag vX.Y.Z\` 실행
 - [ ] \`git push origin vX.Y.Z\`
 - [ ] publish workflow 성공 확인
 - [ ] npm provenance와 GitHub generated release notes 확인
@@ -754,7 +754,7 @@ describe("release metadata validation / release metadata 검증", () => {
     const identityAuditBlock = PUBLIC_PACKAGES
       .map(({ name }) => `npm view ${name} name version maintainers repository dist-tags --json --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT}`)
       .join("\n");
-    const bootstrap = "- [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행";
+    const bootstrap = "- [ ] `pnpm release:start --tag v0.1.0 --bootstrap` 자동화 명령 실행";
     const guide = readFileSync(releasingGuide, "utf8")
       .replace(`${identityAuditBlock}\n`, "")
       .replace(`${bootstrap}\n`, `${bootstrap}\n${identityAuditBlock}\n`);
@@ -765,12 +765,12 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it.each([
     ["Trusted Publisher setup", "Trusted Publisher 설정", "- [ ] owner `kangjuhyup`, repository `nest-batch`, workflow `publish.yml`, environment `npm` 등록"],
-    ["release tag creation", "release tag 생성", "- [ ] `git tag -s vX.Y.Z <release-commit>`"],
+    ["release tag creation", "release tag 생성", "- [ ] `pnpm release:start --tag vX.Y.Z` 실행"],
     ["OIDC provenance confirmation", "OIDC provenance 확인", "처음으로 OIDC publish되는 후속 version부터 provenance를 필수로 확인합니다."]
   ])("rejects bootstrap publish moved after %s / %s 뒤로 이동한 bootstrap publish를 거부한다", async (_english, _korean, laterStep) => {
     const root = createRepository();
     const releasingGuide = join(root, "docs", "releasing.md");
-    const bootstrap = "- [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행";
+    const bootstrap = "- [ ] `pnpm release:start --tag v0.1.0 --bootstrap` 자동화 명령 실행";
     const guide = readFileSync(releasingGuide, "utf8")
       .replace(`${bootstrap}\n`, "")
       .replace(laterStep, `${laterStep}\n${bootstrap}`);
@@ -779,11 +779,11 @@ describe("release metadata validation / release metadata 검증", () => {
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/bootstrap publish.*before/u);
   });
 
-  it("rejects local E2E moved after signed tag creation / signed tag 생성 뒤로 이동한 local E2E를 거부한다", async () => {
+  it("rejects local E2E moved after automated tag creation / 자동 tag 생성 뒤로 이동한 local E2E를 거부한다", async () => {
     const root = createRepository();
     const releasingGuide = join(root, "docs", "releasing.md");
     const localE2e = "- [ ] `pnpm test:e2e` 성공";
-    const tagCreation = "- [ ] `git tag -s vX.Y.Z <release-commit>`";
+    const tagCreation = "- [ ] `pnpm release:start --tag vX.Y.Z` 실행";
     const guide = readFileSync(releasingGuide, "utf8")
       .replace(`${localE2e}\n`, "")
       .replace(`${tagCreation}\n`, `${tagCreation}\n${localE2e}\n`);
@@ -792,11 +792,11 @@ describe("release metadata validation / release metadata 검증", () => {
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/release guide flow|approved order/u);
   });
 
-  it("rejects release check and E2E moved after signed tag creation / signed tag 생성 뒤로 함께 이동한 release check와 E2E를 거부한다", async () => {
+  it("rejects release check and E2E moved after automated tag creation / 자동 tag 생성 뒤로 함께 이동한 release check와 E2E를 거부한다", async () => {
     const root = createRepository();
     const releasingGuide = join(root, "docs", "releasing.md");
     const localChecks = "- [ ] `pnpm release:check` 성공\n- [ ] `pnpm test:e2e` 성공";
-    const tagCreation = "- [ ] `git tag -s vX.Y.Z <release-commit>`";
+    const tagCreation = "- [ ] `pnpm release:start --tag vX.Y.Z` 실행";
     const guide = readFileSync(releasingGuide, "utf8")
       .replace(`${localChecks}\n`, "")
       .replace(`${tagCreation}\n`, `${tagCreation}\n${localChecks}\n`);
@@ -823,7 +823,7 @@ describe("release metadata validation / release metadata 검증", () => {
   it("rejects Trusted Publisher setup moved before its section / 해당 section 앞쪽으로 이동한 Trusted Publisher 설정을 거부한다", async () => {
     const root = createRepository();
     const releasingGuide = join(root, "docs", "releasing.md");
-    const bootstrap = "- [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행";
+    const bootstrap = "- [ ] `pnpm release:start --tag v0.1.0 --bootstrap` 자동화 명령 실행";
     const trustedPublisher = "- [ ] owner `kangjuhyup`, repository `nest-batch`, workflow `publish.yml`, environment `npm` 등록";
     const guide = readFileSync(releasingGuide, "utf8")
       .replace(`${trustedPublisher}\n`, "")
@@ -833,11 +833,11 @@ describe("release metadata validation / release metadata 검증", () => {
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/release guide flow|approved order/u);
   });
 
-  it("rejects signed tag creation moved before the tag section / tag section 앞쪽으로 이동한 signed tag 생성을 거부한다", async () => {
+  it("rejects automated tag creation moved before the tag section / tag section 앞쪽으로 이동한 자동 tag 생성을 거부한다", async () => {
     const root = createRepository();
     const releasingGuide = join(root, "docs", "releasing.md");
     const trustedPublisher = "- [ ] owner `kangjuhyup`, repository `nest-batch`, workflow `publish.yml`, environment `npm` 등록";
-    const tagCreation = "- [ ] `git tag -s vX.Y.Z <release-commit>`";
+    const tagCreation = "- [ ] `pnpm release:start --tag vX.Y.Z` 실행";
     const guide = readFileSync(releasingGuide, "utf8")
       .replace(`${tagCreation}\n`, "")
       .replace(`${trustedPublisher}\n`, `${trustedPublisher}\n${tagCreation}\n`);
@@ -852,12 +852,12 @@ describe("release metadata validation / release metadata 검증", () => {
     writeFileSync(
       releasingGuide,
       readFileSync(releasingGuide, "utf8").replace(
-        "pnpm run release:publish --tag v0.1.0",
-        "pnpm run release:publish -- --tag v0.1.0"
+        "pnpm release:start --tag v0.1.0 --bootstrap",
+        "pnpm release:start -- --tag v0.1.0 --bootstrap"
       )
     );
 
-    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*pnpm run release:publish --tag v0\.1\.0/);
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*pnpm release:start --tag v0\.1\.0 --bootstrap/);
   });
 
   it("rejects a release checklist without every catalog identity audit / 모든 catalog identity audit가 없는 릴리즈 checklist를 거부한다", async () => {

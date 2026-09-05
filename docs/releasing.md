@@ -68,9 +68,10 @@ npm view @rvkang/batch-cli name version maintainers repository dist-tags --json 
   - 8개 package의 `E404`는 이름의 public 조회 결과일 뿐 scope ownership이나 publish 권한의 증거가 아닙니다. 두 권한을 직접 확인한 뒤에만 bootstrap 후보로 판단합니다.
 - [ ] npm 계정과 2FA 상태 확인
   - `npm whoami --registry https://registry.npmjs.org/ --@rvkang:registry=https://registry.npmjs.org/`가 의도한 maintainer를 출력하고, `npm profile get --registry https://registry.npmjs.org/ --@rvkang:registry=https://registry.npmjs.org/`의 2FA 값이 publish를 보호하는 설정인지 확인합니다.
-- [ ] `pnpm run release:publish --tag v0.1.0`을 maintainer가 직접 실행
-  - **Manual gate — 실제 npm publish:** 이 명령은 인증된 maintainer가 모든 이전 checkbox를 확인한 뒤 직접 실행합니다. 이 문서 작성·검증 작업에서는 실행하지 않습니다.
-  - 실행 명령: `pnpm run release:publish --tag v0.1.0`
+- [ ] `pnpm release:start --tag v0.1.0 --bootstrap` 자동화 명령 실행
+  - **Manual gate — 실제 npm publish와 tag push:** 인증된 maintainer가 모든 이전 checkbox를 확인한 뒤 이 명령을 직접 시작합니다. 자동화 준비·검증 작업에서는 실행하지 않습니다.
+  - 명령은 `pnpm release:check`, clean worktree와 `origin/develop` 포함 여부 확인, `v0.1.0` 서명 tag 생성, `pnpm run release:publish --tag v0.1.0`, tag push 순서로 실행합니다.
+  - publish가 완전히 확인되기 전에는 tag를 origin에 push하지 않습니다. 중간 실패 시 서명된 local tag는 복구를 위해 남으며, 같은 명령을 다시 실행하면 동일 package integrity와 tag commit을 검증한 뒤 이어서 처리합니다.
   - publish child process는 maintainer terminal의 표준 입출력을 상속하므로 npm의 OTP/WebAuthn prompt에 직접 응답할 수 있습니다.
   - 로컬에서 publish한 `0.1.0`은 provenance 예외입니다. 동일 artifact를 tag workflow가 건너뛰어도 기존 version에 provenance가 사후 추가되지는 않습니다.
 - [ ] 8개 package의 `0.1.0`과 integrity 확인
@@ -102,10 +103,11 @@ npm view @rvkang/batch-cli@0.1.0 version dist.integrity --json --registry https:
 
 ## 4. Tag release
 
-- [ ] `git tag -s vX.Y.Z <release-commit>`
-  - **Manual gate — 서명 tag 생성:** maintainer가 확인한 release commit에만 실행합니다. 이 문서 작성·검증 작업에서는 tag를 만들지 않습니다.
-- [ ] `git push origin vX.Y.Z`
-  - **Manual gate — 서명 tag push:** 위에서 서명한 tag만 push합니다. 이 문서 작성·검증 작업에서는 push하지 않습니다.
+- [ ] `pnpm release:start --tag vX.Y.Z` 실행
+  - **Manual gate — 후속 release 시작:** maintainer가 검토한 Version PR merge commit에서만 실행합니다. 자동화 준비·검증 작업에서는 실행하지 않습니다.
+  - 명령은 `pnpm release:check`, clean worktree와 `origin/develop` 포함 여부 확인, version과 tag 일치 확인, 서명 tag 생성·검증, origin push를 수행합니다.
+  - 이미 같은 commit의 서명 tag가 있으면 검증 후 재사용합니다. local 또는 remote tag가 다른 commit을 가리키거나 서명을 검증할 수 없으면 중단합니다.
+  - tag push가 `publish.yml`을 시작하며, 후속 package publish는 npm Trusted Publishing(OIDC)으로 처리합니다.
 - [ ] publish workflow 성공 확인
   - GitHub **Actions → Publish packages**에서 `publish.yml`이 `vX.Y.Z` tag로 실행되었고 `publish` job과 `github-release` job이 모두 성공했는지 확인합니다.
 - [ ] npm provenance와 GitHub generated release notes 확인
@@ -119,6 +121,9 @@ npm view @rvkang/batch-cli@0.1.0 version dist.integrity --json --registry https:
 
 ## 5. 실패 복구
 
+- [ ] `release:start`를 같은 tag로 재실행해 중단 지점부터 복구
+  - 최초 bootstrap의 부분 publish는 `pnpm release:start --tag v0.1.0 --bootstrap`을 다시 실행합니다. 동일 integrity package와 이미 존재하는 동일 commit tag는 안전하게 건너뜁니다.
+  - 후속 release의 tag push 실패는 `pnpm release:start --tag vX.Y.Z`를 다시 실행합니다.
 - [ ] 같은 tag workflow 재실행으로 동일 integrity package를 skip
   - GitHub **Actions → Publish packages → Re-run failed jobs**에서 같은 `vX.Y.Z` tag workflow를 재실행합니다. `release:publish`는 registry의 같은 version과 integrity가 일치하는 package를 skip하고 남은 package만 처리합니다.
 - [ ] integrity가 다르면 즉시 중단하고 원인 조사

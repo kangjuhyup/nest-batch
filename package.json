@@ -38,6 +38,7 @@
     "release:verify": "node scripts/release/verify-release.mjs",
     "release:smoke": "node scripts/release/smoke-packages.mjs",
     "release:check": "node scripts/release/release-check.mjs",
+    "release:start": "node scripts/release/start-release.mjs",
     "release:publish": "node scripts/release/publish-packages.mjs"
   },
   "devDependencies": {

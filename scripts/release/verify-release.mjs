@@ -13,8 +13,8 @@ const EXPECTED_FILES = ["dist", "src", "README.md", "LICENSE"];
 const RELEASING_GUIDE_PATH = "docs/releasing.md";
 const PUBLISH_WORKFLOW_FILENAME = "publish.yml";
 const PUBLISH_ENVIRONMENT = "npm";
-const BOOTSTRAP_PUBLISH_COMMAND = "pnpm run release:publish --tag v0.1.0";
-const BOOTSTRAP_PUBLISH_CHECKLIST_ITEM = `- [ ] \`${BOOTSTRAP_PUBLISH_COMMAND}\`을 maintainer가 직접 실행`;
+const BOOTSTRAP_PUBLISH_COMMAND = "pnpm release:start --tag v0.1.0 --bootstrap";
+const BOOTSTRAP_PUBLISH_CHECKLIST_ITEM = `- [ ] \`${BOOTSTRAP_PUBLISH_COMMAND}\` 자동화 명령 실행`;
 const BOOTSTRAP_VERSION = "0.1.0";
 const IDENTITY_AUDIT_ARGUMENTS = "name version maintainers repository dist-tags --json";
 const INTEGRITY_CONFIRMATION_ARGUMENTS = "version dist.integrity --json";
@@ -45,7 +45,7 @@ const LOCAL_CANDIDATE_CHECKLIST_ITEMS = [
   "- [ ] `pnpm test:e2e` 성공"
 ];
 const TRUSTED_PUBLISHER_CHECKLIST_ITEM = `- [ ] owner \`kangjuhyup\`, repository \`nest-batch\`, workflow \`${PUBLISH_WORKFLOW_FILENAME}\`, environment \`${PUBLISH_ENVIRONMENT}\` 등록`;
-const TAG_CREATION_CHECKLIST_ITEM = "- [ ] `git tag -s vX.Y.Z <release-commit>`";
+const TAG_CREATION_CHECKLIST_ITEM = "- [ ] `pnpm release:start --tag vX.Y.Z` 실행";
 const GITHUB_RELEASE_RERUN_RULE = "기존 GitHub Release가 있으면 검증 후 건너뛰고, 없을 때만 생성합니다.";
 const GITHUB_RELEASE_EXISTING_RULE = "기존 release는 tag 이름이 정확하고 draft/prerelease가 아니어야 합니다.";
 const GITHUB_RELEASE_CHECKOUT_RULE = "workflow checkout의 tag와 `HEAD`가 모두 `GITHUB_SHA`로 resolve되어야 하며, `target_commitish`가 40자리 commit SHA이면 그 값도 일치해야 합니다.";
@@ -552,7 +552,7 @@ const validateReleasingGuide = (root) => {
     { name: "Trusted Publisher section", marker: RELEASE_CHECKLIST_SECTIONS.trustedPublisher },
     { name: "Trusted Publisher setup", marker: TRUSTED_PUBLISHER_CHECKLIST_ITEM },
     { name: "tag release section", marker: RELEASE_CHECKLIST_SECTIONS.tagRelease },
-    { name: "signed tag creation", marker: TAG_CREATION_CHECKLIST_ITEM },
+    { name: "automated signed tag creation", marker: TAG_CREATION_CHECKLIST_ITEM },
     { name: "OIDC provenance confirmation", marker: LATER_PROVENANCE_REQUIREMENT },
     { name: "recovery section", marker: RELEASE_CHECKLIST_SECTIONS.recovery }
   ];
