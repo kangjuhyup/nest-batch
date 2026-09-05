@@ -968,6 +968,64 @@ describe("release metadata validation / release metadata 검증", () => {
     await expect(release.verifyReleaseRepository(root)).resolves.toBeUndefined();
   });
 
+  it("rejects inline npm hidden by an invalid backtick fence info string / 잘못된 backtick fence info string에 숨은 inline npm을 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      `${readFileSync(releasingGuide, "utf8")}\n\`\`\`bash \`npm whoami\`\n`
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/registry-touching.*npm whoami|npm whoami.*registry/u);
+  });
+
+  it.each([
+    ["double-quoted redirect target", "double quote redirect 대상", `"x --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT} y"`],
+    ["single-quoted redirect target", "single quote redirect 대상", `'x --registry ${NPM_REGISTRY_URL} ${NPM_SCOPE_REGISTRY_ARGUMENT} y'`]
+  ])("rejects canonical registry text hidden in a %s / %s에 숨긴 canonical registry text를 거부한다", async (_english, _korean, redirectTarget) => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      `${readFileSync(releasingGuide, "utf8")}\n\`npm whoami > ${redirectTarget}\`\n`
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/registry-touching.*npm whoami|npm whoami.*registry/u);
+  });
+
+  it("rejects a double-quoted registry option with a preserved backslash / 보존되는 backslash가 있는 double quote registry option을 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      `${readFileSync(releasingGuide, "utf8")}\n\`npm whoami "--regis\\try=${NPM_REGISTRY_URL}" ${NPM_SCOPE_REGISTRY_ARGUMENT}\`\n`
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/registry-touching.*npm whoami|npm whoami.*registry/u);
+  });
+
+  it("rejects inline npm between tab-indented pseudo fences / tab 들여쓰기 pseudo fence 사이 inline npm을 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      `${readFileSync(releasingGuide, "utf8")}\n\t\`\`\`bash\n\`npm whoami\`\n\t\`\`\`\n`
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/registry-touching.*npm whoami|npm whoami.*registry/u);
+  });
+
+  it("rejects inline npm in an indented paragraph continuation / 들여쓴 문단 연속 줄의 inline npm을 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(
+      releasingGuide,
+      `${readFileSync(releasingGuide, "utf8")}\nParagraph continuation\n    \`npm whoami\`\n`
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/registry-touching.*npm whoami|npm whoami.*registry/u);
+  });
+
   it("rejects a release checklist without an explicit profile registry / 명시적인 profile registry가 없는 릴리즈 checklist를 거부한다", async () => {
     const root = createRepository();
     const releasingGuide = join(root, "docs", "releasing.md");

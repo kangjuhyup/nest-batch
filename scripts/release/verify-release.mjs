@@ -152,7 +152,8 @@ const hasMarkdownLinkTarget = (readme, target) => {
 };
 
 const SHELL_FENCE_LANGUAGES = new Set(["", "bash", "console", "sh", "shell", "zsh"]);
-const SHELL_FENCE_OPENING_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})[ \t]*([A-Za-z0-9_-]*)[^\r\n]*$/u;
+const BACKTICK_FENCE_OPENING_PATTERN = /^ {0,3}(`{3,})[ \t]*([A-Za-z0-9_-]*)[^`\r\n]*$/u;
+const TILDE_FENCE_OPENING_PATTERN = /^ {0,3}(~{3,})[ \t]*([A-Za-z0-9_-]*)[^\r\n]*$/u;
 const REGISTRY_NPM_COMMAND_PATTERN = /^npm\s+(?:whoami(?:\s|$)|profile\s+get(?:\s|$)|view(?:\s|$))/u;
 
 const extractMarkdownCode = (markdown) => {
@@ -161,14 +162,15 @@ const extractMarkdownCode = (markdown) => {
   const shellFenceBodies = [];
 
   for (let openingIndex = 0; openingIndex < lines.length; openingIndex += 1) {
-    const opening = SHELL_FENCE_OPENING_PATTERN.exec(lines[openingIndex]);
+    const opening = BACKTICK_FENCE_OPENING_PATTERN.exec(lines[openingIndex])
+      ?? TILDE_FENCE_OPENING_PATTERN.exec(lines[openingIndex]);
     if (!opening) {
       continue;
     }
 
     const marker = opening[1];
     const closingPattern = new RegExp(
-      `^[ \\t]{0,3}${escapeRegularExpression(marker[0])}{${marker.length},}[ \\t]*$`,
+      `^ {0,3}${escapeRegularExpression(marker[0])}{${marker.length},}[ \\t]*$`,
       "u"
     );
     let closingIndex = openingIndex + 1;
@@ -185,6 +187,20 @@ const extractMarkdownCode = (markdown) => {
       outsideFences[index] = "";
     }
     openingIndex = closingIndex;
+  }
+
+  let paragraphOpen = false;
+  for (let lineIndex = 0; lineIndex < outsideFences.length; lineIndex += 1) {
+    const line = outsideFences[lineIndex];
+    if (line.trim().length === 0) {
+      paragraphOpen = false;
+    } else if (/^(?: {4}| {0,3}\t)/u.test(line)) {
+      if (!paragraphOpen) {
+        outsideFences[lineIndex] = "";
+      }
+    } else {
+      paragraphOpen = true;
+    }
   }
 
   const inlineCodeSpans = [];
@@ -327,6 +343,94 @@ const extractShellCommandSegments = (source) => {
   return segments;
 };
 
+const extractShellArgumentValues = (command) => {
+  const tokens = [];
+  let current = "";
+  let quote;
+  let tokenStarted = false;
+
+  const pushWord = () => {
+    if (tokenStarted) {
+      tokens.push({ type: "word", value: current });
+    }
+    current = "";
+    tokenStarted = false;
+  };
+
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+
+    if (quote) {
+      tokenStarted = true;
+      if (character === quote) {
+        quote = undefined;
+      } else if (quote === '"' && character === "\\" && index + 1 < command.length) {
+        const escapedCharacter = command[index + 1];
+        if (escapedCharacter === "\r" && command[index + 2] === "\n") {
+          index += 2;
+        } else if (escapedCharacter === "\n") {
+          index += 1;
+        } else if (["$", "`", '"', "\\"].includes(escapedCharacter)) {
+          current += escapedCharacter;
+          index += 1;
+        } else {
+          current += character;
+        }
+      } else {
+        current += character;
+      }
+      continue;
+    }
+
+    if (character === "'" || character === '"') {
+      quote = character;
+      tokenStarted = true;
+      continue;
+    }
+
+    if (character === "\\" && index + 1 < command.length) {
+      tokenStarted = true;
+      current += command[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (/\s/u.test(character)) {
+      pushWord();
+      continue;
+    }
+
+    if (character === "<" || character === ">") {
+      pushWord();
+      const redirectMarker = character;
+      while (command[index + 1] === redirectMarker) {
+        index += 1;
+      }
+      tokens.push({ type: "redirect" });
+      continue;
+    }
+
+    tokenStarted = true;
+    current += character;
+  }
+
+  pushWord();
+
+  const arguments_ = [];
+  let expectsRedirectTarget = false;
+  for (const token of tokens) {
+    if (token.type === "redirect") {
+      expectsRedirectTarget = true;
+    } else if (expectsRedirectTarget) {
+      expectsRedirectTarget = false;
+    } else {
+      arguments_.push(token.value);
+    }
+  }
+
+  return arguments_;
+};
+
 const extractRegistryNpmCommands = (markdown) => {
   const { inlineCodeSpans, shellFenceBodies } = extractMarkdownCode(markdown);
   const commands = [...shellFenceBodies, ...inlineCodeSpans]
@@ -336,16 +440,13 @@ const extractRegistryNpmCommands = (markdown) => {
 };
 
 const hasCanonicalRegistryArguments = (command) => {
-  const publicRegistryArgument = new RegExp(
-    `(?:^|\\s)--registry(?:=|\\s+)${escapeRegularExpression(NPM_REGISTRY_URL)}(?=\\s|$)`,
-    "u"
-  );
-  const scopeRegistryArgument = new RegExp(
-    `(?:^|\\s)${escapeRegularExpression(NPM_SCOPE_REGISTRY_ARGUMENT)}(?=\\s|$)`,
-    "u"
-  );
+  const arguments_ = extractShellArgumentValues(command);
+  const hasPublicRegistry = arguments_.some((argument, index) =>
+    argument === `--registry=${NPM_REGISTRY_URL}`
+    || (argument === "--registry" && arguments_[index + 1] === NPM_REGISTRY_URL));
+  const hasScopeRegistry = arguments_.includes(NPM_SCOPE_REGISTRY_ARGUMENT);
 
-  return publicRegistryArgument.test(command) && scopeRegistryArgument.test(command);
+  return hasPublicRegistry && hasScopeRegistry;
 };
 
 const validateReleasingGuide = (root) => {
