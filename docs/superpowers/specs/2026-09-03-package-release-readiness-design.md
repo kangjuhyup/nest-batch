@@ -102,7 +102,19 @@ root package는 private이므로 Changesets의 release 대상이 아니다. Vers
 실행하는 repository script가 Changesets 계산 후 root version을 공개 package의 고정
 version과 동기화한다. tag/version 검사는 이 root version도 확인한다.
 
-Version PR은 repository `github.token`으로 생성·갱신하므로 장기 credential은 추가하지
+최초 `0.1.0`에는 pending Changeset이나 기존 Version PR이 없고, 새 minor Changeset을
+만들면 fixed group이 `0.2.0`으로 올라간다. 따라서 검토가 끝난 package-release-readiness
+merge commit을 최초 `0.1.0` release candidate로 삼는다. 이 예외는 한 번만 적용하며 새
+Changeset이나 Version PR을 만들지 않는다. exact version/changelog, local release gate,
+signed tag와 manual review는 그대로 적용한다.
+
+최초 `0.1.0` 이후 모든 release에는 Version PR이 필수다. 첫 post-bootstrap Version PR
+전에 maintainer는 GitHub repository의 **Settings → Actions → General → Workflow
+permissions**에서 **Allow GitHub Actions to create and approve pull requests**를 수동으로
+활성화해야 한다. 2026-09-05 read-only audit 결과는
+`can_approve_pull_request_reviews=false`였으며 PAT나 장기 credential로 우회하지 않는다.
+
+후속 Version PR은 repository `github.token`으로 생성·갱신하므로 장기 credential은 추가하지
 않는다. 대신 매 생성·갱신 때 write 권한 maintainer가 PR merge box의
 **Approve workflows to run**을 눌러 CI를 시작하고, **Quality (Node 20.18.3)**,
 **Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한 뒤에만 merge한다. Version PR
@@ -112,7 +124,7 @@ merge commit을 release candidate로 삼아 local release 검증을 마친 뒤�
 
 ### tag-gated publish
 
-Version PR이 병합되어 package version이 확정된 뒤 maintainer가 같은 version의
+최초 bootstrap 이후에는 Version PR이 병합되어 package version이 확정된 뒤 maintainer가 같은 version의
 `vX.Y.Z` tag를 push한다. `publish.yml`은 tag가 가리키는 commit을 checkout하고
 다음 순서로 실행한다.
 

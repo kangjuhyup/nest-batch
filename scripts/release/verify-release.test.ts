@@ -20,6 +20,13 @@ const BUGS_URL = "https://github.com/kangjuhyup/nest-batch/issues";
 const LICENSE_TEXT = "MIT License\n";
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const temporaryRoots: string[] = [];
+const BOOTSTRAP_CANDIDATE_CHECKLIST_ITEM = "- [ ] 최초 `0.1.0` release candidate로 검토된 package-release-readiness merge commit 지정";
+const BOOTSTRAP_CANDIDATE_RULE = "이 예외는 최초 `0.1.0`에 한 번만 적용하며, 새 Changeset이나 Version PR을 만들지 않습니다.";
+const LATER_VERSION_PR_RULE = "최초 `0.1.0` 이후 모든 release에는 Changesets Version PR이 필수입니다.";
+const ACTIONS_PR_SETTING_CHECKLIST_ITEM = "- [ ] 첫 post-bootstrap Version PR 전에 GitHub Actions의 pull request 생성 권한 수동 활성화";
+const ACTIONS_PR_SETTING_PATH = "Settings → Actions → General → Workflow permissions";
+const ACTIONS_PR_SETTING_NAME = "Allow GitHub Actions to create and approve pull requests";
+const ACTIONS_PR_SETTING_AUDIT = "`can_approve_pull_request_reviews=false`";
 
 const entrypointsFor = (packageInfo: (typeof PUBLIC_PACKAGES)[number]) => {
   const exports: Record<string, { types: string; import: string }> = {
@@ -43,14 +50,19 @@ const entrypointsFor = (packageInfo: (typeof PUBLIC_PACKAGES)[number]) => {
   };
 };
 
-const createPackageReadme = (packageInfo: (typeof PUBLIC_PACKAGES)[number]) => `# ${packageInfo.name}
+const createPackageReadme = (packageInfo: (typeof PUBLIC_PACKAGES)[number]) => {
+  const packageNames = packageInfo.name === `${PUBLIC_PACKAGE_SCOPE}/cli`
+    ? [`${PUBLIC_PACKAGE_SCOPE}/cli`, `${PUBLIC_PACKAGE_SCOPE}/core`, `${PUBLIC_PACKAGE_SCOPE}/inmemory`]
+    : [packageInfo.name];
+
+  return `# ${packageInfo.name}
 
 \`\`\`bash
-pnpm add ${packageInfo.name}
+pnpm add ${packageNames.join(" ")}
 \`\`\`
 
 \`\`\`ts
-import {} from "${packageInfo.name}";
+${packageNames.map((name) => `import {} from "${name}";`).join("\n")}
 \`\`\`
 
 [Repository](https://github.com/kangjuhyup/nest-batch)
@@ -59,6 +71,7 @@ import {} from "${packageInfo.name}";
 
 MIT. Report issues at https://github.com/kangjuhyup/nest-batch/issues.
 `;
+};
 
 const createReleasingGuide = () => `# Releasing nest-batch
 
@@ -73,10 +86,25 @@ pnpm install --frozen-lockfile
 
 ## 1. Release candidate 준비
 
+### 최초 0.1.0 release candidate
+
+${BOOTSTRAP_CANDIDATE_CHECKLIST_ITEM}
+  - 검토가 끝난 package-release-readiness merge commit을 최초 \`0.1.0\` release candidate로 사용합니다.
+  - ${BOOTSTRAP_CANDIDATE_RULE}
+
+### 후속 release candidate
+
+${ACTIONS_PR_SETTING_CHECKLIST_ITEM}
+  - GitHub repository의 **${ACTIONS_PR_SETTING_PATH}**에서 **${ACTIONS_PR_SETTING_NAME}**를 선택하고 저장합니다.
+  - 2026-09-05 read-only audit에서는 ${ACTIONS_PR_SETTING_AUDIT}였으므로, maintainer가 직접 활성화하기 전에는 첫 post-bootstrap Version PR을 생성하지 않습니다.
 - [ ] Changesets Version PR workflow 승인과 CI 성공 확인 후 merge
+  - ${LATER_VERSION_PR_RULE}
   - 각 Changesets Version PR이 생성되거나 갱신될 때마다 write 권한 maintainer가 PR merge box에서 **Approve workflows to run**을 클릭합니다.
   - **Quality (Node 20.18.3)**, **Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한 뒤에만 Version PR을 merge합니다.
   - Version PR merge commit을 release candidate로 정하고 아래 local 검증을 마친 뒤에만 release tag를 생성합니다.
+
+### 공통 local candidate 검증
+
 - [ ] worktree가 clean이고 release commit이 \`develop\`에 포함됨
 - [ ] 8개 package와 root version이 동일함
 - [ ] \`pnpm release:check\` 성공
@@ -469,6 +497,25 @@ describe("release metadata validation / release metadata 검증", () => {
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(previousCore);
   });
 
+  it("rejects NUL-obfuscated previous scope in a package README / package README의 NUL로 숨긴 이전 scope를 거부한다", async () => {
+    const root = createRepository();
+    const readmePath = join(root, "packages", "core", "README.md");
+    const previousCore = `${["@nest", "batch"].join("-")}/core`;
+    writeFileSync(
+      readmePath,
+      Buffer.concat([readFileSync(readmePath), Buffer.from([0]), Buffer.from(`Install ${previousCore}.\n`)])
+    );
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/README\.md.*NUL|README\.md.*previous package namespace/u);
+  });
+
+  it("allows NUL bytes in an explicit binary format / 명시적인 binary format의 NUL byte를 허용한다", async () => {
+    const root = createRepository();
+    writeFileSync(join(root, "logo.png"), Buffer.from([0, 1, 2, 3]));
+
+    await expect(release.verifyReleaseRepository(root)).resolves.toBeUndefined();
+  });
+
   it("rejects removed packages in the new scope / 새 scope의 제거된 package를 거부한다", async () => {
     const root = createRepository();
     const removedPackageName = `${PUBLIC_PACKAGE_SCOPE}/queue-core`;
@@ -593,6 +640,43 @@ describe("release metadata validation / release metadata 검증", () => {
     writeFileSync(releasingGuide, readFileSync(releasingGuide, "utf8").replace("environment `npm`", "environment `release`"));
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/docs\/releasing\.md.*environment.*npm/);
+  });
+
+  it.each([
+    ["reviewed bootstrap candidate", "검토된 bootstrap candidate", BOOTSTRAP_CANDIDATE_CHECKLIST_ITEM],
+    ["one-time bootstrap exception", "일회성 bootstrap 예외", BOOTSTRAP_CANDIDATE_RULE],
+    ["mandatory later Version PR", "후속 Version PR 필수 규칙", LATER_VERSION_PR_RULE]
+  ])("rejects a release checklist without the %s / %s이 없는 릴리즈 checklist를 거부한다", async (_english, _korean, requirement) => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(releasingGuide, readFileSync(releasingGuide, "utf8").replace(requirement, "누락된 release candidate 규칙"));
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/release candidate|Version PR|0\.1\.0/u);
+  });
+
+  it.each([
+    ["manual prerequisite", "수동 prerequisite", ACTIONS_PR_SETTING_CHECKLIST_ITEM],
+    ["repository setting path", "repository setting 경로", ACTIONS_PR_SETTING_PATH],
+    ["repository setting name", "repository setting 이름", ACTIONS_PR_SETTING_NAME],
+    ["read-only audit state", "read-only audit 상태", ACTIONS_PR_SETTING_AUDIT]
+  ])("rejects a release checklist without the GitHub Actions pull request %s / GitHub Actions pull request %s이 없는 릴리즈 checklist를 거부한다", async (_english, _korean, requirement) => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(releasingGuide, readFileSync(releasingGuide, "utf8").replace(requirement, "누락된 GitHub Actions 설정"));
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/GitHub Actions|Workflow permissions|pull request|can_approve_pull_request_reviews/u);
+  });
+
+  it("rejects the GitHub Actions pull request prerequisite after the Version PR gate / Version PR gate 뒤의 GitHub Actions pull request prerequisite를 거부한다", async () => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    const versionPrChecklistItem = "- [ ] Changesets Version PR workflow 승인과 CI 성공 확인 후 merge";
+    const guide = readFileSync(releasingGuide, "utf8")
+      .replace(`${ACTIONS_PR_SETTING_CHECKLIST_ITEM}\n`, "")
+      .replace(`${versionPrChecklistItem}\n`, `${versionPrChecklistItem}\n${ACTIONS_PR_SETTING_CHECKLIST_ITEM}\n`);
+    writeFileSync(releasingGuide, guide);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/approved order|GitHub Actions.*Version PR/u);
   });
 
   it("rejects a release checklist without Version PR workflow approval / Version PR workflow 승인이 없는 릴리즈 checklist를 거부한다", async () => {
@@ -834,6 +918,21 @@ describe("release metadata validation / release metadata 검증", () => {
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/bare.*npm whoami|npm whoami.*registry/u);
   });
 
+  it.each([
+    ["fenced npm whoami", "fence의 npm whoami", "```bash\nnpm whoami\n```"],
+    ["inline npm whoami", "inline npm whoami", "`npm whoami --json`"],
+    ["fenced npm profile get", "fence의 npm profile get", "```sh\nnpm profile get\n```"],
+    ["inline npm profile get", "inline npm profile get", "`npm profile get`"],
+    ["fenced npm view", "fence의 npm view", `\`\`\`shell\nnpm view ${PUBLIC_PACKAGE_SCOPE}/core version\n\`\`\``],
+    ["inline npm view", "inline npm view", `\`npm view ${PUBLIC_PACKAGE_SCOPE}/core version\``]
+  ])("rejects an additional unsafe %s / 추가된 안전하지 않은 %s 명령을 거부한다", async (_english, _korean, unsafeCommand) => {
+    const root = createRepository();
+    const releasingGuide = join(root, "docs", "releasing.md");
+    writeFileSync(releasingGuide, `${readFileSync(releasingGuide, "utf8")}\n${unsafeCommand}\n`);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/registry-touching.*npm (?:whoami|profile get|view)|npm (?:whoami|profile get|view).*registry/u);
+  });
+
   it("rejects a release checklist without an explicit profile registry / 명시적인 profile registry가 없는 릴리즈 checklist를 거부한다", async () => {
     const root = createRepository();
     const releasingGuide = join(root, "docs", "releasing.md");
@@ -981,6 +1080,27 @@ describe("package document validation / package 문서 검증", () => {
     }
   });
 
+  it.each([
+    ["source tree", "source tree", "https://github.com/kangjuhyup/nest-batch/tree/main/packages/core/src"],
+    ["LICENSE blob", "LICENSE blob", "https://github.com/kangjuhyup/nest-batch/blob/main/LICENSE"]
+  ])("rejects a package README %s link to the nonexistent main branch / 존재하지 않는 main branch를 가리키는 package README %s link를 거부한다", async (_english, _korean, brokenLink) => {
+    const root = await mkdtemp(join(tmpdir(), "nest-batch-readme-test-"));
+    const packageInfo = PUBLIC_PACKAGES[0];
+    const packageDirectory = join(root, packageInfo.directory);
+
+    try {
+      await mkdir(packageDirectory, { recursive: true });
+      await writeFile(
+        join(packageDirectory, "README.md"),
+        `${createPackageReadme(packageInfo)}\n[Broken branch link](${brokenLink})\n`
+      );
+
+      await expect(verifyPackageDocuments(root, packageInfo)).rejects.toThrow(/main branch|(?:tree|blob)\/main/u);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("rejects an install command with a package-name prefix / package name prefix를 가진 install command를 거부한다", async () => {
     const root = await mkdtemp(join(tmpdir(), "nest-batch-readme-test-"));
     const packageInfo = PUBLIC_PACKAGES[0];
@@ -997,6 +1117,28 @@ describe("package document validation / package 문서 검증", () => {
       );
 
       await expect(verifyPackageDocuments(root, packageInfo)).rejects.toThrow(/pnpm install command/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a CLI README missing a directly imported dependency from install / 직접 import한 dependency가 install에서 빠진 CLI README를 거부한다", async () => {
+    const root = await mkdtemp(join(tmpdir(), "nest-batch-readme-test-"));
+    const packageInfo = PUBLIC_PACKAGES.find(({ name }) => name === `${PUBLIC_PACKAGE_SCOPE}/cli`)!;
+    const packageDirectory = join(root, packageInfo.directory);
+    const fullInstall = `pnpm add ${PUBLIC_PACKAGE_SCOPE}/cli ${PUBLIC_PACKAGE_SCOPE}/core ${PUBLIC_PACKAGE_SCOPE}/inmemory`;
+
+    try {
+      await mkdir(packageDirectory, { recursive: true });
+      await writeFile(
+        join(packageDirectory, "README.md"),
+        createPackageReadme(packageInfo).replace(
+          fullInstall,
+          `pnpm add ${PUBLIC_PACKAGE_SCOPE}/cli ${PUBLIC_PACKAGE_SCOPE}/core`
+        )
+      );
+
+      await expect(verifyPackageDocuments(root, packageInfo)).rejects.toThrow(/inmemory|direct install dependency/u);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

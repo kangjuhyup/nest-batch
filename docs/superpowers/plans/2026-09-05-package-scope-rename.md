@@ -18,6 +18,9 @@
 - package suffix, `packages/*` directory, package 책임과 dependency 방향은 변경하지 않는다.
 - `core` subpath는 `queue`, `scheduler`, `polling`, `worker`를 그대로 유지한다.
 - root와 공개 package version은 정확히 `0.1.0`을 유지하고 Changesets fixed group으로 함께 관리한다.
+- 최초 `0.1.0`은 검토된 package-release-readiness merge commit을 release candidate로 삼는 일회성 예외이며 새 Changeset이나 Version PR을 만들지 않는다.
+- 최초 `0.1.0` 이후 모든 release에는 Changesets Version PR이 필수다.
+- 첫 post-bootstrap Version PR 전에 maintainer가 GitHub의 **Settings → Actions → General → Workflow permissions**에서 **Allow GitHub Actions to create and approve pull requests**를 수동 활성화한다. 2026-09-05 read-only audit의 `can_approve_pull_request_reviews=false` 상태를 PAT나 장기 credential로 우회하지 않는다.
 - source 내부 dependency는 `workspace:*`, packed/installed 내부 dependency는 exact current fixed version이어야 한다.
 - root private package 이름 `nest-batch`와 repository URL `https://github.com/kangjuhyup/nest-batch.git`은 변경하지 않는다.
 - package는 ESM-only이고 runtime은 Node `>=20.18.0`, publish workflow는 Node 24와 npm `12.0.2`를 유지한다.
@@ -389,7 +392,7 @@ git commit -m "fix : 새 package scope 배포 검증 강화" \
 **Interfaces:**
 - Consumes: Task 1의 exact 8-name catalog와 Task 2의 guide validator
 - Produces: 새 scope 설치/import 문서, ownership/Trusted Publisher/bootstrap checklist
-- Preserves: Version PR 승인 → Node 20/24 Quality/E2E → merge/local 검증 → identity audit → bootstrap → Trusted Publisher → signed tag/provenance/recovery 순서
+- Preserves: 최초 `0.1.0`의 검토된 merge commit/local 검증 → identity audit → bootstrap → Trusted Publisher 순서와, 이후 Version PR 승인 → Node 20/24 Quality/E2E → merge/local 검증 → signed tag/provenance/recovery 순서
 
 **Required skill:** repo-local skill 문서를 수정하므로 이 Task를 시작하기 전에
 `superpowers:writing-skills`를 읽고 해당 검증 절차를 함께 적용한다.
@@ -468,6 +471,9 @@ npm view @rv-nest-batch/core name version maintainers repository dist-tags --jso
 
 scope gate는 다음 의미를 명시한다.
 
+- 검토된 package-release-readiness merge commit을 최초 `0.1.0` candidate로 지정하고 이때만 새 Changeset/Version PR을 만들지 않음
+- 최초 `0.1.0` 이후 모든 release에는 Version PR이 필수
+- 첫 post-bootstrap Version PR 전에 GitHub Actions의 pull request 생성 권한을 수동 활성화하고 `can_approve_pull_request_reviews=false` audit 상태를 PAT로 우회하지 않음
 - npm의 `rv-nest-batch` scope ownership과 publish 권한을 maintainer가 직접 확인
 - 8개 `E404`는 이름의 public 조회 결과일 뿐 권한 증거가 아님
 - 기존/새 package identity가 예상과 다르면 즉시 STOP

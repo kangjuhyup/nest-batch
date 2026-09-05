@@ -35,4 +35,4 @@ effects to be idempotent when a failed execution restarts.
 
 ## License
 
-[MIT](https://github.com/kangjuhyup/nest-batch/blob/main/LICENSE)
+[MIT](https://github.com/kangjuhyup/nest-batch/blob/HEAD/LICENSE)

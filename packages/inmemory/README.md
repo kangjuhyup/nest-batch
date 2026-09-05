@@ -31,4 +31,4 @@ adapter instead.
 
 ## License
 
-[MIT](https://github.com/kangjuhyup/nest-batch/blob/main/LICENSE)
+[MIT](https://github.com/kangjuhyup/nest-batch/blob/HEAD/LICENSE)

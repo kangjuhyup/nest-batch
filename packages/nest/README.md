@@ -50,4 +50,4 @@ process restart. Make writer side effects idempotent for at-least-once work.
 
 ## License
 
-[MIT](https://github.com/kangjuhyup/nest-batch/blob/main/LICENSE)
+[MIT](https://github.com/kangjuhyup/nest-batch/blob/HEAD/LICENSE)

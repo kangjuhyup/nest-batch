@@ -108,8 +108,14 @@ audit, bootstrap integrity confirmation,
 `npm profile get --registry https://registry.npmjs.org/ --@rv-nest-batch:registry=https://registry.npmjs.org/`는 새 scoped registry
 override를 명시한다. Trusted Publisher는 새 package 8개 각각에 등록하도록 설명한다.
 
-Changesets Version PR, Node 20/24 CI, local release gate, signed tag, OIDC publish, GitHub Release,
-bootstrap `0.1.0` provenance 예외와 이후 version provenance 요구는 기존 계약을 유지한다.
+최초 `0.1.0`은 검토된 package-release-readiness merge commit을 release candidate로 삼는
+일회성 예외이며 새 Changeset이나 Version PR을 만들지 않는다. 이후 모든 release에는
+Changesets Version PR, Node 20/24 CI, merge와 local release gate를 적용한다. 첫
+post-bootstrap Version PR 전에는 maintainer가 GitHub의 **Allow GitHub Actions to create
+and approve pull requests** 설정을 수동 활성화해야 하며, 2026-09-05 read-only audit의
+`can_approve_pull_request_reviews=false` 상태를 PAT로 우회하지 않는다. signed tag, OIDC
+publish, GitHub Release, bootstrap `0.1.0` provenance 예외와 이후 version provenance
+요구는 기존 계약을 유지한다.
 
 ## 실패와 안전 경계
 

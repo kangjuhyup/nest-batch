@@ -16,6 +16,9 @@
 
 - 공개 package는 `core`, `nest`, `inmemory`, `postgres`, `mysql`, `mariadb`, `bullmq`, `cli` 8개다.
 - root와 모든 공개 package의 최초 version은 정확히 `0.1.0`이다.
+- 최초 `0.1.0`은 검토된 package-release-readiness merge commit을 release candidate로 삼는 일회성 예외이며 새 Changeset이나 Version PR을 만들지 않는다.
+- 최초 `0.1.0` 이후 모든 release에는 Changesets Version PR이 필수다.
+- 첫 post-bootstrap Version PR 전에 maintainer가 GitHub의 **Settings → Actions → General → Workflow permissions**에서 **Allow GitHub Actions to create and approve pull requests**를 수동 활성화한다. 2026-09-05 read-only audit의 `can_approve_pull_request_reviews=false` 상태를 PAT나 장기 credential로 우회하지 않는다.
 - 8개 package는 Changesets fixed group으로 항상 같은 version을 사용한다.
 - package runtime은 Node `>=20.18.0`, publish workflow는 Node 24와 npm `12.0.2`를 사용한다.
 - package는 ESM-only이며 CommonJS export를 추가하지 않는다.
@@ -808,7 +811,17 @@ with:
 action output `pr-number`가 있으면 `gh label create release --force` 후 해당 PR에
 `release` label을 붙인다. step은 repository `GITHUB_TOKEN`만 사용한다.
 
-이 token topology에서는 Changesets Version PR이 생성되거나 갱신될 때 write 권한
+최초 `0.1.0`에는 pending Changeset이나 기존 Version PR이 없고 새 minor Changeset은 fixed
+group을 `0.2.0`으로 올리므로, 검토된 package-release-readiness merge commit을 release
+candidate로 지정한다. 이 예외는 한 번만 적용하며 새 Changeset이나 Version PR을 만들지
+않는다. 이후 모든 release에는 Version PR이 필수다.
+
+첫 post-bootstrap Version PR 전에 maintainer는 GitHub repository의 **Settings → Actions →
+General → Workflow permissions**에서 **Allow GitHub Actions to create and approve pull
+requests**를 수동으로 활성화한다. 2026-09-05 read-only audit 결과는
+`can_approve_pull_request_reviews=false`였으며 PAT나 장기 credential로 우회하지 않는다.
+
+후속 Version PR의 token topology에서는 Changesets Version PR이 생성되거나 갱신될 때 write 권한
 maintainer가 PR merge box에서 **Approve workflows to run**을 눌러야 한다. 매 갱신마다
 **Quality (Node 20.18.3)**, **Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한
 뒤에만 Version PR을 merge한다. merge commit을 release candidate로 정하고 local
@@ -960,7 +973,13 @@ git commit -m "chore : package release workflow 추가" -m "- Node 호환성과 
 
 ```markdown
 ## 1. Release candidate 준비
+- [ ] 최초 `0.1.0` release candidate로 검토된 package-release-readiness merge commit 지정
+  - 이 예외는 최초 `0.1.0`에 한 번만 적용하며, 새 Changeset이나 Version PR을 만들지 않습니다.
+- [ ] 첫 post-bootstrap Version PR 전에 GitHub Actions의 pull request 생성 권한 수동 활성화
+  - **Settings → Actions → General → Workflow permissions**에서 **Allow GitHub Actions to create and approve pull requests**를 활성화합니다.
+  - 2026-09-05 read-only audit의 `can_approve_pull_request_reviews=false` 상태를 확인했고 PAT나 장기 credential로 우회하지 않습니다.
 - [ ] Changesets Version PR workflow 승인과 CI 성공 확인 후 merge
+  - 최초 `0.1.0` 이후 모든 release에는 Changesets Version PR이 필수입니다.
   - 각 Changesets Version PR이 생성되거나 갱신될 때마다 write 권한 maintainer가 PR merge box에서 **Approve workflows to run**을 클릭합니다.
   - **Quality (Node 20.18.3)**, **Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한 뒤에만 Version PR을 merge합니다.
   - Version PR merge commit을 release candidate로 정하고 아래 local 검증을 마친 뒤에만 release tag를 생성합니다.
@@ -1018,11 +1037,13 @@ root README/README-kr의 Development section에는 `pnpm changeset`과
 - [ ] **Step 3: checklist와 catalog 일치 검증 추가**
 
 `verify-release.mjs`는 `docs/releasing.md`에 8개 package name, `publish.yml`, `npm`
-environment, Version PR 승인과 세 CI check, `pnpm release:check`, bootstrap command가
-있는지 확인한다. 이름 있는 exact checklist constant의 위치를 조회하여 Version PR 승인 →
-CI 성공 → merge → local candidate 검증, catalog identity audit/STOP → bootstrap publish →
-Trusted Publisher → tag → provenance 순서를 검사한다. 필요한 위치를 찾지 못하거나 문서가
-workflow filename/package catalog와 달라지면 release check가 실패해야 한다.
+environment, 최초 `0.1.0`의 검토된 merge candidate와 일회성 예외, 후속 Version PR 필수,
+GitHub Actions pull request 생성 설정과 read-only audit 결과, Version PR 승인과 세 CI check,
+`pnpm release:check`, bootstrap command가 있는지 확인한다. 이름 있는 exact checklist
+constant의 위치를 조회하여 bootstrap candidate 또는 후속 Version PR 승인 → CI 성공 → merge
+→ local candidate 검증, catalog identity audit/STOP → bootstrap publish → Trusted Publisher →
+tag → provenance 순서를 검사한다. 필요한 위치를 찾지 못하거나 문서가 workflow
+filename/package catalog와 달라지면 release check가 실패해야 한다.
 
 - [ ] **Step 4: 전체 local verification**
 

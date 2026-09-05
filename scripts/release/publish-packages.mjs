@@ -275,6 +275,7 @@ export const publishRelease = async ({ tag, rootVersion, artifactRoot, artifacts
   assertRegistry(registry);
   const published = [];
   const skipped = [];
+  const publicationPlan = [];
 
   for (const artifact of validatedArtifacts) {
     const remoteIntegrity = await registry.lookupIntegrity(artifact.name, version);
@@ -282,11 +283,16 @@ export const publishRelease = async ({ tag, rootVersion, artifactRoot, artifacts
 
     if (decision === "skip") {
       skipped.push(artifact.name);
-      continue;
     }
 
-    await registry.publish(artifact);
-    published.push(artifact.name);
+    publicationPlan.push({ artifact, decision });
+  }
+
+  for (const { artifact, decision } of publicationPlan) {
+    if (decision === "publish") {
+      await registry.publish(artifact);
+      published.push(artifact.name);
+    }
   }
 
   await confirmPublication({ artifacts: validatedArtifacts, registry, sleep });

@@ -659,9 +659,9 @@ const result = await runCli(
 );
 ```
 
-지원 command는 `run`, `retry`, `status`, `list`입니다. `run`, `retry`,
-`status`는 `DatabaseBatchStorage`가 필요하고, `run`과 `retry`는 주입된 job
-registry에 대상 job이 있어야 합니다. 운영 command output은 JSON입니다.
+지원 command는 `run`, `retry`, `status`, `list`, `worker`, `schedule`입니다.
+`run`, `retry`, `status`는 `DatabaseBatchStorage`가 필요하고, `run`과 `retry`는
+주입된 job registry에 대상 job이 있어야 합니다. 운영 command output은 JSON입니다.
 
 ## Core Example
 

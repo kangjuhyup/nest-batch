@@ -253,7 +253,8 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     await expect(publish(fixture, registry)).resolves.toEqual({ published: catalogNames(), skipped: [] });
 
     expect(events).toEqual([
-      ...catalogNames().flatMap((name) => [lookupEvent(name), publishEvent(name)]),
+      ...catalogNames().map(lookupEvent),
+      ...catalogNames().map(publishEvent),
       ...catalogNames().map(lookupEvent)
     ]);
   });
@@ -272,9 +273,8 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     });
 
     expect(events).toEqual([
-      lookupEvent(catalogNames()[0]),
-      lookupEvent(catalogNames()[1]),
-      ...catalogNames().slice(2).flatMap((name) => [lookupEvent(name), publishEvent(name)]),
+      ...catalogNames().map(lookupEvent),
+      ...catalogNames().slice(2).map(publishEvent),
       ...catalogNames().map(lookupEvent)
     ]);
   });
@@ -298,7 +298,8 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     })).rejects.toThrow(/after 6 attempts/u);
 
     expect(events).toEqual([
-      ...catalogNames().flatMap((name) => [lookupEvent(name), publishEvent(name)]),
+      ...catalogNames().map(lookupEvent),
+      ...catalogNames().map(publishEvent),
       ...Array.from({ length: 6 }).flatMap(() => catalogNames().map(lookupEvent))
     ]);
     expect(sleeps).toEqual([5_000, 5_000, 5_000, 5_000, 5_000]);
@@ -329,11 +330,58 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
       sleeps.push(milliseconds);
     })).resolves.toEqual({ published: catalogNames(), skipped: [] });
     expect(events).toEqual([
-      ...catalogNames().flatMap((name) => [lookupEvent(name), publishEvent(name)]),
+      ...catalogNames().map(lookupEvent),
+      ...catalogNames().map(publishEvent),
       ...catalogNames().map(lookupEvent),
       ...catalogNames().map(lookupEvent)
     ]);
     expect(sleeps).toEqual([5_000]);
+  });
+
+  it("publishes nothing when the last artifact has different integrity / 마지막 artifact integrity가 다르면 아무 package도 배포하지 않는다", async () => {
+    const fixture = await createFixture();
+    const lastArtifact = fixture.artifacts.at(-1)!;
+    const lookedUp: string[] = [];
+    const published: string[] = [];
+    const registry = {
+      lookupIntegrity: async (name: string) => {
+        lookedUp.push(name);
+        return name === lastArtifact.name ? integrity(99) : undefined;
+      },
+      publish: async (artifact: Artifact) => {
+        published.push(artifact.name);
+      }
+    };
+
+    await expect(publish(fixture, registry)).rejects.toThrow(/integrity/u);
+    expect(lookedUp).toEqual(catalogNames());
+    expect(published).toEqual([]);
+  });
+
+  it("publishes nothing when the last artifact lookup fails / 마지막 artifact 조회가 실패하면 아무 package도 배포하지 않는다", async () => {
+    const fixture = await createFixture();
+    const lastArtifact = fixture.artifacts.at(-1)!;
+    const lookupFailure = new Error("LAST_LOOKUP_FAILURE");
+    const lookedUp: string[] = [];
+    const published: string[] = [];
+    const registry = {
+      lookupIntegrity: async (name: string) => {
+        lookedUp.push(name);
+
+        if (name === lastArtifact.name) {
+          throw lookupFailure;
+        }
+
+        return undefined;
+      },
+      publish: async (artifact: Artifact) => {
+        published.push(artifact.name);
+      }
+    };
+
+    await expect(publish(fixture, registry)).rejects.toBe(lookupFailure);
+    expect(lookedUp).toEqual(catalogNames());
+    expect(published).toEqual([]);
   });
 
   it("stops before publishing an occupied different artifact / 다른 integrity로 점유된 artifact는 publish 전에 중단한다", async () => {
@@ -388,7 +436,10 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     };
 
     await expect(publish(fixture, registry)).rejects.toBe(publishFailure);
-    expect(events).toEqual([lookupEvent(fixture.artifacts[0].name), publishEvent(fixture.artifacts[0].name)]);
+    expect(events).toEqual([
+      ...catalogNames().map(lookupEvent),
+      publishEvent(fixture.artifacts[0].name)
+    ]);
   });
 
   it("stops confirmation on a different integrity / confirmation 중 다른 integrity가 확인되면 중단한다", async () => {

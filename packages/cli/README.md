@@ -5,7 +5,7 @@ Operational command parsing and executable entrypoint for `nest-batch` jobs.
 ## Install
 
 ```bash
-pnpm add @rv-nest-batch/cli
+pnpm add @rv-nest-batch/cli @rv-nest-batch/core @rv-nest-batch/inmemory
 ```
 
 The published executable can always print its command summary:
@@ -46,4 +46,4 @@ in-memory adapter above is only a local example.
 
 ## License
 
-[MIT](https://github.com/kangjuhyup/nest-batch/blob/main/LICENSE)
+[MIT](https://github.com/kangjuhyup/nest-batch/blob/HEAD/LICENSE)

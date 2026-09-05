@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { basename, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT, PUBLIC_PACKAGE_SCOPE, PUBLIC_PACKAGES, REPOSITORY_URL } from "./package-catalog.mjs";
 import { getPackageEntrypointTargets, validatePackageEntrypoints } from "./package-entrypoints.mjs";
@@ -18,7 +18,6 @@ const BOOTSTRAP_PUBLISH_CHECKLIST_ITEM = `- [ ] \`${BOOTSTRAP_PUBLISH_COMMAND}\`
 const BOOTSTRAP_VERSION = "0.1.0";
 const IDENTITY_AUDIT_ARGUMENTS = "name version maintainers repository dist-tags --json";
 const INTEGRITY_CONFIRMATION_ARGUMENTS = "version dist.integrity --json";
-const BARE_NPM_WHOAMI_COMMAND = "`npm whoami`";
 const IDENTITY_AUDIT_STOP_RULE = "기존 package는 승인된 repository identity와 ownership이 일치하거나 명시적인 transfer/rename 결정이 있어야 합니다. 그렇지 않으면 **STOP**합니다.";
 const E404_BOOTSTRAP_RULE = "`E404`는 scope publish 권한을 확인한 뒤에만 bootstrap 후보입니다.";
 const TOKEN_PUBLISHING_ACCESS_PATH = "Settings → Publishing access";
@@ -28,6 +27,13 @@ const PORTABLE_NVM_COMMAND = "nvm use";
 const COREPACK_VERSION_CHECK = "corepack pnpm --version # 10.34.5";
 const BOOTSTRAP_PROVENANCE_EXCEPTION = "로컬에서 publish한 `0.1.0`은 provenance 예외입니다.";
 const LATER_PROVENANCE_REQUIREMENT = "처음으로 OIDC publish되는 후속 version부터 provenance를 필수로 확인합니다.";
+const BOOTSTRAP_CANDIDATE_CHECKLIST_ITEM = "- [ ] 최초 `0.1.0` release candidate로 검토된 package-release-readiness merge commit 지정";
+const BOOTSTRAP_CANDIDATE_RULE = "이 예외는 최초 `0.1.0`에 한 번만 적용하며, 새 Changeset이나 Version PR을 만들지 않습니다.";
+const LATER_VERSION_PR_RULE = "최초 `0.1.0` 이후 모든 release에는 Changesets Version PR이 필수입니다.";
+const ACTIONS_PR_SETTING_CHECKLIST_ITEM = "- [ ] 첫 post-bootstrap Version PR 전에 GitHub Actions의 pull request 생성 권한 수동 활성화";
+const ACTIONS_PR_SETTING_PATH = "Settings → Actions → General → Workflow permissions";
+const ACTIONS_PR_SETTING_NAME = "Allow GitHub Actions to create and approve pull requests";
+const ACTIONS_PR_SETTING_AUDIT = "`can_approve_pull_request_reviews=false`";
 const VERSION_PR_CHECKLIST_ITEM = "- [ ] Changesets Version PR workflow 승인과 CI 성공 확인 후 merge";
 const VERSION_PR_APPROVAL_RULE = "각 Changesets Version PR이 생성되거나 갱신될 때마다 write 권한 maintainer가 PR merge box에서 **Approve workflows to run**을 클릭합니다.";
 const VERSION_PR_CHECKS_RULE = "**Quality (Node 20.18.3)**, **Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한 뒤에만 Version PR을 merge합니다.";
@@ -63,6 +69,12 @@ const SEMVER_PATTERN = new RegExp(
   `^${NUMERIC_IDENTIFIER}\\.${NUMERIC_IDENTIFIER}\\.${NUMERIC_IDENTIFIER}(?:-${PRERELEASE_IDENTIFIER}(?:\\.${PRERELEASE_IDENTIFIER})*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$`
 );
 const PUBLIC_PACKAGE_NAMES = new Set(PUBLIC_PACKAGES.map(({ name }) => name));
+const CLI_PACKAGE_NAME = `${PUBLIC_PACKAGE_SCOPE}/cli`;
+const CLI_README_DIRECT_DEPENDENCIES = [
+  CLI_PACKAGE_NAME,
+  `${PUBLIC_PACKAGE_SCOPE}/core`,
+  `${PUBLIC_PACKAGE_SCOPE}/inmemory`
+];
 const PUBLIC_PACKAGE_NAME_PATTERN = new RegExp(`^${PUBLIC_PACKAGE_SCOPE}/[a-z0-9][a-z0-9._-]*$`);
 const DEPENDENCY_FIELDS = ["dependencies", "optionalDependencies", "peerDependencies", "devDependencies"];
 const LEGACY_PACKAGE_PREFIXES = [`${"@nest"}-batch/`];
@@ -78,6 +90,16 @@ const REMOVED_PUBLIC_PACKAGE_SUFFIXES = [
 const REMOVED_PUBLIC_PACKAGE_NAMES = REMOVED_PUBLIC_PACKAGE_SUFFIXES
   .map((suffix) => `${PUBLIC_PACKAGE_SCOPE}/${suffix}`);
 const ROOT_GENERATED_SCAN_DIRECTORIES = new Set([".git", ".superpowers", ".worktrees", "coverage", "node_modules"]);
+const ACTIVE_TEXT_EXTENSIONS = new Set([
+  ".cjs", ".css", ".csv", ".graphql", ".gql", ".html", ".js", ".json", ".jsx", ".md", ".mjs",
+  ".mts", ".sh", ".sql", ".svg", ".toml", ".ts", ".tsx", ".txt", ".yaml", ".yml"
+]);
+const ACTIVE_TEXT_FILENAMES = new Set([".gitignore", ".gitmessage", ".npmignore", ".nvmrc", "Dockerfile", "LICENSE", "Makefile"]);
+const EXPLICIT_BINARY_EXTENSIONS = new Set([
+  ".avif", ".bmp", ".gif", ".gz", ".ico", ".jpeg", ".jpg", ".mov", ".mp3", ".mp4", ".ogg",
+  ".otf", ".p12", ".pdf", ".pfx", ".png", ".psd", ".tgz", ".ttf", ".wasm", ".wav", ".webm",
+  ".webp", ".woff", ".woff2", ".zip"
+]);
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -96,6 +118,11 @@ const isGeneratedOrVendorDirectory = (pathFromRoot) => {
   return isWorkspaceOutput || segments.at(-1) === "node_modules";
 };
 
+const isKnownActiveTextPath = (path) =>
+  ACTIVE_TEXT_FILENAMES.has(basename(path)) || ACTIVE_TEXT_EXTENSIONS.has(extname(path).toLowerCase());
+
+const isExplicitBinaryPath = (path) => EXPLICIT_BINARY_EXTENSIONS.has(extname(path).toLowerCase());
+
 const hasExactFiles = (files) =>
   Array.isArray(files) && files.length === EXPECTED_FILES.length && files.every((file, index) => file === EXPECTED_FILES[index]);
 
@@ -112,6 +139,9 @@ const hasPnpmAddPackage = (readme, packageName) => {
   return Array.from(commands, (command) => hasPackageToken(command[1], packageName)).some(Boolean);
 };
 
+const hasPublicImport = (readme, packageName) =>
+  new RegExp(`from\\s+["']${escapeRegularExpression(packageName)}["']`, "u").test(readme);
+
 const hasMarkdownLinkTarget = (readme, target) => {
   const escapedTarget = escapeRegularExpression(target);
   const targetPattern = `${escapedTarget}/?(?:#[^\\s)>]+)?`;
@@ -119,6 +149,48 @@ const hasMarkdownLinkTarget = (readme, target) => {
   const autoLink = new RegExp(`<${targetPattern}>`, "u");
 
   return markdownLink.test(readme) || autoLink.test(readme);
+};
+
+const SHELL_FENCE_LANGUAGES = new Set(["", "bash", "console", "sh", "shell", "zsh"]);
+const SHELL_FENCE_PATTERN = /^(`{3,}|~{3,})[ \t]*([A-Za-z0-9_-]*)[^\r\n]*\r?\n([\s\S]*?)^\1[ \t]*$/gmu;
+const INLINE_CODE_SPAN_PATTERN = /(?<!`)`([^`\r\n]+)`(?!`)/gu;
+const REGISTRY_NPM_COMMAND_PATTERN = /^npm\s+(?:whoami(?:\s|$)|profile\s+get(?:\s|$)|view(?:\s|$))/u;
+
+const extractShellCommandSegments = (source) => source
+  .replace(/\\\r?\n[ \t]*/gu, " ")
+  .split(/\r?\n/gu)
+  .flatMap((line) => line.split(/\s*(?:&&|\|\||;|\|)\s*/u))
+  .map((line) => line.trim().replace(/^(?:\$|>)\s+/u, ""))
+  .filter((line) => line.length > 0);
+
+const extractRegistryNpmCommands = (markdown) => {
+  const commands = [];
+  const withoutFences = markdown.replace(SHELL_FENCE_PATTERN, (fence, _marker, language, body) => {
+    if (SHELL_FENCE_LANGUAGES.has(language.toLowerCase())) {
+      commands.push(...extractShellCommandSegments(body));
+    }
+
+    return fence.replace(/[^\r\n]/gu, " ");
+  });
+
+  for (const match of withoutFences.matchAll(INLINE_CODE_SPAN_PATTERN)) {
+    commands.push(...extractShellCommandSegments(match[1]));
+  }
+
+  return commands.filter((command) => REGISTRY_NPM_COMMAND_PATTERN.test(command));
+};
+
+const hasCanonicalRegistryArguments = (command) => {
+  const publicRegistryArgument = new RegExp(
+    `(?:^|\\s)--registry(?:=|\\s+)${escapeRegularExpression(NPM_REGISTRY_URL)}(?=\\s|$)`,
+    "u"
+  );
+  const scopeRegistryArgument = new RegExp(
+    `(?:^|\\s)${escapeRegularExpression(NPM_SCOPE_REGISTRY_ARGUMENT)}(?=\\s|$)`,
+    "u"
+  );
+
+  return publicRegistryArgument.test(command) && scopeRegistryArgument.test(command);
 };
 
 const validateReleasingGuide = (root) => {
@@ -131,8 +203,14 @@ const validateReleasingGuide = (root) => {
     throw new Error(`${RELEASING_GUIDE_PATH} is required: ${error instanceof Error ? error.message : String(error)}`);
   }
 
-  if (guide.includes(BARE_NPM_WHOAMI_COMMAND)) {
-    throw new Error(`${RELEASING_GUIDE_PATH} must not contain a bare npm whoami command without explicit registry arguments`);
+  const unsafeRegistryCommands = extractRegistryNpmCommands(guide)
+    .filter((command) => !hasCanonicalRegistryArguments(command));
+
+  if (unsafeRegistryCommands.length > 0) {
+    throw new Error(
+      `${RELEASING_GUIDE_PATH} unsafe or bare registry-touching npm commands: ${unsafeRegistryCommands.join(", ")}; `
+      + `each command must include --registry ${NPM_REGISTRY_URL} and ${NPM_SCOPE_REGISTRY_ARGUMENT}`
+    );
   }
 
   const expectedChecklistLines = [
@@ -156,6 +234,13 @@ const validateReleasingGuide = (root) => {
     TOKEN_PUBLISHING_ACCESS_SAVE,
     PORTABLE_NVM_COMMAND,
     COREPACK_VERSION_CHECK,
+    BOOTSTRAP_CANDIDATE_CHECKLIST_ITEM,
+    BOOTSTRAP_CANDIDATE_RULE,
+    LATER_VERSION_PR_RULE,
+    ACTIONS_PR_SETTING_CHECKLIST_ITEM,
+    ACTIONS_PR_SETTING_PATH,
+    ACTIONS_PR_SETTING_NAME,
+    ACTIONS_PR_SETTING_AUDIT,
     VERSION_PR_APPROVAL_RULE,
     VERSION_PR_CHECKS_RULE,
     VERSION_PR_SEQUENCE_RULE,
@@ -189,7 +274,14 @@ const validateReleasingGuide = (root) => {
 
   const releaseGuideFlow = [
     { name: "release candidate section", marker: RELEASE_CHECKLIST_SECTIONS.releaseCandidate },
+    { name: "one-time bootstrap candidate", marker: BOOTSTRAP_CANDIDATE_CHECKLIST_ITEM },
+    { name: "one-time bootstrap rule", marker: BOOTSTRAP_CANDIDATE_RULE },
+    { name: "GitHub Actions pull request setting prerequisite", marker: ACTIONS_PR_SETTING_CHECKLIST_ITEM },
+    { name: "GitHub Actions pull request setting path", marker: ACTIONS_PR_SETTING_PATH },
+    { name: "GitHub Actions pull request setting name", marker: ACTIONS_PR_SETTING_NAME },
+    { name: "GitHub Actions read-only audit", marker: ACTIONS_PR_SETTING_AUDIT },
     { name: "Version PR checklist", marker: VERSION_PR_CHECKLIST_ITEM },
+    { name: "mandatory later Version PR", marker: LATER_VERSION_PR_RULE },
     { name: "Version PR workflow approval", marker: VERSION_PR_APPROVAL_RULE },
     { name: "Version PR required checks", marker: VERSION_PR_CHECKS_RULE },
     { name: "Version PR merge candidate", marker: VERSION_PR_SEQUENCE_RULE },
@@ -236,13 +328,27 @@ const validatePackageDocuments = (root, packageInfo) => {
     throw new Error(`${packageInfo.directory}/README.md is required: ${error instanceof Error ? error.message : String(error)}`);
   }
 
+  const brokenMainBranchLink = ["blob", "tree"]
+    .map((linkType) => `${EXPECTED_REPOSITORY_URL}/${linkType}/main/`)
+    .find((linkPrefix) => readme.includes(linkPrefix));
+
+  if (brokenMainBranchLink !== undefined) {
+    throw new Error(`${packageInfo.directory}/README.md must not link to the nonexistent main branch: ${brokenMainBranchLink}`);
+  }
+
   const requirements = [
     [hasPackageToken(readme, packageInfo.name), "package name"],
     [hasPnpmAddPackage(readme, packageInfo.name), "pnpm install command"],
-    [new RegExp(`from\\s+[\"']${escapeRegularExpression(packageInfo.name)}[\"']`, "u").test(readme), "public import"],
+    [hasPublicImport(readme, packageInfo.name), "public import"],
     [hasMarkdownLinkTarget(readme, EXPECTED_REPOSITORY_URL), "repository link"],
     [readme.includes("MIT"), "MIT license"],
-    [readme.includes(EXPECTED_BUGS_URL), "issue tracker link"]
+    [readme.includes(EXPECTED_BUGS_URL), "issue tracker link"],
+    ...(packageInfo.name === CLI_PACKAGE_NAME
+      ? CLI_README_DIRECT_DEPENDENCIES.flatMap((dependency) => [
+        [hasPnpmAddPackage(readme, dependency), `direct install dependency ${dependency}`],
+        [hasPublicImport(readme, dependency), `direct public import ${dependency}`]
+      ])
+      : [])
   ];
 
   const missing = requirements
@@ -433,8 +539,17 @@ const scanFiles = (root, directory = root) => readdirSync(directory, { withFileT
       return [];
     }
 
+    if (isExplicitBinaryPath(path)) {
+      return [];
+    }
+
     const contents = readFileSync(path);
-    return contents.includes(0) ? [] : [{ path, source: contents.toString("utf8") }];
+
+    if (contents.includes(0) && isKnownActiveTextPath(path)) {
+      throw new Error(`${pathFromRoot}: active text file must not contain NUL bytes`);
+    }
+
+    return [{ path, source: contents.toString("utf8") }];
   });
 
 const validateLegacyPackageAbsence = (root) => {

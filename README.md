@@ -663,10 +663,10 @@ const result = await runCli(
 );
 ```
 
-Supported commands are `run`, `retry`, `status`, and `list`. `run`, `retry`, and
-`status` require `DatabaseBatchStorage`; `run` and `retry` also require the job
-to be present in the supplied registry. Command output is JSON for operational
-commands.
+Supported commands are `run`, `retry`, `status`, `list`, `worker`, and
+`schedule`. `run`, `retry`, and `status` require `DatabaseBatchStorage`; `run`
+and `retry` also require the job to be present in the supplied registry. Command
+output is JSON for operational commands.
 
 ## Core Example
 
