@@ -3,23 +3,23 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { commandForPlatform, localBinaryForPlatform, runCommandInherited } from "./command-runner.mjs";
-import { CORE_SUBPATHS, PUBLIC_PACKAGES } from "./package-catalog.mjs";
+import { CORE_SUBPATHS, PUBLIC_PACKAGE_SCOPE, PUBLIC_PACKAGES } from "./package-catalog.mjs";
 import { packPackages, validatePackedManifest } from "./pack-packages.mjs";
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 
-const consumerSource = `import { DefaultBatchRunner, defineJob } from "@nest-batch/core";
-import { WorkerLoop } from "@nest-batch/core/queue";
-import { SchedulerLoop } from "@nest-batch/core/scheduler";
-import { ContinuousPollingLoop } from "@nest-batch/core/polling";
-import { LocalWorkerPool, WorkerThreadPool } from "@nest-batch/core/worker";
-import { NestBatchModule } from "@nest-batch/nest";
-import { InMemoryBatchStorage } from "@nest-batch/inmemory";
-import { PostgresBatchStorage } from "@nest-batch/postgres";
-import { MySqlBatchStorage } from "@nest-batch/mysql";
-import { MariaDbBatchStorage } from "@nest-batch/mariadb";
-import { BullMqWorkQueue } from "@nest-batch/bullmq";
-import { runCli } from "@nest-batch/cli";
+const consumerSource = `import { DefaultBatchRunner, defineJob } from "${PUBLIC_PACKAGE_SCOPE}/core";
+import { WorkerLoop } from "${PUBLIC_PACKAGE_SCOPE}/core/queue";
+import { SchedulerLoop } from "${PUBLIC_PACKAGE_SCOPE}/core/scheduler";
+import { ContinuousPollingLoop } from "${PUBLIC_PACKAGE_SCOPE}/core/polling";
+import { LocalWorkerPool, WorkerThreadPool } from "${PUBLIC_PACKAGE_SCOPE}/core/worker";
+import { NestBatchModule } from "${PUBLIC_PACKAGE_SCOPE}/nest";
+import { InMemoryBatchStorage } from "${PUBLIC_PACKAGE_SCOPE}/inmemory";
+import { PostgresBatchStorage } from "${PUBLIC_PACKAGE_SCOPE}/postgres";
+import { MySqlBatchStorage } from "${PUBLIC_PACKAGE_SCOPE}/mysql";
+import { MariaDbBatchStorage } from "${PUBLIC_PACKAGE_SCOPE}/mariadb";
+import { BullMqWorkQueue } from "${PUBLIC_PACKAGE_SCOPE}/bullmq";
+import { runCli } from "${PUBLIC_PACKAGE_SCOPE}/cli";
 
 void [DefaultBatchRunner, defineJob, WorkerLoop, SchedulerLoop, ContinuousPollingLoop,
   LocalWorkerPool, WorkerThreadPool, NestBatchModule, InMemoryBatchStorage,
@@ -28,7 +28,7 @@ void [DefaultBatchRunner, defineJob, WorkerLoop, SchedulerLoop, ContinuousPollin
 
 const runtimeImportsSource = `const specifiers = ${JSON.stringify([
   ...PUBLIC_PACKAGES.map(({ name }) => name),
-  ...CORE_SUBPATHS.map((subpath) => `@nest-batch/core/${subpath}`)
+  ...CORE_SUBPATHS.map((subpath) => `${PUBLIC_PACKAGE_SCOPE}/core/${subpath}`)
 ])};
 
 await Promise.all(specifiers.map(async (specifier) => {

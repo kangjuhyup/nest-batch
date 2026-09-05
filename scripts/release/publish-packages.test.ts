@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseDocument } from "yaml";
 import { commandForPlatform, runCommand } from "./command-runner.mjs";
-import { NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT, PUBLIC_PACKAGES } from "./package-catalog.mjs";
+import { NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT, PUBLIC_PACKAGE_SCOPE, PUBLIC_PACKAGES } from "./package-catalog.mjs";
 import {
   createNpmRegistryAdapter,
   decidePublication,
@@ -17,6 +17,7 @@ import {
 } from "./publish-packages.mjs";
 
 const VERSION = "0.1.0";
+const CORE_PACKAGE_NAME = `${PUBLIC_PACKAGE_SCOPE}/core`;
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const temporaryRoots: string[] = [];
 
@@ -172,7 +173,7 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     ["npm 11 scalar", "npm 11 scalar", JSON.stringify(INTEGRITY)],
     ["npm 12 one-element array", "npm 12 단일 원소 배열", JSON.stringify([INTEGRITY])]
   ])("parses a valid remote integrity shape: %s / 유효한 remote integrity 형태를 해석한다: %s", (_english, _korean, stdout) => {
-    expect(parseRemoteIntegrity(stdout, "@nest-batch/core", VERSION)).toBe(INTEGRITY);
+    expect(parseRemoteIntegrity(stdout, CORE_PACKAGE_NAME, VERSION)).toBe(INTEGRITY);
   });
 
   it.each([
@@ -181,7 +182,7 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     ["non-string value", "문자열이 아닌 값", [42]],
     ["malformed integrity", "잘못된 integrity", ["sha512-not_base64!"]]
   ])("rejects an invalid npm 12 integrity shape: %s / 잘못된 npm 12 integrity 형태를 거부한다: %s", (_english, _korean, value) => {
-    expect(() => parseRemoteIntegrity(JSON.stringify(value), "@nest-batch/core", VERSION)).toThrow(/integrity|exactly one/u);
+    expect(() => parseRemoteIntegrity(JSON.stringify(value), CORE_PACKAGE_NAME, VERSION)).toThrow(/integrity|exactly one/u);
   });
 
   it("accepts only a matching stable release tag / 일치하는 stable release tag만 허용한다", () => {
@@ -547,8 +548,8 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
       }
     });
 
-    await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).resolves.toBeUndefined();
-    expect(commandCalls).toEqual([["npm", ["view", "@nest-batch/core@0.1.0", "dist.integrity", "--json", "--registry", NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT], expect.any(Object)]]);
+    await expect(adapter.lookupIntegrity(CORE_PACKAGE_NAME, VERSION)).resolves.toBeUndefined();
+    expect(commandCalls).toEqual([["npm", ["view", `${CORE_PACKAGE_NAME}@0.1.0`, "dist.integrity", "--json", "--registry", NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT], expect.any(Object)]]);
   });
 
   it("classifies npm E404 stderr as missing / npm E404 stderr를 미배포로 처리한다", async () => {
@@ -558,7 +559,7 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
       }
     });
 
-    await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).resolves.toBeUndefined();
+    await expect(adapter.lookupIntegrity(CORE_PACKAGE_NAME, VERSION)).resolves.toBeUndefined();
   });
 
   it.each([
@@ -568,19 +569,19 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
   ])("%s / %s", async (_englishLabel, _koreanLabel, failure) => {
     const adapter = createNpmRegistryAdapter({ runLookup: async () => { throw failure; } });
 
-    await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).rejects.toBe(failure);
+    await expect(adapter.lookupIntegrity(CORE_PACKAGE_NAME, VERSION)).rejects.toBe(failure);
   });
 
   it("rejects malformed npm lookup JSON / 잘못된 npm 조회 JSON을 거부한다", async () => {
     const adapter = createNpmRegistryAdapter({ runLookup: async () => ({ stdout: "not-json" }) });
 
-    await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).rejects.toThrow(/invalid JSON/u);
+    await expect(adapter.lookupIntegrity(CORE_PACKAGE_NAME, VERSION)).rejects.toThrow(/invalid JSON/u);
   });
 
   it("rejects malformed npm lookup integrity / 잘못된 npm 조회 integrity를 거부한다", async () => {
     const adapter = createNpmRegistryAdapter({ runLookup: async () => ({ stdout: JSON.stringify("sha512-not_base64!") }) });
 
-    await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).rejects.toThrow(/integrity/u);
+    await expect(adapter.lookupIntegrity(CORE_PACKAGE_NAME, VERSION)).rejects.toThrow(/integrity/u);
   });
 
   it("accepts an npm 12 one-element lookup array / npm 12 단일 원소 lookup 배열을 허용한다", async () => {
@@ -588,7 +589,7 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
       runLookup: async () => ({ stdout: JSON.stringify([INTEGRITY]) })
     });
 
-    await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).resolves.toBe(INTEGRITY);
+    await expect(adapter.lookupIntegrity(CORE_PACKAGE_NAME, VERSION)).resolves.toBe(INTEGRITY);
   });
 
   it("confirms published artifacts through npm 12 arrays after retry / 재시도 뒤 npm 12 배열로 배포 artifact를 확인한다", async () => {
@@ -605,7 +606,7 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
         const count = (lookupCounts.get(name) ?? 0) + 1;
         lookupCounts.set(name, count);
 
-        if (count === 1 || (name === "@nest-batch/core" && count === 2)) {
+        if (count === 1 || (name === CORE_PACKAGE_NAME && count === 2)) {
           throw Object.assign(new Error("missing"), { code: "E404" });
         }
 
@@ -621,7 +622,7 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
     })).resolves.toEqual({ published: catalogNames(), skipped: [] });
     expect(publishCalls).toEqual(fixture.artifacts.map(({ tarball }) => tarball));
     expect(sleepCalls).toEqual([5_000]);
-    expect(lookupCounts.get("@nest-batch/core")).toBe(3);
+    expect(lookupCounts.get(CORE_PACKAGE_NAME)).toBe(3);
   });
 
   it("uses buffered lookup and inherited publish runners with the public registry / 조회와 배포에 각각 buffered 및 inherited runner와 public registry를 사용한다", async () => {
@@ -639,17 +640,23 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
       }
     });
 
-    await expect(adapter.lookupIntegrity("@nest-batch/core", VERSION)).resolves.toBe(fixture.artifacts[0].integrity);
+    await expect(adapter.lookupIntegrity(CORE_PACKAGE_NAME, VERSION)).resolves.toBe(fixture.artifacts[0].integrity);
     await adapter.publish(fixture.artifacts[0]);
-    expect(lookupCalls).toEqual([["npm", ["view", "@nest-batch/core@0.1.0", "dist.integrity", "--json", "--registry", NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT], expect.objectContaining({ maxBuffer: expect.any(Number) })]]);
+    expect(lookupCalls).toEqual([["npm", ["view", `${CORE_PACKAGE_NAME}@0.1.0`, "dist.integrity", "--json", "--registry", NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT], expect.objectContaining({ maxBuffer: expect.any(Number) })]]);
     expect(publishCalls).toEqual([["npm", ["publish", "--access", "public", "--registry", NPM_REGISTRY_URL, NPM_SCOPE_REGISTRY_ARGUMENT, "--", fixture.artifacts[0].tarball], expect.not.objectContaining({ maxBuffer: expect.anything() })]]);
+    const arguments_ = lookupCalls[0][1] as string[];
+    const previousScopeRegistryArgument = `--${["@nest", "batch"].join("-")}:registry=${NPM_REGISTRY_URL}`;
+
+    expect(NPM_SCOPE_REGISTRY_ARGUMENT).toBe("--@rv-nest-batch:registry=https://registry.npmjs.org/");
+    expect(arguments_).toContain(NPM_SCOPE_REGISTRY_ARGUMENT);
+    expect(arguments_).not.toContain(previousScopeRegistryArgument);
   });
 
   it("overrides a hostile ambient scoped registry through real npm resolution / 실제 npm 해석에서 hostile ambient scoped registry를 덮어쓴다", async () => {
     const { stdout } = await runCommand(commandForPlatform("npm"), [
       "config",
       "get",
-      "@nest-batch:registry",
+      `${PUBLIC_PACKAGE_SCOPE}:registry`,
       "--registry",
       NPM_REGISTRY_URL,
       NPM_SCOPE_REGISTRY_ARGUMENT
@@ -657,7 +664,7 @@ describe("idempotent package publishing / 멱등 package 배포", () => {
       cwd: REPOSITORY_ROOT,
       env: {
         ...process.env,
-        "npm_config_@nest-batch:registry": "http://127.0.0.1:9/"
+        "npm_config_@rv-nest-batch:registry": "http://127.0.0.1:9/"
       }
     });
 

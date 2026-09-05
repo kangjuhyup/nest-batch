@@ -62,9 +62,10 @@ const SEMVER_PATTERN = new RegExp(
   `^${NUMERIC_IDENTIFIER}\\.${NUMERIC_IDENTIFIER}\\.${NUMERIC_IDENTIFIER}(?:-${PRERELEASE_IDENTIFIER}(?:\\.${PRERELEASE_IDENTIFIER})*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$`
 );
 const PUBLIC_PACKAGE_NAMES = new Set(PUBLIC_PACKAGES.map(({ name }) => name));
-const PUBLIC_PACKAGE_NAME_PATTERN = new RegExp(`^${PUBLIC_PACKAGE_SCOPE}/[A-Za-z0-9][A-Za-z0-9._-]*$`);
+const PUBLIC_PACKAGE_NAME_PATTERN = new RegExp(`^${PUBLIC_PACKAGE_SCOPE}/[a-z0-9][a-z0-9._-]*$`);
 const DEPENDENCY_FIELDS = ["dependencies", "optionalDependencies", "peerDependencies", "devDependencies"];
-const LEGACY_PACKAGE_NAMES = [
+const LEGACY_PACKAGE_PREFIXES = [`${"@nest"}-batch/`];
+const REMOVED_PUBLIC_PACKAGE_SUFFIXES = [
   "queue-core",
   "scheduler-core",
   "scheduler-calendar",
@@ -72,7 +73,9 @@ const LEGACY_PACKAGE_NAMES = [
   "worker-local",
   "worker-threads",
   "queue-bullmq"
-].map((name) => ["@nest-batch", name].join("/"));
+];
+const REMOVED_PUBLIC_PACKAGE_NAMES = REMOVED_PUBLIC_PACKAGE_SUFFIXES
+  .map((suffix) => `${PUBLIC_PACKAGE_SCOPE}/${suffix}`);
 const IGNORED_SCAN_ENTRIES = new Set([".git", ".superpowers", ".tsbuildinfo", ".worktrees", "coverage", "dist", "node_modules"]);
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -259,6 +262,8 @@ export function validateManifest(manifest, packageInfo) {
 
   if (typeof manifest.name !== "string" || !PUBLIC_PACKAGE_NAME_PATTERN.test(manifest.name)) {
     errors.push(`name must be an ${PUBLIC_PACKAGE_SCOPE} scoped package name`);
+  } else if (manifest.name !== packageInfo.name) {
+    errors.push(`name must equal ${packageInfo.name}`);
   }
 
   if (typeof manifest.version !== "string" || !SEMVER_PATTERN.test(manifest.version)) {
@@ -421,8 +426,8 @@ const validateLegacyPackageAbsence = (root) => {
   const files = scanFiles(root);
   const errors = [];
 
-  for (const legacyName of LEGACY_PACKAGE_NAMES) {
-    const legacyDirectory = join(root, "packages", legacyName.slice("@nest-batch/".length));
+  for (const suffix of REMOVED_PUBLIC_PACKAGE_SUFFIXES) {
+    const legacyDirectory = join(root, "packages", suffix);
 
     if (existsSync(legacyDirectory)) {
       errors.push(`${relative(root, legacyDirectory)} is a removed workspace package directory`);
@@ -430,9 +435,22 @@ const validateLegacyPackageAbsence = (root) => {
   }
 
   for (const { path, source } of files) {
-    for (const legacyName of LEGACY_PACKAGE_NAMES) {
-      if (source.includes(legacyName)) {
-        errors.push(`${relative(root, path)} contains removed package name ${legacyName}`);
+    for (const prefix of LEGACY_PACKAGE_PREFIXES) {
+      const matches = [...source.matchAll(new RegExp(`${escapeRegularExpression(prefix)}[A-Za-z0-9._-]+`, "gu"))]
+        .map(([packageName]) => packageName);
+
+      if (matches.length > 0) {
+        for (const packageName of matches) {
+          errors.push(`${relative(root, path)} contains previous package namespace ${packageName}`);
+        }
+      } else if (source.includes(prefix)) {
+        errors.push(`${relative(root, path)} contains previous package namespace ${prefix}`);
+      }
+    }
+
+    for (const removedName of REMOVED_PUBLIC_PACKAGE_NAMES) {
+      if (source.includes(removedName)) {
+        errors.push(`${relative(root, path)} contains removed package name ${removedName}`);
       }
     }
   }

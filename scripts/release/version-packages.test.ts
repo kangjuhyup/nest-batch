@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { PUBLIC_PACKAGES } from "./package-catalog.mjs";
+import { PUBLIC_PACKAGE_SCOPE, PUBLIC_PACKAGES } from "./package-catalog.mjs";
 import { versionPackages } from "./version-packages.mjs";
 
 const createVersionFixture = async ({
@@ -23,7 +23,7 @@ const createVersionFixture = async ({
   await writeFile(join(root, ".changeset", "README.md"), "# Changeset\n");
 
   if (pendingChangeset) {
-    await writeFile(join(root, ".changeset", "pending.md"), "---\n\"@nest-batch/core\": minor\n---\n\nrelease\n");
+    await writeFile(join(root, ".changeset", "pending.md"), `---\n\"${PUBLIC_PACKAGE_SCOPE}/core\": minor\n---\n\nrelease\n`);
   }
 
   await Promise.all(PUBLIC_PACKAGES.map(async ({ directory, name }) => {

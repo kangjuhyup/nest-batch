@@ -443,9 +443,44 @@ describe("release metadata validation / release metadata 검증", () => {
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/workspace:\*/u);
   });
 
+  it.each([
+    ["an e2e import", "e2e import", (root: string, previousCore: string) => {
+      mkdirSync(join(root, "e2e"), { recursive: true });
+      writeFileSync(join(root, "e2e", "old-scope.e2e.test.ts"), `import { defineJob } from "${previousCore}";\nvoid defineJob;\n`);
+    }],
+    ["a package manifest dependency", "package manifest dependency", (root: string, previousCore: string) => {
+      const manifestPath = join(root, "packages", "nest", "package.json");
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>;
+      manifest.dependencies = { [previousCore]: "workspace:*" };
+      writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    }],
+    ["a root Markdown file", "root Markdown", (root: string, previousCore: string) => {
+      writeFileSync(join(root, "MIGRATION.md"), `Install ${previousCore}.\n`);
+    }],
+    ["the lockfile fixture", "lockfile fixture", (root: string, previousCore: string) => {
+      writeFileSync(join(root, "pnpm-lock.yaml"), `lockfileVersion: '9.0'\npackages:\n  ${JSON.stringify(previousCore)}:\n`);
+    }]
+  ])("rejects the previous package namespace in %s / %s의 이전 package namespace를 거부한다", async (_english, _korean, mutate) => {
+    const root = createRepository();
+    const previousScope = ["@nest", "batch"].join("-");
+    const previousCore = `${previousScope}/core`;
+    mutate(root, previousCore);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(previousCore);
+  });
+
+  it("rejects removed packages in the new scope / 새 scope의 제거된 package를 거부한다", async () => {
+    const root = createRepository();
+    const removedPackageName = `${PUBLIC_PACKAGE_SCOPE}/queue-core`;
+    mkdirSync(join(root, "packages", "core", "src"), { recursive: true });
+    writeFileSync(join(root, "packages", "core", "src", "legacy.ts"), `export * from "${removedPackageName}";\n`);
+
+    await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/@rv-nest-batch\/queue-core/u);
+  });
+
   it("rejects a removed package name outside historical docs / 과거 문서 밖의 제거된 package 이름을 거부한다", async () => {
     const root = createRepository();
-    const removedName = ["@nest-batch", "queue-core"].join("/");
+    const removedName = `${PUBLIC_PACKAGE_SCOPE}/queue-core`;
     mkdirSync(join(root, "packages/core/src"), { recursive: true });
     writeFileSync(join(root, "packages/core/src/legacy.ts"), `export * from "${removedName}";\n`);
 
@@ -462,7 +497,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a removed import in root e2e tests / root e2e test의 제거된 import를 거부한다", async () => {
     const root = createRepository();
-    const removedName = ["@nest-batch", "scheduler-core"].join("/");
+    const removedName = `${PUBLIC_PACKAGE_SCOPE}/scheduler-core`;
     mkdirSync(join(root, "e2e"), { recursive: true });
     writeFileSync(join(root, "e2e/legacy.e2e.test.ts"), `import "${removedName}";\n`);
 
@@ -471,7 +506,7 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("rejects a removed package name in a root document / root 문서의 제거된 package 이름을 거부한다", async () => {
     const root = createRepository();
-    const removedName = ["@nest-batch", "polling-core"].join("/");
+    const removedName = `${PUBLIC_PACKAGE_SCOPE}/polling-core`;
     writeFileSync(join(root, "DATABASE.md"), `Do not install ${removedName}.\n`);
 
     await expect(release.verifyReleaseRepository(root)).rejects.toThrow(/DATABASE\.md.*removed package name/u);
@@ -479,9 +514,10 @@ describe("release metadata validation / release metadata 검증", () => {
 
   it("allows removed package history only under docs superpowers / docs superpowers 아래의 과거 package 기록만 허용한다", async () => {
     const root = createRepository();
-    const removedName = ["@nest-batch", "worker-threads"].join("/");
+    const removedName = `${PUBLIC_PACKAGE_SCOPE}/worker-threads`;
+    const previousCore = `${["@nest", "batch"].join("-")}/core`;
     mkdirSync(join(root, "docs/superpowers/specs"), { recursive: true });
-    writeFileSync(join(root, "docs/superpowers/specs/history.md"), `Historical package: ${removedName}.\n`);
+    writeFileSync(join(root, "docs/superpowers/specs/history.md"), `Historical packages: ${previousCore}, ${removedName}.\n`);
 
     await expect(release.verifyReleaseRepository(root)).resolves.toBeUndefined();
   });

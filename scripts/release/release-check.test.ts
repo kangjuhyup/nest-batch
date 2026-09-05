@@ -3,7 +3,7 @@ import { access, mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } fr
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { PUBLIC_PACKAGES } from "./package-catalog.mjs";
+import { PUBLIC_PACKAGE_SCOPE, PUBLIC_PACKAGES } from "./package-catalog.mjs";
 import { cleanupReleaseBuildInfo, cleanupReleaseOutputs, releaseBuildInfoTargets, releaseOutputTargets, runReleaseCheck } from "./release-check.mjs";
 
 const temporaryRoots: string[] = [];
@@ -187,7 +187,7 @@ describe("release check cleanup / release check 정리", () => {
     await writeFile(sentinel, "keep\n");
 
     await expect(cleanupReleaseBuildInfo(repositoryRoot, {
-      publicPackages: [{ name: "@nest-batch/core", directory }]
+      publicPackages: [{ name: `${PUBLIC_PACKAGE_SCOPE}/core`, directory }]
     })).rejects.toThrow(/invalid public package directory/u);
 
     await expect(readFile(sentinel, "utf8")).resolves.toBe("keep\n");
@@ -204,7 +204,7 @@ describe("release check cleanup / release check 정리", () => {
     await symlink(externalRoot, join(repositoryRoot, "packages", "core"), "dir");
 
     await expect(cleanupReleaseBuildInfo(repositoryRoot, {
-      publicPackages: [{ name: "@nest-batch/core", directory: "packages/core" }]
+      publicPackages: [{ name: `${PUBLIC_PACKAGE_SCOPE}/core`, directory: "packages/core" }]
     })).rejects.toThrow(/symbolic link/u);
 
     await expect(readFile(sentinel, "utf8")).resolves.toBe("keep\n");
@@ -220,7 +220,7 @@ describe("release check cleanup / release check 정리", () => {
     await symlink(externalRoot, join(repositoryRoot, "packages", "core", "dist"), "dir");
 
     await expect(cleanupReleaseOutputs(repositoryRoot, {
-      publicPackages: [{ name: "@nest-batch/core", directory: "packages/core" }]
+      publicPackages: [{ name: `${PUBLIC_PACKAGE_SCOPE}/core`, directory: "packages/core" }]
     })).rejects.toThrow(/symbolic link/u);
 
     await expect(readFile(sentinel, "utf8")).resolves.toBe("keep\n");
@@ -237,7 +237,7 @@ describe("release check cleanup / release check 정리", () => {
     await symlink(externalRoot, join(repositoryRoot, "packages", "core", ".tsbuildinfo"), "dir");
 
     await expect(cleanupReleaseBuildInfo(repositoryRoot, {
-      publicPackages: [{ name: "@nest-batch/core", directory: "packages/core" }]
+      publicPackages: [{ name: `${PUBLIC_PACKAGE_SCOPE}/core`, directory: "packages/core" }]
     })).rejects.toThrow(/symbolic link/u);
 
     await expect(readFile(sentinel, "utf8")).resolves.toBe("keep\n");
