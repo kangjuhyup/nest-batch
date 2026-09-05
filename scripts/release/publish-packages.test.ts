@@ -129,7 +129,7 @@ const createIsolatedPublishRepository = async (version: string) => {
 };
 
 const runPnpm = (cwd: string, arguments_: string[]) => new Promise<{ exitCode: number | null; stderr: string; stdout: string }>((resolve, reject) => {
-  const child = spawn("corepack", ["pnpm", "run", ...arguments_], {
+  const child = spawn(commandForPlatform("pnpm"), ["run", ...arguments_], {
     cwd,
     env: {
       ...process.env,
