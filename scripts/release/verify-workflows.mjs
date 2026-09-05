@@ -112,7 +112,7 @@ const EXPECTED_FILES = {
   },
   ".github/workflows/release-pr.yml": {
     name: "Version packages",
-    on: { push: { branches: ["develop"] } },
+    on: { push: { branches: ["main"] } },
     permissions: {},
     jobs: {
       version: {
@@ -136,7 +136,7 @@ const EXPECTED_FILES = {
               "version-script": "pnpm release:version",
               "commit-message": "chore : package version 업데이트",
               "pr-title": "chore : package version 업데이트",
-              "pr-base-branch": "develop",
+              "pr-base-branch": "main",
               "create-github-releases": false,
               "push-git-tags": false
             }

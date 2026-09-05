@@ -24,6 +24,9 @@ pnpm install --frozen-lockfile
 
 ### 후속 release candidate
 
+- [ ] package 변경이 `main`에 병합됨
+  - 기능 PR은 `develop`에서 검증할 수 있지만 Changesets Version PR은 변경이 `main`에 병합된 뒤에만 생성하거나 갱신합니다.
+  - Version PR의 base branch도 `main`이며, `develop`에만 있는 Changeset은 package version을 올리지 않습니다.
 - [ ] 첫 post-bootstrap Version PR 전에 GitHub Actions의 pull request 생성 권한 수동 활성화
   - GitHub repository의 **Settings → Actions → General → Workflow permissions**에서 **Allow GitHub Actions to create and approve pull requests**를 선택하고 저장합니다.
   - 2026-09-05 read-only audit에서는 `can_approve_pull_request_reviews=false`였으므로, maintainer가 직접 활성화하기 전에는 첫 post-bootstrap Version PR을 생성하지 않습니다.
@@ -36,8 +39,8 @@ pnpm install --frozen-lockfile
 
 ### 공통 local candidate 검증
 
-- [ ] worktree가 clean이고 release commit이 `develop`에 포함됨
-  - `git status --short`의 출력이 없어야 하며, `git fetch origin develop` 후 `git merge-base --is-ancestor <release-commit> origin/develop`가 성공해야 합니다.
+- [ ] worktree가 clean이고 release commit이 `main`에 포함됨
+  - `git status --short`의 출력이 없어야 하며, `git fetch origin main` 후 `git merge-base --is-ancestor <release-commit> origin/main`가 성공해야 합니다.
 - [ ] 8개 package와 root version이 동일함
   - `pnpm release:check`가 root와 아래 공개 package의 고정 version을 함께 검사합니다: `@rvkang/batch-core`, `@rvkang/batch-nest`, `@rvkang/batch-inmemory`, `@rvkang/batch-postgres`, `@rvkang/batch-mysql`, `@rvkang/batch-mariadb`, `@rvkang/batch-bullmq`, `@rvkang/batch-cli`.
 - [ ] `pnpm release:check` 성공
@@ -70,7 +73,7 @@ npm view @rvkang/batch-cli name version maintainers repository dist-tags --json 
   - `npm whoami --registry https://registry.npmjs.org/ --@rvkang:registry=https://registry.npmjs.org/`가 의도한 maintainer를 출력하고, `npm profile get --registry https://registry.npmjs.org/ --@rvkang:registry=https://registry.npmjs.org/`의 2FA 값이 publish를 보호하는 설정인지 확인합니다.
 - [ ] `pnpm release:start --tag v0.1.0 --bootstrap` 자동화 명령 실행
   - **Manual gate — 실제 npm publish와 tag push:** 인증된 maintainer가 모든 이전 checkbox를 확인한 뒤 이 명령을 직접 시작합니다. 자동화 준비·검증 작업에서는 실행하지 않습니다.
-  - 명령은 `pnpm release:check`, clean worktree와 `origin/develop` 포함 여부 확인, `v0.1.0` 서명 tag 생성, `pnpm run release:publish --tag v0.1.0`, tag push 순서로 실행합니다.
+  - 명령은 `pnpm release:check`, clean worktree와 `origin/main` 포함 여부 확인, `v0.1.0` 서명 tag 생성, `pnpm run release:publish --tag v0.1.0`, tag push 순서로 실행합니다.
   - publish가 완전히 확인되기 전에는 tag를 origin에 push하지 않습니다. 중간 실패 시 서명된 local tag는 복구를 위해 남으며, 같은 명령을 다시 실행하면 동일 package integrity와 tag commit을 검증한 뒤 이어서 처리합니다.
   - publish child process는 maintainer terminal의 표준 입출력을 상속하므로 npm의 OTP/WebAuthn prompt에 직접 응답할 수 있습니다.
   - 로컬에서 publish한 `0.1.0`은 provenance 예외입니다. 동일 artifact를 tag workflow가 건너뛰어도 기존 version에 provenance가 사후 추가되지는 않습니다.
@@ -105,7 +108,7 @@ npm view @rvkang/batch-cli@0.1.0 version dist.integrity --json --registry https:
 
 - [ ] `pnpm release:start --tag vX.Y.Z` 실행
   - **Manual gate — 후속 release 시작:** maintainer가 검토한 Version PR merge commit에서만 실행합니다. 자동화 준비·검증 작업에서는 실행하지 않습니다.
-  - 명령은 `pnpm release:check`, clean worktree와 `origin/develop` 포함 여부 확인, version과 tag 일치 확인, 서명 tag 생성·검증, origin push를 수행합니다.
+  - 명령은 `pnpm release:check`, clean worktree와 `origin/main` 포함 여부 확인, version과 tag 일치 확인, 서명 tag 생성·검증, origin push를 수행합니다.
   - 이미 같은 commit의 서명 tag가 있으면 검증 후 재사용합니다. local 또는 remote tag가 다른 commit을 가리키거나 서명을 검증할 수 없으면 중단합니다.
   - tag push가 `publish.yml`을 시작하며, 후속 package publish는 npm Trusted Publishing(OIDC)으로 처리합니다.
 - [ ] publish workflow 성공 확인

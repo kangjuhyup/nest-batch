@@ -14,7 +14,7 @@ const fakeGit = (overrides: Record<string, unknown> = {}) => ({
   ensureClean: async () => undefined,
   fetchReleaseRefs: async () => undefined,
   headSha: async () => SHA,
-  isIncludedInDevelop: async () => true,
+  isIncludedInMain: async () => true,
   localTagSha: async () => undefined,
   remoteTagSha: async () => undefined,
   createSignedTag: async () => undefined,
@@ -45,7 +45,7 @@ describe("release start automation / release 시작 자동화", () => {
       ensureClean: async () => { events.push("clean"); },
       fetchReleaseRefs: async () => { events.push("fetch"); },
       headSha: async () => { events.push("head"); return SHA; },
-      isIncludedInDevelop: async () => { events.push("develop"); return true; },
+      isIncludedInMain: async () => { events.push("main"); return true; },
       localTagSha: async () => { events.push("local"); return localTag; },
       remoteTagSha: async () => { events.push("remote"); return undefined; },
       createSignedTag: async () => { events.push("sign"); localTag = SHA; },
@@ -54,7 +54,7 @@ describe("release start automation / release 시작 자동화", () => {
 
     await expect(prepareSignedReleaseTag({ tag: TAG, version: VERSION, git }))
       .resolves.toEqual({ remoteExists: false, sha: SHA, tag: TAG });
-    expect(events).toEqual(["clean", "fetch", "head", "develop", "local", "remote", "sign", "verify", "local"]);
+    expect(events).toEqual(["clean", "fetch", "head", "main", "local", "remote", "sign", "verify", "local"]);
   });
 
   it("reuses an exact signed local and remote tag / 정확한 local·remote 서명 tag를 재사용한다", async () => {
@@ -72,7 +72,7 @@ describe("release start automation / release 시작 자동화", () => {
   });
 
   it.each([
-    ["commit outside develop", "develop 밖 commit", { isIncludedInDevelop: async () => false }, /origin\/develop/u],
+    ["commit outside main", "main 밖 commit", { isIncludedInMain: async () => false }, /origin\/main/u],
     ["conflicting local tag", "충돌하는 local tag", { localTagSha: async () => "b".repeat(40) }, /Local release tag/u],
     ["conflicting remote tag", "충돌하는 remote tag", { remoteTagSha: async () => "b".repeat(40) }, /Remote release tag/u]
   ])("rejects an unsafe tag state: %s / 안전하지 않은 tag 상태를 거부한다: %s", async (_english, _korean, overrides, error) => {
@@ -160,6 +160,18 @@ describe("release start automation / release 시작 자동화", () => {
     const git = createGitReleaseAdapter({ run, runInherited, command: "git", cwd: "/release" });
 
     await expect(prepareSignedReleaseTag({ tag: TAG, version: VERSION, git })).resolves.toMatchObject({ tag: TAG });
+    expect(calls.map(({ arguments_ }) => arguments_)).toContainEqual([
+      "fetch",
+      "--tags",
+      "origin",
+      "refs/heads/main:refs/remotes/origin/main"
+    ]);
+    expect(calls.map(({ arguments_ }) => arguments_)).toContainEqual([
+      "merge-base",
+      "--is-ancestor",
+      SHA,
+      "refs/remotes/origin/main"
+    ]);
     expect(calls.map(({ arguments_ }) => arguments_)).toContainEqual(["tag", "-s", "-m", `Release ${TAG}`, TAG, SHA]);
     expect(calls.map(({ arguments_ }) => arguments_)).toContainEqual(["verify-tag", TAG]);
   });

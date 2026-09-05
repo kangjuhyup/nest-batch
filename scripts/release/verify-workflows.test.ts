@@ -118,7 +118,7 @@ jobs:
 on:
   push:
     branches:
-      - develop
+      - main
 permissions: {}
 jobs:
   version:
@@ -147,7 +147,7 @@ jobs:
           version-script: pnpm release:version
           commit-message: "chore : package version 업데이트"
           pr-title: "chore : package version 업데이트"
-          pr-base-branch: develop
+          pr-base-branch: main
           create-github-releases: false
           push-git-tags: false
       - name: Label Version PR
@@ -284,6 +284,8 @@ describe("release workflow validation / 릴리즈 workflow 검증", () => {
     ["uses a movable action tag", "이동 가능한 action tag를 사용한다", (sources: WorkflowSources) => replace(sources, ".github/workflows/ci.yml", `actions/checkout@${ACTION_PINS.checkout}`, "actions/checkout@v6")],
     ["uses a wrong reviewed action SHA", "검토한 action의 잘못된 SHA를 사용한다", (sources: WorkflowSources) => replace(sources, ".github/workflows/ci.yml", ACTION_PINS.checkout, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")],
     ["uses the version-only Changesets action", "version-only Changesets action을 사용한다", (sources: WorkflowSources) => replace(sources, ".github/workflows/release-pr.yml", `changesets/action@${ACTION_PINS.changesets}`, `changesets/action/version@${ACTION_PINS.changesets}`)],
+    ["changes the Version PR trigger branch", "Version PR trigger branch를 바꾼다", (sources: WorkflowSources) => replace(sources, ".github/workflows/release-pr.yml", "      - main", "      - develop")],
+    ["changes the Version PR base branch", "Version PR base branch를 바꾼다", (sources: WorkflowSources) => replace(sources, ".github/workflows/release-pr.yml", "          pr-base-branch: main", "          pr-base-branch: develop")],
     ["changes the Changesets no-op input", "Changesets no-op input을 바꾼다", (sources: WorkflowSources) => replace(sources, ".github/workflows/release-pr.yml", "create-github-releases: false", "create-github-releases: true")],
     ["changes the CI matrix", "CI matrix를 바꾼다", (sources: WorkflowSources) => replace(sources, ".github/workflows/ci.yml", 'node: ["20.18.3", "24"]', 'node: ["24"]')],
     ["changes an E2E service image", "E2E service image를 바꾼다", (sources: WorkflowSources) => replace(sources, ".github/workflows/ci.yml", "image: redis:7-alpine", "image: redis:6-alpine")],

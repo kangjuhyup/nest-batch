@@ -105,7 +105,7 @@ ${ACTIONS_PR_SETTING_CHECKLIST_ITEM}
 
 ### 공통 local candidate 검증
 
-- [ ] worktree가 clean이고 release commit이 \`develop\`에 포함됨
+- [ ] worktree가 clean이고 release commit이 \`main\`에 포함됨
 - [ ] 8개 package와 root version이 동일함
 - [ ] \`pnpm release:check\` 성공
 - [ ] \`pnpm test:e2e\` 성공

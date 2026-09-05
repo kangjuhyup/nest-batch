@@ -5,7 +5,7 @@ import { commandForPlatform, runCommand, runCommandInherited } from "./command-r
 import { parseReleaseTag } from "./publish-packages.mjs";
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
-const DEVELOP_REF = "refs/remotes/origin/develop";
+const MAIN_REF = "refs/remotes/origin/main";
 const FULL_SHA = /^[0-9a-f]{40}$/u;
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -98,16 +98,16 @@ export const createGitReleaseAdapter = ({
       "fetch",
       "--tags",
       "origin",
-      "refs/heads/develop:refs/remotes/origin/develop"
+      "refs/heads/main:refs/remotes/origin/main"
     ], { cwd });
   },
   headSha: async () => {
     const result = await run(command, ["rev-parse", "--verify", "HEAD^{commit}"], { cwd });
     return assertSha(result.stdout.trim(), "Release HEAD");
   },
-  isIncludedInDevelop: async (sha) => {
+  isIncludedInMain: async (sha) => {
     try {
-      await run(command, ["merge-base", "--is-ancestor", sha, DEVELOP_REF], { cwd });
+      await run(command, ["merge-base", "--is-ancestor", sha, MAIN_REF], { cwd });
       return true;
     } catch (error) {
       if (commandExitCode(error) === 1) {
@@ -168,8 +168,8 @@ export const prepareSignedReleaseTag = async ({ tag, version, git }) => {
 
   const sha = assertSha(await git.headSha(), "Release HEAD");
 
-  if (!await git.isIncludedInDevelop(sha)) {
-    throw new Error(`Release commit ${sha} must be included in origin/develop.`);
+  if (!await git.isIncludedInMain(sha)) {
+    throw new Error(`Release commit ${sha} must be included in origin/main.`);
   }
 
   const localTagSha = await git.localTagSha(tag);

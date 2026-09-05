@@ -3,7 +3,7 @@ name: Version packages
 on:
   push:
     branches:
-      - develop
+      - main
 
 permissions: {}
 
@@ -34,7 +34,7 @@ jobs:
           version-script: pnpm release:version
           commit-message: "chore : package version 업데이트"
           pr-title: "chore : package version 업데이트"
-          pr-base-branch: develop
+          pr-base-branch: main
           create-github-releases: false
           push-git-tags: false
       - name: Label Version PR
