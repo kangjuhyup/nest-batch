@@ -5,7 +5,7 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown
 } from "@nestjs/common";
-import type { SchedulerLoop } from "@nest-batch/scheduler-core";
+import type { SchedulerLoop } from "@rvkang/batch-core/scheduler";
 import { BATCH_SCHEDULER_LOOP, NEST_BATCH_OPTIONS } from "./constants.js";
 import type { NestBatchModuleOptions } from "./module-options.js";
 

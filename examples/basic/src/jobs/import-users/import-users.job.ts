@@ -1,4 +1,4 @@
-import { defineJob } from "@nest-batch/core";
+import { defineJob } from "@rvkang/batch-core";
 import { importUsersStep } from "./import-users.step.js";
 
 export const dailyUserImport = defineJob({

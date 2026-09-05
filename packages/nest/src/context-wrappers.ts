@@ -1,4 +1,4 @@
-import { openReader } from "@nest-batch/core";
+import { openReader } from "@rvkang/batch-core";
 import type {
   AnyStepDefinition,
   ChunkCheckpointContext,
@@ -19,7 +19,7 @@ import type {
   TaskletStepExecutionContext,
   TaskletStepDefinition,
   Writer
-} from "@nest-batch/core";
+} from "@rvkang/batch-core";
 import type { BatchContextStorage } from "./batch-context.storage.js";
 import type { NestBatchExecutionContext } from "./batch-context.types.js";
 

@@ -1,4 +1,4 @@
-import type { BatchExecutionId, CheckpointStore } from "@nest-batch/core";
+import type { BatchExecutionId, CheckpointStore } from "@rvkang/batch-core";
 import { resolveMariaDbPool } from "./driver.js";
 import type { MariaDbBatchOptions } from "./options.js";
 import type { MariaDbPoolLike } from "./options.js";

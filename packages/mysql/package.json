@@ -1,9 +1,23 @@
 {
-  "name": "@nest-batch/mysql",
-  "version": "0.0.1",
+  "name": "@rvkang/batch-mysql",
+  "version": "0.1.0",
   "description": "MySQL persistence adapter for nest-batch.",
+  "keywords": ["nestjs", "batch", "mysql", "persistence"],
   "type": "module",
   "license": "MIT",
+  "author": "kangjuhyup",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kangjuhyup/nest-batch.git",
+    "directory": "packages/mysql"
+  },
+  "homepage": "https://github.com/kangjuhyup/nest-batch#readme",
+  "bugs": {
+    "url": "https://github.com/kangjuhyup/nest-batch/issues"
+  },
+  "engines": {
+    "node": ">=20.18.0"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -12,14 +26,17 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "src", "README.md", "LICENSE"],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run --root ../.. --config vitest.config.ts packages/mysql/test"
   },
   "dependencies": {
-    "@nest-batch/core": "workspace:*",
-    "@nest-batch/scheduler-core": "workspace:*",
+    "@rvkang/batch-core": "workspace:*",
     "mysql2": "^3.23.0"
   }
 }

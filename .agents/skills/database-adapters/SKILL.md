@@ -7,7 +7,7 @@ description: nest-batch 저장소에서 Postgres, MySQL, MariaDB 같은 SQL data
 
 ## Overview
 
-`nest-batch`의 persistence adapter를 특정 database에 묶이지 않게 설계하기 위한 기준입니다. SQL adapter는 durable execution의 source of truth를 제공하지만, `@nest-batch/core`에 database client나 dialect 세부사항을 노출하지 않습니다.
+`nest-batch`의 persistence adapter를 특정 database에 묶이지 않게 설계하기 위한 기준입니다. SQL adapter는 durable execution의 source of truth를 제공하지만, `@rvkang/batch-core`에 database client나 dialect 세부사항을 노출하지 않습니다.
 
 ## 확인할 입력
 

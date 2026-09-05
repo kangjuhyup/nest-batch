@@ -1,6 +1,6 @@
 # Database Schema
 
-이 문서는 `@nest-batch/postgres`, `@nest-batch/mysql`, `@nest-batch/mariadb` adapter가 생성하고 사용하는 durable batch schema를 설명한다.
+이 문서는 `@rvkang/batch-postgres`, `@rvkang/batch-mysql`, `@rvkang/batch-mariadb` adapter가 생성하고 사용하는 durable batch schema를 설명한다.
 
 현재 SQL adapter는 같은 논리 스키마를 공유한다. 차이는 identifier quoting, JSON 타입, timestamp 타입, schema/database qualification 정도에 있다.
 

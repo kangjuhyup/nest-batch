@@ -1,5 +1,5 @@
-import { DatabaseBatchStorage } from "@nest-batch/core";
-import type { JobExecution, JobInstance, PartitionExecution, StepExecution } from "@nest-batch/core";
+import { DatabaseBatchStorage } from "@rvkang/batch-core";
+import type { JobExecution, JobInstance, PartitionExecution, StepExecution } from "@rvkang/batch-core";
 import { describe, expect, it } from "vitest";
 import {
   InMemoryBatchStorage,

@@ -29,14 +29,14 @@ tarball을 별도 임시 프로젝트에 설치해 runtime import와 CLI 실행�
 
 공개 대상 package는 다음과 같다.
 
-- `@nest-batch/core`
-- `@nest-batch/nest`
-- `@nest-batch/inmemory`
-- `@nest-batch/postgres`
-- `@nest-batch/mysql`
-- `@nest-batch/mariadb`
-- `@nest-batch/bullmq`
-- `@nest-batch/cli`
+- `@rv-nest-batch/core`
+- `@rv-nest-batch/nest`
+- `@rv-nest-batch/inmemory`
+- `@rv-nest-batch/postgres`
+- `@rv-nest-batch/mysql`
+- `@rv-nest-batch/mariadb`
+- `@rv-nest-batch/bullmq`
+- `@rv-nest-batch/cli`
 
 ## 비목표
 
@@ -54,15 +54,15 @@ tarball을 별도 임시 프로젝트에 설치해 runtime import와 CLI 실행�
 ### npm package 경계 통합
 
 공개 npm package와 source module을 같은 단위로 강제하지 않는다. 외부 dependency가
-없고 framework-independent인 기능은 `@nest-batch/core` 안에서 다음 subpath로
+없고 framework-independent인 기능은 `@rv-nest-batch/core` 안에서 다음 subpath로
 노출한다.
 
 | 기존 package | 공개 import 경로 |
 | --- | --- |
-| `@nest-batch/queue-core` | `@nest-batch/core/queue` |
-| `@nest-batch/scheduler-core`, `@nest-batch/scheduler-calendar` | `@nest-batch/core/scheduler` |
-| `@nest-batch/polling-core` | `@nest-batch/core/polling` |
-| `@nest-batch/worker-local`, `@nest-batch/worker-threads` | `@nest-batch/core/worker` |
+| `@nest-batch/queue-core` | `@rv-nest-batch/core/queue` |
+| `@nest-batch/scheduler-core`, `@nest-batch/scheduler-calendar` | `@rv-nest-batch/core/scheduler` |
+| `@nest-batch/polling-core` | `@rv-nest-batch/core/polling` |
+| `@nest-batch/worker-local`, `@nest-batch/worker-threads` | `@rv-nest-batch/core/worker` |
 
 각 subpath는 `packages/core/src/` 아래의 독립 directory와 barrel을 가지며 root
 entrypoint가 모든 symbol을 다시 export하지 않는다. 사용자는 package 하나만
@@ -71,17 +71,17 @@ entrypoint가 모든 symbol을 다시 export하지 않는다. 사용자는 packa
 외부 framework, database driver, queue client 또는 process entrypoint가 있는 경계는
 별도 package로 유지한다.
 
-- `@nest-batch/nest`: NestJS peer dependency와 DI/lifecycle 통합
-- `@nest-batch/inmemory`: 비영속 adapter임을 명확히 분리
-- `@nest-batch/postgres`, `@nest-batch/mysql`, `@nest-batch/mariadb`: 서로 다른 SQL
+- `@rv-nest-batch/nest`: NestJS peer dependency와 DI/lifecycle 통합
+- `@rv-nest-batch/inmemory`: 비영속 adapter임을 명확히 분리
+- `@rv-nest-batch/postgres`, `@rv-nest-batch/mysql`, `@rv-nest-batch/mariadb`: 서로 다른 SQL
   driver와 dialect
-- `@nest-batch/bullmq`: BullMQ peer dependency와 queue adapter
-- `@nest-batch/cli`: executable entrypoint와 운영 command
+- `@rv-nest-batch/bullmq`: BullMQ peer dependency와 queue adapter
+- `@rv-nest-batch/cli`: executable entrypoint와 운영 command
 
-기존 `@nest-batch/queue-bullmq`는 공개 전에 `@nest-batch/bullmq`로 이름을 단순화한다.
+기존 `@nest-batch/queue-bullmq`는 공개 전에 `@rv-nest-batch/bullmq`로 이름을 단순화한다.
 기존 6개 core 성격 package는 source와 test를 `core`로 이동한 뒤 workspace package를
 제거한다. `nest`, storage adapter, `inmemory`, `bullmq`, `cli`의 내부 dependency는
-가능한 한 `@nest-batch/core` 하나로 수렴한다. README, example, test, TypeScript path와
+가능한 한 `@rv-nest-batch/core` 하나로 수렴한다. README, example, test, TypeScript path와
 project reference도 새 import 경로를 사용한다.
 
 ### Changesets 고정 버전
@@ -102,11 +102,29 @@ root package는 private이므로 Changesets의 release 대상이 아니다. Vers
 실행하는 repository script가 Changesets 계산 후 root version을 공개 package의 고정
 version과 동기화한다. tag/version 검사는 이 root version도 확인한다.
 
+최초 `0.1.0`에는 pending Changeset이나 기존 Version PR이 없고, 새 minor Changeset을
+만들면 fixed group이 `0.2.0`으로 올라간다. 따라서 검토가 끝난 package-release-readiness
+merge commit을 최초 `0.1.0` release candidate로 삼는다. 이 예외는 한 번만 적용하며 새
+Changeset이나 Version PR을 만들지 않는다. exact version/changelog, local release gate,
+signed tag와 manual review는 그대로 적용한다.
+
+최초 `0.1.0` 이후 모든 release에는 Version PR이 필수다. 첫 post-bootstrap Version PR
+전에 maintainer는 GitHub repository의 **Settings → Actions → General → Workflow
+permissions**에서 **Allow GitHub Actions to create and approve pull requests**를 수동으로
+활성화해야 한다. 2026-09-05 read-only audit 결과는
+`can_approve_pull_request_reviews=false`였으며 PAT나 장기 credential로 우회하지 않는다.
+
+후속 Version PR은 repository `github.token`으로 생성·갱신하므로 장기 credential은 추가하지
+않는다. 대신 매 생성·갱신 때 write 권한 maintainer가 PR merge box의
+**Approve workflows to run**을 눌러 CI를 시작하고, **Quality (Node 20.18.3)**,
+**Quality (Node 24)**, **E2E (Node 24)** check가 모두 성공한 뒤에만 merge한다. Version PR
+merge commit을 release candidate로 삼아 local release 검증을 마친 뒤에만 tag를 생성한다.
+
 문서나 CI처럼 package 산출물에 영향을 주지 않는 변경은 empty Changeset을 허용한다.
 
 ### tag-gated publish
 
-Version PR이 병합되어 package version이 확정된 뒤 maintainer가 같은 version의
+최초 bootstrap 이후에는 Version PR이 병합되어 package version이 확정된 뒤 maintainer가 같은 version의
 `vX.Y.Z` tag를 push한다. `publish.yml`은 tag가 가리키는 commit을 checkout하고
 다음 순서로 실행한다.
 
@@ -122,6 +140,18 @@ Version PR이 병합되어 package version이 확정된 뒤 maintainer가 같은
 publish job과 GitHub Release job을 분리한다. publish job만 `id-token: write`를
 가지고, GitHub Release job만 `contents: write`를 가진다. GitHub-hosted runner와
 Node 24를 사용하고 npm CLI가 Trusted Publishing 최소 버전을 충족하는지 검사한다.
+GitHub Release job은 tag commit을 checkout하고 `HEAD`와 tag ref가 모두 workflow
+`GITHUB_SHA`로 resolve되는지 확인한다. explicit repository를 `gh api graphql`의
+`repository.release(tagName:)`에서 schema-valid `databaseId`만 조회해 published와 draft를
+함께 찾는다. `data.repository.release`가 `null`인 경우에만 generated release를 생성한다.
+object가 있으면 REST `GET repos/{owner}/{repo}/releases/{databaseId}`로 full metadata를
+조회하고 tag, target, draft, prerelease를 검증한다. REST response의 `id`가 있으면 GraphQL
+ID와도 일치해야 한다. 기존 release는 정확한 tag, non-draft, non-prerelease여야 한다.
+`target_commitish`가 immutable 40자리 SHA이면 workflow SHA와도 일치해야 하며, branch
+이름이면 검증된 tag ref를 authoritative source로 삼는다. GraphQL `errors`, GraphQL/REST
+인증, 권한, network, malformed 응답에서는 release를 만들지 않고 실패한다. create가
+실패하면 같은 두 단계 경로로 한 번만 재조회하여 그 사이 생성된 exact release는 성공으로
+복구하고, absent/lookup failure는 원래 create 오류, conflict는 충돌 오류로 실패한다.
 
 ### 최초 `0.1.0` bootstrap
 
@@ -139,7 +169,9 @@ npm Trusted Publisher는 registry에 이미 존재하는 package에만 설정할
 Trusted Publisher 등록을 마친 뒤 `v0.1.0` tag를 push한다. workflow의 publish
 script는 이미 존재하는 정확한 version을 검증 후 건너뛰므로 중복 publish 없이
 GitHub Release만 생성할 수 있다. 이후 version부터는 tag workflow가 OIDC로 직접
-배포한다.
+배포한다. 로컬에서 bootstrap한 `0.1.0`은 provenance 예외이며 기존 version에는
+provenance가 사후 첨부되지 않는다. 따라서 provenance는 처음으로 OIDC publish되는
+후속 version부터 필수로 확인한다.
 
 ## package 산출물 설계
 
@@ -155,6 +187,7 @@ GitHub Release만 생성할 수 있다. 이후 version부터는 tag workflow가 
 - `homepage`, `bugs.url`
 - `engines.node: >=20.18.0`
 - `publishConfig.access: public`
+- `publishConfig.registry: https://registry.npmjs.org/`
 
 root package는 private workspace 상태를 유지하며 repository와 engines 같은 공통
 프로젝트 metadata를 가진다. publish workflow는 package runtime 지원 범위와 별개로
@@ -181,7 +214,11 @@ git에서 제외한다. runtime source map과 declaration map이 가리키는 �
 수 있도록 package tarball에는 `dist/`, `src/`, `README.md`, `LICENSE`,
 `package.json`만 포함한다. test와 local cache는 포함하지 않는다.
 
-`exports`, `main`, `types`, CLI `bin`은 실제 tarball 안의 파일과 일치해야 한다.
+모든 package는 `main: ./dist/index.js`, `types: ./dist/index.d.ts`와 root `exports`의 exact
+`types`/`import` pair를 가진다. `core`만 `./queue`, `./scheduler`, `./polling`, `./worker`
+subpath의 exact pair를 추가하고, CLI만 `bin.nest-batch: ./dist/bin.js`를 가진다. 다른
+package에는 `bin`이 없어야 한다. 모든 target은 traversal, backslash, absolute path가 없는
+canonical package-relative `./dist/...` 경로여야 하며 실제 tarball 파일과 일치해야 한다.
 package 간 `workspace:*`는 pack 결과에서 현재 고정 version으로 치환되어야 한다.
 
 ## 자동 검증
@@ -198,11 +235,14 @@ repository script는 다음 조건을 검사하고 하나라도 어기면 실패
 - source manifest의 내부 dependency는 `workspace:*`이고 pack된 manifest에서는 현재
   고정 version으로 치환된다.
 - README/LICENSE가 존재하고 LICENSE 내용이 root와 같다.
-- public entrypoint, types entrypoint, CLI bin이 build 결과에 존재한다.
+- source와 packed manifest의 `main`, top-level `types`, root/subpath `exports`, CLI `bin`
+  shape가 위 exact 계약과 일치하고 모든 referenced target이 build와 tarball에 존재한다.
 - `core/queue`, `core/scheduler`, `core/polling`, `core/worker` subpath의 JavaScript와
   declaration entrypoint가 build 및 pack 결과에 존재한다.
 - tarball에 허용된 파일만 들어 있고 `.tsbuildinfo`, test, local secret이 없다.
 - package tarball의 README/LICENSE와 내부 dependency 치환이 올바르다.
+- catalog가 소유한 `dist`를 build 전에 안전하게 비워 stale 파일이 tarball에 섞이지
+  않는다.
 
 ### 소비자 smoke test
 
@@ -242,7 +282,10 @@ publish workflow는 재현성을 위해 cache를 사용하지 않고 tag commit�
 
 `.github/release.yml`에서 feature, fix, documentation, dependency, maintenance
 category를 label로 분류한다. Version PR은 `release` label을 붙여 generated notes에서
-제외한다. GitHub Release는 npm의 8개 package 확인이 끝난 뒤에만 생성한다.
+제외한다. GitHub Release는 npm의 8개 package 확인이 끝난 뒤에만 생성한다. 같은 tag의
+release가 이미 있으면 GraphQL ID와 REST-by-ID metadata로 위 state와 tag checkout을 검증
+후 건너뛰고, draft-aware GraphQL 조회가 `null`을 반환했을 때만 생성한다. 다른 조회 실패는
+존재하지 않음으로 간주하지 않는다.
 
 ## 실패와 재실행
 

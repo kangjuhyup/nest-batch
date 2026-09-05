@@ -5,13 +5,8 @@
     "outDir": "dist",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "tsBuildInfoFile": "dist/.tsbuildinfo"
+    "tsBuildInfoFile": ".tsbuildinfo/tsconfig.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "references": [
-    { "path": "../core" },
-    { "path": "../polling-core" },
-    { "path": "../queue-core" },
-    { "path": "../scheduler-core" }
-  ]
+  "references": [{ "path": "../core" }]
 }

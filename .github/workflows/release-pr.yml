@@ -1,0 +1,46 @@
+name: Version packages
+
+on:
+  push:
+    branches:
+      - develop
+
+permissions: {}
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: "24"
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Create or update Version PR
+        id: version
+        uses: changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          version-script: pnpm release:version
+          commit-message: "chore : package version 업데이트"
+          pr-title: "chore : package version 업데이트"
+          pr-base-branch: develop
+          create-github-releases: false
+          push-git-tags: false
+      - name: Label Version PR
+        if: steps.version.outputs.pr-number != ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          gh label create release --force --color "5319e7" --description "Package version pull request"
+          gh pr edit "${{ steps.version.outputs.pr-number }}" --add-label release

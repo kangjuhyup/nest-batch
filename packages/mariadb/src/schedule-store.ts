@@ -7,7 +7,7 @@ import type {
   ScheduleOccurrence,
   ScheduleOccurrenceCandidate,
   ScheduleStore
-} from "@nest-batch/scheduler-core";
+} from "@rvkang/batch-core/scheduler";
 import { resolveMariaDbPool } from "./driver.js";
 import type { MariaDbBatchOptions, MariaDbPoolLike } from "./options.js";
 import { ensureMariaDbScheduleSchema } from "./schedule-schema.js";

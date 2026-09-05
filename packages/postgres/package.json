@@ -1,9 +1,23 @@
 {
-  "name": "@nest-batch/postgres",
-  "version": "0.0.1",
+  "name": "@rvkang/batch-postgres",
+  "version": "0.1.0",
   "description": "Postgres persistence adapter for nest-batch.",
+  "keywords": ["nestjs", "batch", "postgres", "persistence"],
   "type": "module",
   "license": "MIT",
+  "author": "kangjuhyup",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kangjuhyup/nest-batch.git",
+    "directory": "packages/postgres"
+  },
+  "homepage": "https://github.com/kangjuhyup/nest-batch#readme",
+  "bugs": {
+    "url": "https://github.com/kangjuhyup/nest-batch/issues"
+  },
+  "engines": {
+    "node": ">=20.18.0"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -12,7 +26,11 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "src", "README.md", "LICENSE"],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test:e2e": "vitest run --root ../.. --config vitest.e2e.config.ts packages/postgres/test/postgres.e2e.test.ts",
@@ -20,8 +38,7 @@
     "test": "vitest run --root ../.. --config vitest.config.ts packages/postgres/test"
   },
   "dependencies": {
-    "@nest-batch/core": "workspace:*",
-    "@nest-batch/scheduler-core": "workspace:*",
+    "@rvkang/batch-core": "workspace:*",
     "pg": "^8.22.0"
   },
   "devDependencies": {
